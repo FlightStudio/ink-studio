@@ -108,6 +108,93 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalError"
+  /api/uploads:
+    post:
+      operationId: uploadFile
+      parameters:
+        - name: purpose
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/UploadPurpose"
+        - name: x-file-name
+          in: header
+          required: true
+          description: The file's name, URI-encoded.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "201":
+          description: The file was stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadedAsset"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /api/assets/{assetId}:
+    parameters:
+      - name: assetId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getAsset
+      responses:
+        "302":
+          description: A redirect to a fresh short signed URL for the file.
+          headers:
+            Location:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /api/assets/{assetId}/status:
+    parameters:
+      - name: assetId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getAssetStatus
+      responses:
+        "200":
+          description: The asset's processing status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetStatus"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
 components:
   schemas:
     PageFormatId:
@@ -168,6 +255,38 @@ components:
           type: integer
         content:
           $ref: "#/components/schemas/LetterContentEnvelope"
+    UploadPurpose:
+      type: string
+      enum:
+        - photo
+        - mask
+        - font-file
+    UploadedAsset:
+      type: object
+      additionalProperties: false
+      required: [id]
+      properties:
+        id:
+          type: string
+          format: uuid
+    AssetProcessingStatus:
+      type: string
+      enum:
+        - pending
+        - running
+        - done
+        - failed
+    AssetStatus:
+      type: object
+      additionalProperties: false
+      required: [status, error]
+      properties:
+        status:
+          $ref: "#/components/schemas/AssetProcessingStatus"
+        error:
+          allOf:
+            - $ref: "#/components/schemas/ApiErrorCode"
+          nullable: true
     Health:
       type: object
       additionalProperties: false
@@ -189,6 +308,9 @@ components:
         - invalid_letter
         - invalid_title
         - stale_revision
+        - file_too_large
+        - unsupported_file
+        - heic_not_supported
     ApiError:
       type: object
       additionalProperties: false

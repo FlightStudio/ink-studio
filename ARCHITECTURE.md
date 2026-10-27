@@ -11,6 +11,7 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | typescript-config | `packages/typescript-config`                            | Shared TypeScript presets                                          |
 | logger            | `packages/logger`                                       | Structured log helper                                              |
 | types             | `packages/types/src/index.ts`                           | Identity shapes, including `Member`                                |
+| types             | `packages/types/src/asset.ts`                           | `Asset`, its origin and its processing                             |
 | types             | `packages/types/src/page.ts`                            | `PAGE_SPECS`, one entry per provider and product                   |
 | types             | `packages/types/src/ink.ts`                             | `INK_COLORS` and `TEXT_SIZES`                                      |
 | types             | `packages/types/src/font.ts`                            | `STOCK_FONTS`                                                      |
@@ -33,7 +34,12 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | api               | `packages/api/src/zod.ts`                               | Request and response schemas typed against the generated types     |
 | db                | `packages/db/src/index.ts`                              | Identity and letter repositories and migrations                    |
 | db                | `packages/db/src/drizzle/letters.ts`                    | `Letters`, the revision-checked save and soft delete               |
+| db                | `packages/db/src/drizzle/assets.ts`                     | `Assets`, rows mapped to and from `Asset`                          |
 | services          | `packages/services/src/letters/index.ts`                | `LetterService`, `letterResources`, `letterOwnerIds`               |
+| services          | `packages/services/src/assets/index.ts`                 | `AssetService`, `isServable`, `assetReadUrl`                       |
+| services          | `packages/services/src/assets/assets.service.ts`        | `UPLOADS`, the sniff and `READ_URL_EXPIRES_IN_SECONDS`             |
+| services          | `packages/services/src/assets/assets.types.ts`          | `AssetStorage`, the provider integrations implements               |
+| integrations      | `packages/integrations/src/shared/gcp/index.ts`         | `@repo/integrations/shared/gcp`, `GcsAssetStorage`                 |
 | ui                | `packages/ui/src/styles/globals.css`                    | Stationery tokens inside the studio class                          |
 | ui                | `packages/ui/components.json`                           | shadcn CLI config for the primitives                               |
 | ui                | `packages/ui/src/components/ui`                         | Generated shadcn primitives                                        |
@@ -51,10 +57,15 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | web               | `apps/web/src/server/letters.ts`                        | `getLetter` and `listLetters` for pages                            |
 | web               | `apps/web/src/app/api/letters/route.ts`                 | Create a letter                                                    |
 | web               | `apps/web/src/app/api/letters/[letterId]/route.ts`      | Read, save and delete one letter                                   |
+| web               | `apps/web/src/server/services.ts`                       | Builds the db, the storage and each service lazily                 |
+| web               | `apps/web/src/app/api/uploads/route.ts`                 | Upload one file                                                    |
+| web               | `apps/web/src/app/api/assets/[assetId]/route.ts`        | Redirect to a fresh signed URL                                     |
+| web               | `apps/web/src/app/api/assets/[assetId]/status/route.ts` | An asset's processing status                                       |
 | tools             | `tools/check-comments.ts`                               | No-comment check                                                   |
 | tools             | `tools/check-architecture.ts`                           | This map stays honest                                              |
 | tools             | `tools/migrate.ts`                                      | Applies `packages/db/drizzle`                                      |
 | tools             | `tools/dev/screens.ts`                                  | `pnpm screens` writes both viewports                               |
+| tools             | `tools/docker/gcs/ink-studio-assets`                    | The local bucket, loaded by the `gcs` compose service              |
 1. An app may import packages. A package never imports an app.
 2. Dependencies point toward `packages/types`. `packages/errors` stands alone. `packages/api` may import `packages/errors`.
 3. Drizzle and `pg` live only in `packages/db`.
@@ -65,7 +76,8 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 8. Client components import `@repo/render/html` and `@repo/render/schema`. Services import `@repo/render/schema` to validate a letter against the real schema. `@repo/render/html` imports `perfect-freehand`.
 9. Only the worker imports `@repo/render`. The web never does, and integrations never import `packages/render`: the worker passes outlines and the measure function in.
 10. `packages/testing` is dev-only. Render, integrations and worker tests, the web's e2e files and `tools/dev` import it.
-11. Services take a `Member` and throw `ServiceError` with a kind and an `ApiErrorCode`. `handleJson` checks the origin, the content type and the body, finds the member, and turns each kind into one status; nothing else in a route touches errors.
+11. Services take a `Member` and throw `ServiceError` with a kind and an `ApiErrorCode`. `handleJson` checks the origin, the content type and the body, finds the member, and turns each kind into one status; nothing else in a route touches errors. `handleRequest` does the same for routes without a JSON body, such as the upload, which reads the raw body stream. Services that touch only assets take the `UserOrganization`.
+12. A provider is an interface a service declares, such as `AssetStorage`. `packages/integrations` implements it and imports only types from services; services never import integrations. Apps build the implementation and pass it in, in `apps/web/src/server/services.ts`. Integration classes read no environment; apps pass every setting.
 
 ## Pages
 
@@ -121,6 +133,16 @@ A save is parsed and refused when stale. `saveLetter` runs `parseLetterContent`,
 
 `getLetter` returns the letter with its `LetterResources` from `letterResources` and `editable` from `letterOwnerIds`; the export reads resources through the same function. The editor fills the rest of this section.
 
+## Files
+
+Every file is one `assets` row with its bytes in GCS. `Asset` in `packages/types/src/asset.ts` carries an origin, uploaded with a purpose or generated by a job, and a processing status.
+
+An upload is checked before it is stored. `upload` in `AssetService` refuses a declared size over its purpose's limit without reading the body, reads through a counter that cancels the stream past the limit, sniffs the first bytes, and stores the sniffed type, never the name's. HEIC has its own code, `heic_not_supported`; any other type the purpose does not take is `unsupported_file`. Limits and types per purpose are `UPLOADS` in `packages/services/src/assets/assets.service.ts`. The bytes go under `organizations/<organizationId>/assets/<assetId>` with their SHA-256 checksum, and only then is the `done` row inserted, so a crash leaves an orphan object and never a row without bytes.
+
+The browser never holds a signed URL. Pages and the letter use `/api/assets/{assetId}`, which finds the member's organization, asks `getAssetReadUrl`, and answers a redirect to a fresh signed URL with `private, no-store` caching, or 404 for another organization's asset. Nothing expires in an open editor because every read signs again. `isServable` decides which assets are ever read back, and a raw photo never is; `assetReadUrl` is the one place that rule meets `READ_URL_EXPIRES_IN_SECONDS`. `AssetStatus` carries no URL.
+
+`GcsAssetStorage` in `packages/integrations/src/shared/gcp/storage/gcs-asset-storage.ts` signs V4 read URLs. Given `emulatorBaseUrl`, which the web passes from `STORAGE_EMULATOR_HOST`, it returns the emulator's download URL instead of signing. Locally the `gcs` service in `docker-compose.yml` runs fake-gcs-server, loads the bucket from `tools/docker/gcs/ink-studio-assets`, and allows the browser's cross-origin reads. `GCS_ASSETS_BUCKET` names the bucket.
+
 ## Jobs
 
 Filled as jobs land.
@@ -133,6 +155,7 @@ Filled as jobs land.
 | organizations      | `packages/db` | A studio                                                                                |
 | organization_users | `packages/db` | Membership and role                                                                     |
 | letters            | `packages/db` | A letter's title, content and revision; stands in for project-post's `product_editions` |
+| assets             | `packages/db` | One file: storage key, sniffed type, size, checksum, origin and processing              |
 
 ## Where to change things
 
@@ -141,3 +164,7 @@ Repo checks live in `tools/check.ts`.
 ## Moving into project-post
 
 Shared packages are shaped so the move is a folder merge. The plan is `PLAN.md`.
+
+The `assets` table extends the assets outline in project-post's schema file: it adds `purpose`, `filename`, `uploaded_by_user_id` and a `job` jsonb column, makes `source` the `asset_source` enum where the outline has a varchar, and adds `assets_origin_check`, which ties an uploaded source to a purpose and no job. The schema file gains these on the move.
+
+The real bucket needs a CORS rule allowing GET from the platform origin with the `Content-Type` header, because the browser follows the redirect to GCS from the editor. The web and worker service accounts need `roles/iam.serviceAccountTokenCreator` on themselves to sign URLs.

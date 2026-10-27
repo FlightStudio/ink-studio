@@ -1,0 +1,23 @@
+{
+	"name": "@repo/integrations",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./shared/gcp": "./src/shared/gcp/index.ts"
+	},
+	"scripts": {
+		"test": "vitest run",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@google-cloud/storage": "catalog:",
+		"@repo/services": "workspace:*"
+	},
+	"devDependencies": {
+		"@repo/typescript-config": "workspace:*",
+		"@types/node": "catalog:",
+		"testcontainers": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	}
+}

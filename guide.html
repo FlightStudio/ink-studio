@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, and letter storage are ready on your own computer. The editor screen is next.</p>
-  <div class="progress" aria-hidden="true"><span style="width:25%"></span></div>
-  <p class="log">9 of 36 steps in the repository. Step 10 puts the editor on the page, with autosave.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, and file uploads are ready on your own computer. The editor screen is next.</p>
+  <div class="progress" aria-hidden="true"><span style="width:28%"></span></div>
+  <p class="log">10 of 36 steps in the repository. Step 13 stores uploaded files. Step 10 puts the editor on the page, with autosave.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -91,7 +91,7 @@ cp tools/.env.example tools/.env
 docker compose up -d
 docker compose ps
 pnpm db:migrate</pre>
-      <p><code>docker compose ps</code> should show the postgres service as healthy before you migrate. <code>pnpm db:migrate</code> creates <code>users</code>, <code>organizations</code>, <code>organization_users</code>, and <code>letters</code>. After a <code>git pull</code> that brings a new table, run <code>pnpm db:migrate</code> again; it only applies what is new.</p>
+      <p><code>docker compose ps</code> should show the postgres service as healthy before you migrate. <code>pnpm db:migrate</code> creates <code>users</code>, <code>organizations</code>, <code>organization_users</code>, <code>letters</code>, and <code>assets</code>. After a <code>git pull</code> that brings a new table, run <code>pnpm db:migrate</code> again; it only applies what is new.</p>
       <p>Look at the tables in the browser with Drizzle Studio. It uses the database config already in the repo, so you do not install a second Postgres or a separate database app:</p>
       <pre>pnpm db:studio</pre>
       <p>Leave that terminal open while you browse <code>users</code>, <code>organizations</code>, <code>organization_users</code>, and <code>letters</code>. Stop it with Ctrl+C. The connection it uses is:</p>
@@ -115,70 +115,30 @@ pnpm dev</pre>
     </div>
   </section>
 
-  <section class="panel" id="step-9">
-    <p class="kicker">Just landed · M3 begins</p>
-    <h2>Step 9. Letters are stored, with titles and revisions</h2>
-    <p>A letter now lives in Postgres, in a <code>letters</code> table, so it survives a reload and follows you to another device. Each letter belongs to your organization. There is still no editor screen; step 10 adds it. For now the letter is reached through the website's API, which the editor will call.</p>
-    <ul class="points">
-      <li>A new letter is called Untitled letter and starts empty, in Caveat at 20 pt in Ink blue. A new postcard is called Untitled postcard.</li>
-      <li>Every save carries the revision it was based on. If another tab saved in between, the save is refused with “This letter changed in another tab.” and nothing is overwritten. Step 10 shows that message with two choices, Load the latest and Keep mine.</li>
-      <li>Every save is checked by the same parser as in step 7. A colour, size or font outside the catalogue is refused, and so is a title that is empty, over 120 characters, or holds a control character. Spaces around a title are trimmed.</li>
-      <li>Deleting a letter hides it everywhere but keeps the row, with the time it was deleted.</li>
-      <li>Another organization cannot read, save or delete your letters. To them a letter of yours does not exist.</li>
-    </ul>
-    <p>To try it on your computer, after <code>git pull</code>, <code>pnpm install</code>, and <code>pnpm db:migrate</code>, start <code>pnpm dev</code> and in a second terminal create a letter:</p>
-    <pre>curl -s -X POST http://127.0.0.1:3000/api/letters \
-  -H 'Origin: http://127.0.0.1:3000' -H 'Content-Type: application/json' -d '{}'</pre>
-    <p>It answers with the new letter's id, for example <code>{"id":"01a17f47-…"}</code>. Open <code>http://127.0.0.1:3000/api/letters/&lt;that id&gt;</code> in the browser to see its title, revision 1, and the empty Caveat letter. It also shows up in <code>pnpm db:studio</code> under <code>letters</code>. A request without the <code>Origin</code> header is refused, so another website cannot save into your letters.</p>
-    <p>The tests for this step run on their own throwaway Postgres in Docker:</p>
-    <pre>pnpm --filter @repo/db test --reporter=verbose
-pnpm --filter @repo/services test --reporter=verbose</pre>
-    <p>The names read like “a stale save is refused and changes nothing” and “another organization cannot read, save or delete the letter”.</p>
-    <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including 12 database and 9 letter service tests, and every API answer above against the local database.</p>
-  </section>
-
-  <section class="panel" id="step-8">
-    <p class="kicker">Landed before · M2 complete</p>
-    <h2>Step 8. One letter page, in Chromium and WebKit</h2>
-    <p>There is now one page component, <code>LetterPage</code>. The editor will show it, the print preview will show it, and the worker will turn it into the proof PDF. Because they all draw the same page with the same CSS, the letter a creator sees is the letter that prints.</p>
-    <ul class="points">
-      <li>A letter is drawn as sheets of paper on the desk with a gap between them while editing, and as plain white sheets with no gap when printed. The text column runs down through every side the letter may use.</li>
-      <li>Text skips the gap between sides, so no line is ever cut in half across a page break. On a postcard the text flows around the address and postage block on the back.</li>
-      <li>While editing, the corners the printer keeps clear are hatched, so a creator can see them. They disappear in print.</li>
-      <li>Caveat, Patrick Hand, and Homemade Apple are in the repository with their licences, under <code>packages/render/fonts</code>. The page loads them by id, so the editor and the print use the same font files.</li>
-      <li>A measure reads where every line sits, in inches, even when the page is zoomed. That count decides how many sides a letter uses and how far it runs over.</li>
-    </ul>
-    <p>The tests open seven sample letters in real Chromium and real WebKit, the engine behind Safari on the iPad. Each runs at screen resolution and at print resolution, in both edit and print mode. The two engines agree on the number of sides for every sample. One gap remains: in WebKit, the down arrow from the last line of a side jumps further than the next line when a paragraph carries on past the gap. The editor in steps 10 and 11 will move the caret across that gap itself.</p>
-    <p>There is no page in the app that shows a letter yet. The editor in step 10 is the first. To run the browser tests yourself, with Docker running:</p>
-    <pre>pnpm --filter @repo/render test --silent=false</pre>
-    <p>The first run downloads the Playwright browser image. The output lists each sample with its line and side counts in both engines, for example <code>nearly-full edit @1.000: chromium 61 lines 3 sides, webkit 61 lines 3 sides</code>.</p>
-    <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including all 86 render tests.</p>
-  </section>
-
   <section>
     <h2 class="milestone">All 36 steps</h2>
     <p class="log">Done means the code is merged into <code>main</code>. Later means the plan still describes it.</p>
 
     <h3>M1. Scaffold, database, dev identity</h3>
-    <details open>
+    <details id="step-1">
       <summary><span class="tag done">Done</span> 1. Monorepo, toolchain, comment check, architecture check</summary>
       <p>Goal: a green empty monorepo. You can install and run the three checks above.</p>
     </details>
-    <details open>
+    <details id="step-2">
       <summary><span class="tag done">Done</span> 2. Types, API contract, errors</summary>
       <p>Shared identity shapes and a health endpoint contract.</p>
     </details>
-    <details>
+    <details id="step-3">
       <summary><span class="tag done">Done</span> 3. Database package and Postgres</summary>
       <p>Postgres 17 on port 5434, three identity tables, and <code>pnpm db:migrate</code>. Follow the box at the top.</p>
     </details>
-    <details>
+    <details id="step-4">
       <summary><span class="tag done">Done</span> 4. Dev identity and the web shell</summary>
       <p><code>pnpm seed</code> then <code>pnpm dev</code>. The home page says Ink Studio. <code>/api/health</code> answers 200. Follow “Open the website” above.</p>
     </details>
 
     <h3>M2. Design system and page model</h3>
-    <details>
+    <details id="step-5">
       <summary><span class="tag done">Done</span> 5. Stationery design system and browser harness</summary>
       <p>Open <a href="http://127.0.0.1:3000/styleguide">/styleguide</a> while <code>pnpm dev</code> is running. One sheet of letter paper lies on a warm desk, the way the editor will look:</p>
       <ul class="points">
@@ -191,7 +151,7 @@ pnpm --filter @repo/services test --reporter=verbose</pre>
       <p>On an iPad the legend moves above the sheet.</p>
       <p>The sheet carries the scanned paper from project-post, <code>apps/web/public/images/paper.png</code>, repeated at its own size. As printed drops the texture and shows plain white.</p>
     </details>
-    <details>
+    <details id="step-6">
       <summary><span class="tag done">Done</span> 6. Page specs and exclusion floats</summary>
       <p>The paper the printer takes is now data. There is one entry for the Thanks.io windowless letter, the default, and one for the Thanks.io 6×9 postcard. Each entry has the canvas size, the safe zone, the text margin, how many sides a creator may use, and the corners the printer keeps clear. A new printer or product is one more entry.</p>
       <ul class="points">
@@ -206,7 +166,7 @@ pnpm --filter @repo/render test</pre>
       <p>Each test is named for what it proves, for example “the band between side 1 and side 2 covers both margins and the gap” and “the postcard's address block shapes the back's text”. Add <code>--reporter=verbose</code> to see every name.</p>
       <p>The five ink colours a creator writes with are in the catalogue now: Midnight, Ink blue, Sepia, Forest, and Oxblood. Open <a href="http://127.0.0.1:3000/styleguide">/styleguide</a> and the legend has an Ink section. Pick a colour and the sample line under it changes to that ink.</p>
     </details>
-    <details>
+    <details id="step-7">
       <summary><span class="tag done">Done</span> 7. One letter document and validation</summary>
       <p>A letter is now one defined shape: Tiptap JSON with paragraphs, line breaks, and one ink style per run of text (font, size, and colour). Doodles placed on the page live in the same document, so one undo will cover typing and moving a doodle alike. The document also records how many sides the creator added and, for a postcard, the front image.</p>
       <ul class="points">
@@ -221,36 +181,119 @@ pnpm --filter @repo/render test</pre>
 pnpm --filter @repo/render test --reporter=verbose</pre>
       <p>The seal cases are under <code>humanSeal</code>, and the parser cases read like “an ink colour outside the catalogue is refused”.</p>
     </details>
-    <details>
+    <details id="step-8">
       <summary><span class="tag done">Done</span> 8. Shared letter page in Chromium and WebKit</summary>
-      <p>One page component for the editor and the print. Text flows across sides and around the postcard's address block in both engines. See <a href="#step-8">Just landed</a>.</p>
+      <p>There is now one page component, <code>LetterPage</code>. The editor will show it, the print preview will show it, and the worker will turn it into the proof PDF. Because they all draw the same page with the same CSS, the letter a creator sees is the letter that prints.</p>
+      <ul class="points">
+        <li>A letter is drawn as sheets of paper on the desk with a gap between them while editing, and as plain white sheets with no gap when printed. The text column runs down through every side the letter may use.</li>
+        <li>Text skips the gap between sides, so no line is ever cut in half across a page break. On a postcard the text flows around the address and postage block on the back.</li>
+        <li>While editing, the corners the printer keeps clear are hatched, so a creator can see them. They disappear in print.</li>
+        <li>Caveat, Patrick Hand, and Homemade Apple are in the repository with their licences, under <code>packages/render/fonts</code>. The page loads them by id, so the editor and the print use the same font files.</li>
+        <li>A measure reads where every line sits, in inches, even when the page is zoomed. That count decides how many sides a letter uses and how far it runs over.</li>
+      </ul>
+      <p>The tests open seven sample letters in real Chromium and real WebKit, the engine behind Safari on the iPad. Each runs at screen resolution and at print resolution, in both edit and print mode. The two engines agree on the number of sides for every sample. One gap remains: in WebKit, the down arrow from the last line of a side jumps further than the next line when a paragraph carries on past the gap. The editor in steps 10 and 11 will move the caret across that gap itself.</p>
+      <p>There is no page in the app that shows a letter yet. The editor in step 10 is the first. To run the browser tests yourself, with Docker running:</p>
+      <pre>pnpm --filter @repo/render test --silent=false</pre>
+      <p>The first run downloads the Playwright browser image. The output lists each sample with its line and side counts in both engines, for example <code>nearly-full edit @1.000: chromium 61 lines 3 sides, webkit 61 lines 3 sides</code>.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including all 86 render tests.</p>
     </details>
 
     <h3>M3. Editor</h3>
-    <details>
+    <details id="step-9">
       <summary><span class="tag done">Done</span> 9. Store letters, titles, revisions</summary>
-      <p>A <code>letters</code> table, saves refused when another tab saved first, and delete that hides a letter. See <a href="#step-9">Just landed</a>.</p>
+      <p>A letter now lives in Postgres, in a <code>letters</code> table, so it survives a reload and follows you to another device. Each letter belongs to your organization. There is still no editor screen; step 10 adds it. For now the letter is reached through the website's API, which the editor will call.</p>
+      <ul class="points">
+        <li>A new letter is called Untitled letter and starts empty, in Caveat at 20 pt in Ink blue. A new postcard is called Untitled postcard.</li>
+        <li>Every save carries the revision it was based on. If another tab saved in between, the save is refused with “This letter changed in another tab.” and nothing is overwritten. Step 10 shows that message with two choices, Load the latest and Keep mine.</li>
+        <li>Every save is checked by the same parser as in step 7. A colour, size or font outside the catalogue is refused, and so is a title that is empty, over 120 characters, or holds a control character. Spaces around a title are trimmed.</li>
+        <li>Deleting a letter hides it everywhere but keeps the row, with the time it was deleted.</li>
+        <li>Another organization cannot read, save or delete your letters. To them a letter of yours does not exist.</li>
+      </ul>
+      <p>To try it on your computer, after <code>git pull</code>, <code>pnpm install</code>, and <code>pnpm db:migrate</code>, start <code>pnpm dev</code> and in a second terminal create a letter:</p>
+      <pre>curl -s -X POST http://127.0.0.1:3000/api/letters \
+  -H 'Origin: http://127.0.0.1:3000' -H 'Content-Type: application/json' -d '{}'</pre>
+      <p>It answers with the new letter's id, for example <code>{"id":"01a17f47-…"}</code>. Open <code>http://127.0.0.1:3000/api/letters/&lt;that id&gt;</code> in the browser to see its title, revision 1, and the empty Caveat letter. It also shows up in <code>pnpm db:studio</code> under <code>letters</code>. A request without the <code>Origin</code> header is refused, so another website cannot save into your letters.</p>
+      <p>The tests for this step run on their own throwaway Postgres in Docker:</p>
+      <pre>pnpm --filter @repo/db test --reporter=verbose
+pnpm --filter @repo/services test --reporter=verbose</pre>
+      <p>The names read like “a stale save is refused and changes nothing” and “another organization cannot read, save or delete the letter”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including 12 database and 9 letter service tests, and every API answer above against the local database.</p>
     </details>
-    <details open>
+    <details id="step-10" open>
       <summary><span class="tag now">Now</span> 10. Write on the page with autosave</summary>
       <p>The letters list, a new letter, typing on the page in Caveat, an editable title, and a save line that reads Saved, Saving…, or Offline, retrying. A stale tab can keep its version or load the newer one. Not in the repository yet.</p>
     </details>
-    <details><summary><span class="tag later">Later</span> 11. Floating toolbar, format, undo</summary><p>Selection formatting.</p></details>
-    <details><summary><span class="tag later">Later</span> 12. Sides, overflow, seal, print preview</summary><p>Fit is decided in Chromium.</p></details>
+    <details id="step-11"><summary><span class="tag later">Later</span> 11. Floating toolbar, format, undo</summary><p>One small toolbar for font, size, ink colour and alignment, with undo and redo. Formatting is its own undo step.</p></details>
+    <details id="step-12"><summary><span class="tag later">Later</span> 12. Sides, overflow, seal, print preview</summary><p>The editor shows how many sides the letter uses, text that will not fit on a ghost sheet, Add a side, the Human Seal, and a print preview that is the print page itself.</p></details>
 
     <h3>M4. Files and jobs</h3>
-    <details><summary><span class="tag later">Later</span> 13. Upload files into fake GCS</summary><p>Org-checked asset route.</p></details>
-    <details><summary><span class="tag later">Later</span> 14. Both worker pools on the Pub/Sub emulator</summary><p>Port 8086.</p></details>
-    <details><summary><span class="tag later">Later</span> 15. Jobs, retries, sweep</summary><p>One message shape.</p></details>
+    <details id="step-13">
+      <summary><span class="tag done">Done</span> 13. Upload files, one checked way to read them</summary>
+      <p>Files now have a home. Every photo, doodle mask and font file a creator uploads is stored in Google Cloud Storage and recorded in a new <code>assets</code> table that belongs to their organization. On your computer a stand-in for Cloud Storage runs in Docker next to Postgres, on port 4443, so nothing leaves the machine. There is no upload button yet; the doodle library in step 17 and the photo lift in step 21 add them.</p>
+      <ul class="points">
+        <li>A photo may be a JPEG, PNG or WebP up to 15 MB. A doodle mask is a PNG up to 8 MB. A font file is a TTF or OTF up to 4 MB.</li>
+        <li>The type is read from the first bytes of the file, never from its name. A JPEG renamed to <code>.png</code> is still a JPEG.</li>
+        <li>An iPhone HEIC photo is refused with “HEIC photos cannot be uploaded, so choose a JPEG, PNG or WebP.” Anything else outside the list reads “That kind of file cannot be used here.”</li>
+        <li>A file over its limit is refused with “That file is too large.” The website stops reading as soon as the limit is passed, even when the sender does not say how big the file is.</li>
+        <li>Every file is read through one address, <code>/api/assets/&lt;id&gt;</code>, which checks your organization and then hands the browser a link to the stored file that expires after five minutes. Another organization gets “That was not found.”</li>
+        <li>A raw photo is stored but never handed back. Only the ink lifted from it will be, from step 21.</li>
+      </ul>
+      <p>To try it on your computer, after <code>git pull</code> and <code>pnpm install</code>, add these three lines to <code>apps/web/.env.local</code>:</p>
+      <pre>GCS_ASSETS_BUCKET=ink-studio-assets
+GOOGLE_CLOUD_PROJECT=ink-studio-local
+STORAGE_EMULATOR_HOST=http://localhost:4443</pre>
+      <p>Then start the storage stand-in, apply the new table, and start the website:</p>
+      <pre>docker compose up -d
+pnpm db:migrate
+pnpm dev</pre>
+      <p><code>docker compose ps</code> now lists <code>gcs</code> next to <code>postgres</code>. The bucket and project lines are required: without them the terminal running <code>pnpm dev</code> reports Invalid environment variables and names the missing one. In a second terminal, upload any PNG as a mask and read it back:</p>
+      <pre>curl -s -X POST 'http://127.0.0.1:3000/api/uploads?purpose=mask' \
+  -H 'Origin: http://127.0.0.1:3000' -H 'x-file-name: paper.png' \
+  --data-binary @apps/web/public/images/paper.png</pre>
+      <p>It answers with the new file's id, for example <code>{"id":"01a17f61-…"}</code>. Open <code>http://127.0.0.1:3000/api/assets/&lt;that id&gt;</code> in the browser and the paper texture appears. <code>/api/assets/&lt;that id&gt;/status</code> answers <code>{"status":"done","error":null}</code>. The row is in <code>pnpm db:studio</code> under <code>assets</code>, and the file itself is under <code>tools/docker/gcs/ink-studio-assets</code> on disk.</p>
+      <p>The tests run on throwaway Postgres and Cloud Storage containers in Docker:</p>
+      <pre>pnpm --filter @repo/services test --reporter=verbose
+pnpm --filter @repo/integrations test --reporter=verbose</pre>
+      <p>The names read like “HEIC is refused with its own code”, “a body that grows past the limit is refused”, and “another organization's asset is invisible”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including 18 service and 3 storage tests, and every answer above against the local database and storage.</p>
+    </details>
+    <details id="step-14"><summary><span class="tag later">Later</span> 14. Both worker pools on the Pub/Sub emulator</summary><p>A Pub/Sub emulator on port 8086 and a worker that runs twice in <code>pnpm dev</code>, once per pool.</p></details>
+    <details id="step-15"><summary><span class="tag later">Later</span> 15. Jobs, retries, sweep</summary><p>One lifecycle for every generated file: pending, running, done or failed, with retries and a sweep that picks up stuck work.</p></details>
 
-    <h3>M5–M11</h3>
-    <details><summary><span class="tag later">Later</span> 16–18. Draw a doodle and place it</summary><p>Pen, library, move, resize, rotate, recolour.</p></details>
-    <details><summary><span class="tag later">Later</span> 19–22. Lift ink from a photo</summary><p>Lighting, lines, specks, erase.</p></details>
-    <details><summary><span class="tag later">Later</span> 23–29. Handwriting fonts</summary><p>Drawn, photographed, or uploaded TTF/OTF. Separable from the rest.</p></details>
-    <details><summary><span class="tag later">Later</span> 30–32. Proofs and postcards</summary><p>Letter PDF, postcard PNGs.</p></details>
-    <details><summary><span class="tag later">Later</span> 33–34. Merge fields and signature</summary><p>The @ menu and the seal.</p></details>
-    <details><summary><span class="tag later">Later</span> 35. Text wrap around a doodle</summary><p>One footprint.</p></details>
-    <details><summary><span class="tag later">Later</span> 36. Move rehearsal</summary><p>A throwaway clone of project-post. Not this repository.</p></details>
+    <h3>M5. Doodles by drawing</h3>
+    <details id="step-16"><summary><span class="tag later">Later</span> 16. Draw with a pen, a mouse or a finger</summary><p>One ink canvas with pencil pressure and palm rejection.</p></details>
+    <details id="step-17"><summary><span class="tag later">Later</span> 17. Doodle library, tap onto the letter</summary><p>Drawn doodles saved per organization and placed on the page in one undoable step.</p></details>
+    <details id="step-18"><summary><span class="tag later">Later</span> 18. Move, resize, rotate, recolour doodles</summary><p>Every gesture is one undo step.</p></details>
+
+    <h3>M6. Photo ink lift</h3>
+    <details id="step-19"><summary><span class="tag later">Later</span> 19. Lift ink from a photo</summary><p>Lighting, colour separation and a soft edge turn a photo of ink into a doodle.</p></details>
+    <details id="step-20"><summary><span class="tag later">Later</span> 20. Remove rulings, grids and specks</summary><p>Lined and graph paper disappear; the dot on an i stays.</p></details>
+    <details id="step-21"><summary><span class="tag later">Later</span> 21. Lift a photo in the worker</summary><p>The worker lifts the ink and stores the result.</p></details>
+    <details id="step-22"><summary><span class="tag later">Later</span> 22. Crop and erase a photo doodle</summary><p>Crop, erase leftovers, save to the library.</p></details>
+
+    <h3>M7. Handwriting fonts (separable)</h3>
+    <details id="step-23"><summary><span class="tag later">Later</span> 23. Alternate letter shapes</summary><p>A handwriting font varies its letters the same way in Chromium and Safari.</p></details>
+    <details id="step-24"><summary><span class="tag later">Later</span> 24. Store handwriting fonts</summary><p>Personal fonts, drawn cell by cell by their owner.</p></details>
+    <details id="step-25"><summary><span class="tag later">Later</span> 25. Build a font in the worker</summary><p>A drawn font becomes a real font file; the last good build stays in use.</p></details>
+    <details id="step-26"><summary><span class="tag later">Later</span> 26. Write with My handwriting</summary><p>Draw the template in the app and write with it.</p></details>
+    <details id="step-27"><summary><span class="tag later">Later</span> 27. Trace ink into outlines</summary><p>Masks become glyph outlines without a GPL tracer.</p></details>
+    <details id="step-28"><summary><span class="tag later">Later</span> 28. Font from a template photo</summary><p>Print the template, write, photograph, get a font.</p></details>
+    <details id="step-29"><summary><span class="tag later">Later</span> 29. Font from an uploaded TTF or OTF</summary><p>Rebuilt from its outlines in a locked-down thread, never served as uploaded.</p></details>
+
+    <h3>M8. Proofs and postcards</h3>
+    <details id="step-30"><summary><span class="tag later">Later</span> 30. Render pages with Chromium</summary><p>Full-size raster PDFs and PNGs, with the network blocked.</p></details>
+    <details id="step-31"><summary><span class="tag later">Later</span> 31. Export a proof</summary><p>The render pool exports a PDF proof, refused with a reason when text does not fit.</p></details>
+    <details id="step-32"><summary><span class="tag later">Later</span> 32. Postcards</summary><p>Pick the product, choose the front image, export two PNGs.</p></details>
+
+    <h3>M9. Merge fields and signature</h3>
+    <details id="step-33"><summary><span class="tag later">Later</span> 33. Merge fields</summary><p>Type @ for first name and last name.</p></details>
+    <details id="step-34"><summary><span class="tag later">Later</span> 34. Sign the letter</summary><p>Your own signature, after the last line.</p></details>
+
+    <h3>M10. Text wrap</h3>
+    <details id="step-35"><summary><span class="tag later">Later</span> 35. Text wrap around a doodle</summary><p>Text flows around a doodle that asks for it.</p></details>
+
+    <h3>M11. Move rehearsal</h3>
+    <details id="step-36"><summary><span class="tag later">Later</span> 36. Move rehearsal</summary><p>A throwaway clone of project-post. Not this repository.</p></details>
   </section>
 </main>
 </body>

@@ -1,3 +1,11 @@
+export type {
+	Asset,
+	AssetJob,
+	AssetOrigin,
+	AssetProcessing,
+	AssetProcessingStatus,
+	UploadPurpose,
+} from "./asset.ts";
 export type { StockFontId } from "./font.ts";
 export { STOCK_FONTS } from "./font.ts";
 export type { InkColorId, TextSizePt } from "./ink.ts";

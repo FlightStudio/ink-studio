@@ -10,6 +10,7 @@
 		"@repo/api": "workspace:*",
 		"@repo/db": "workspace:*",
 		"@repo/errors": "workspace:*",
+		"@repo/integrations": "workspace:*",
 		"@repo/logger": "workspace:*",
 		"@repo/services": "workspace:*",
 		"@repo/types": "workspace:*",

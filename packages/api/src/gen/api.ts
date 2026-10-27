@@ -43,9 +43,28 @@ export interface LetterState {
   content: LetterContentEnvelope;
 }
 
-export interface Health {
-  ok: boolean;
+export type UploadPurpose = typeof UploadPurpose[keyof typeof UploadPurpose];
+
+
+export const UploadPurpose = {
+  photo: 'photo',
+  mask: 'mask',
+  'font-file': 'font-file',
+} as const;
+
+export interface UploadedAsset {
+  id: string;
 }
+
+export type AssetProcessingStatus = typeof AssetProcessingStatus[keyof typeof AssetProcessingStatus];
+
+
+export const AssetProcessingStatus = {
+  pending: 'pending',
+  running: 'running',
+  done: 'done',
+  failed: 'failed',
+} as const;
 
 export type ApiErrorCode = typeof ApiErrorCode[keyof typeof ApiErrorCode];
 
@@ -62,7 +81,19 @@ export const ApiErrorCode = {
   invalid_letter: 'invalid_letter',
   invalid_title: 'invalid_title',
   stale_revision: 'stale_revision',
+  file_too_large: 'file_too_large',
+  unsupported_file: 'unsupported_file',
+  heic_not_supported: 'heic_not_supported',
 } as const;
+
+export interface AssetStatus {
+  status: AssetProcessingStatus;
+  error: ApiErrorCode | null;
+}
+
+export interface Health {
+  ok: boolean;
+}
 
 export interface ApiError {
   code: ApiErrorCode;
@@ -113,6 +144,10 @@ export type InternalErrorResponse = ApiError;
  * You are not in an organization.
  */
 export type NoOrganizationResponse = ApiError;
+
+export type UploadFileParams = {
+purpose: UploadPurpose;
+};
 
 export type getHealthResponse200 = {
   data: Health
@@ -454,4 +489,210 @@ export const deleteLetter = async (letterId: string, options?: RequestInit): Pro
 
   const data: deleteLetterResponse['data'] = body ? JSON.parse(body) : undefined
   return { data, status: res.status, headers: res.headers } as deleteLetterResponse
+}
+
+
+
+export type uploadFileResponse201 = {
+  data: UploadedAsset
+  status: 201
+}
+
+export type uploadFileResponse400 = {
+  data: InvalidRequestResponse
+  status: 400
+}
+
+export type uploadFileResponse401 = {
+  data: UnauthenticatedResponse
+  status: 401
+}
+
+export type uploadFileResponse403 = {
+  data: ForbiddenResponse
+  status: 403
+}
+
+export type uploadFileResponse500 = {
+  data: InternalErrorResponse
+  status: 500
+}
+
+export type uploadFileResponseSuccess = (uploadFileResponse201) & {
+  headers: Headers;
+};
+export type uploadFileResponseError = (uploadFileResponse400 | uploadFileResponse401 | uploadFileResponse403 | uploadFileResponse500) & {
+  headers: Headers;
+};
+
+export type uploadFileResponse = (uploadFileResponseSuccess | uploadFileResponseError)
+
+export const getUploadFileUrl = (params: UploadFileParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/uploads?${stringifiedParams}` : `/api/uploads`
+}
+
+export const uploadFile = async (uploadFileBody: Blob,
+    params: UploadFileParams, options?: RequestInit): Promise<uploadFileResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getUploadFileUrl(params),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream', ...getHeaders(options?.headers) },
+    body: uploadFileBody
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: uploadFileResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as uploadFileResponse
+}
+
+
+
+export type getAssetResponse302 = {
+  data: void
+  status: 302
+}
+
+export type getAssetResponse401 = {
+  data: UnauthenticatedResponse
+  status: 401
+}
+
+export type getAssetResponse403 = {
+  data: ForbiddenResponse
+  status: 403
+}
+
+export type getAssetResponse404 = {
+  data: NotFoundResponse
+  status: 404
+}
+
+export type getAssetResponse500 = {
+  data: InternalErrorResponse
+  status: 500
+}
+
+;
+export type getAssetResponseError = (getAssetResponse302 | getAssetResponse401 | getAssetResponse403 | getAssetResponse404 | getAssetResponse500) & {
+  headers: Headers;
+};
+
+export type getAssetResponse = (getAssetResponseError)
+
+export const getGetAssetUrl = (assetId: string,) => {
+
+
+
+
+  return `/api/assets/${assetId}`
+}
+
+export const getAsset = async (assetId: string, options?: RequestInit): Promise<getAssetResponse> => {
+
+  const res = await fetch(getGetAssetUrl(assetId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getAssetResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getAssetResponse
+}
+
+
+
+export type getAssetStatusResponse200 = {
+  data: AssetStatus
+  status: 200
+}
+
+export type getAssetStatusResponse401 = {
+  data: UnauthenticatedResponse
+  status: 401
+}
+
+export type getAssetStatusResponse403 = {
+  data: ForbiddenResponse
+  status: 403
+}
+
+export type getAssetStatusResponse404 = {
+  data: NotFoundResponse
+  status: 404
+}
+
+export type getAssetStatusResponse500 = {
+  data: InternalErrorResponse
+  status: 500
+}
+
+export type getAssetStatusResponseSuccess = (getAssetStatusResponse200) & {
+  headers: Headers;
+};
+export type getAssetStatusResponseError = (getAssetStatusResponse401 | getAssetStatusResponse403 | getAssetStatusResponse404 | getAssetStatusResponse500) & {
+  headers: Headers;
+};
+
+export type getAssetStatusResponse = (getAssetStatusResponseSuccess | getAssetStatusResponseError)
+
+export const getGetAssetStatusUrl = (assetId: string,) => {
+
+
+
+
+  return `/api/assets/${assetId}/status`
+}
+
+export const getAssetStatus = async (assetId: string, options?: RequestInit): Promise<getAssetStatusResponse> => {
+
+  const res = await fetch(getGetAssetStatusUrl(assetId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getAssetStatusResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getAssetStatusResponse
 }
