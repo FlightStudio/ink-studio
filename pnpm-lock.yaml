@@ -195,6 +195,9 @@ importers:
       '@google-cloud/pubsub':
         specifier: 'catalog:'
         version: 6.3.1
+      '@google-cloud/storage':
+        specifier: 'catalog:'
+        version: 8.4.0
       '@repo/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -434,6 +437,9 @@ importers:
       uuid:
         specifier: ^13.0.0
         version: 13.0.2
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.7
     devDependencies:
       '@repo/typescript-config':
         specifier: workspace:*
@@ -529,6 +535,12 @@ importers:
       '@repo/db':
         specifier: workspace:*
         version: link:../packages/db
+      '@repo/integrations':
+        specifier: workspace:*
+        version: link:../packages/integrations
+      '@repo/services':
+        specifier: workspace:*
+        version: link:../packages/services
       '@repo/testing':
         specifier: workspace:*
         version: link:../packages/testing

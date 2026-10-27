@@ -84,6 +84,7 @@ export const ApiErrorCode = {
   file_too_large: 'file_too_large',
   unsupported_file: 'unsupported_file',
   heic_not_supported: 'heic_not_supported',
+  processing_failed: 'processing_failed',
   photo_unreadable: 'photo_unreadable',
   photo_too_large: 'photo_too_large',
   no_ink_found: 'no_ink_found',

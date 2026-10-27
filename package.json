@@ -14,6 +14,7 @@
 		"seed": "pnpm --filter tools seed",
 		"test:e2e": "pnpm --filter web test:e2e",
 		"screens": "pnpm --filter tools screens",
+		"jobs:sweep": "pnpm --filter tools sweep",
 		"prepare": "lefthook install || true"
 	},
 	"devDependencies": {

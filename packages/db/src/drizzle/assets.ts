@@ -1,13 +1,24 @@
 import type { Asset, AssetOrigin, AssetProcessing } from "@repo/types";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, lt, or, sql } from "drizzle-orm";
 import type { Query } from "./query.ts";
 import { assets } from "./schema/assets.ts";
 
 export type NewAsset = Omit<Asset, "createdAt" | "updatedAt">;
 
+export type StoredFile = {
+	mimeType: string;
+	byteSize: number;
+	checksum: string;
+};
+
 export type Assets = {
 	byId: (organizationId: string, id: string) => Promise<Asset | null>;
 	create: (input: NewAsset) => Promise<Asset>;
+	claim: (id: string, staleBefore: Date) => Promise<Asset | null>;
+	complete: (id: string, file: StoredFile) => Promise<void>;
+	release: (id: string, error: string) => Promise<void>;
+	fail: (id: string, error: string) => Promise<void>;
+	stale: (before: Date) => Promise<Asset[]>;
 };
 
 type AssetRow = typeof assets.$inferSelect;
@@ -95,6 +106,10 @@ function processingColumns(processing: AssetProcessing) {
 	};
 }
 
+function running(id: string) {
+	return and(eq(assets.id, id), eq(assets.processingStatus, "running"));
+}
+
 export function createAssets(db: Query): Assets {
 	return {
 		async byId(organizationId, id) {
@@ -125,6 +140,76 @@ export function createAssets(db: Query): Assets {
 			const row = inserted[0];
 			if (!row) throw new Error("asset insert returned no row");
 			return toAsset(row);
+		},
+		async claim(id, staleBefore) {
+			const claimed = await db
+				.update(assets)
+				.set({
+					processingStatus: "running",
+					processingAttempts: sql`${assets.processingAttempts} + 1`,
+					updatedAt: sql`now()`,
+				})
+				.where(
+					and(
+						eq(assets.id, id),
+						or(
+							eq(assets.processingStatus, "pending"),
+							and(
+								eq(assets.processingStatus, "running"),
+								lt(assets.updatedAt, staleBefore),
+							),
+						),
+					),
+				)
+				.returning();
+			const row = claimed[0];
+			return row ? toAsset(row) : null;
+		},
+		async complete(id, file) {
+			await db
+				.update(assets)
+				.set({
+					mimeType: file.mimeType,
+					byteSize: file.byteSize,
+					checksum: file.checksum,
+					processingStatus: "done",
+					processingLastError: null,
+					updatedAt: sql`now()`,
+				})
+				.where(running(id));
+		},
+		async release(id, error) {
+			await db
+				.update(assets)
+				.set({
+					processingStatus: "pending",
+					processingLastError: error,
+					updatedAt: sql`now()`,
+				})
+				.where(running(id));
+		},
+		async fail(id, error) {
+			await db
+				.update(assets)
+				.set({
+					processingStatus: "failed",
+					processingLastError: error,
+					updatedAt: sql`now()`,
+				})
+				.where(running(id));
+		},
+		async stale(before) {
+			const rows = await db
+				.select()
+				.from(assets)
+				.where(
+					and(
+						inArray(assets.processingStatus, ["pending", "running"]),
+						lt(assets.updatedAt, before),
+					),
+				)
+				.orderBy(asc(assets.updatedAt));
+			return rows.map(toAsset);
 		},
 	};
 }

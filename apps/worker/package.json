@@ -12,6 +12,7 @@
 	},
 	"dependencies": {
 		"@google-cloud/pubsub": "catalog:",
+		"@google-cloud/storage": "catalog:",
 		"@repo/db": "workspace:*",
 		"@repo/integrations": "workspace:*",
 		"@repo/logger": "workspace:*",

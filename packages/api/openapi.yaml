@@ -311,6 +311,7 @@ components:
         - file_too_large
         - unsupported_file
         - heic_not_supported
+        - processing_failed
         - photo_unreadable
         - photo_too_large
         - no_ink_found

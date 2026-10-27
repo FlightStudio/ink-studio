@@ -1,11 +1,21 @@
 import { createHash } from "node:crypto";
-import type { Db } from "@repo/db";
+import type { Db, NewAsset, StoredFile } from "@repo/db";
 import { type ApiErrorCode, apiErrorCodes, ServiceError } from "@repo/errors";
-import type { Asset, UploadPurpose, UserOrganization } from "@repo/types";
+import {
+	type Asset,
+	type AssetJob,
+	assetMessageType,
+	type UploadPurpose,
+	type UserOrganization,
+} from "@repo/types";
 import { v7 as uuidv7 } from "uuid";
+import type { Publisher } from "../queue/index.ts";
 import type {
+	AssetJobMessage,
 	AssetStatus,
 	AssetStorage,
+	JobOf,
+	RunJobParams,
 	UploadParams,
 } from "./assets.types.ts";
 
@@ -24,6 +34,16 @@ export const UPLOADS = {
 >;
 
 export const READ_URL_EXPIRES_IN_SECONDS = 300;
+
+export const MAX_ATTEMPTS = 3;
+
+export const LEASE_MS = 15 * 60_000;
+
+export const STALE_PENDING_MS = 5 * 60_000;
+
+export const SWEEP_MESSAGE_TYPE = "sweep";
+
+const UNPRODUCED_MIME_TYPE = "application/octet-stream";
 
 const SNIFF_BYTES = 16;
 
@@ -95,6 +115,23 @@ function storageKey(organizationId: string, assetId: string): string {
 	return `organizations/${organizationId}/assets/${assetId}`;
 }
 
+function sha256(bytes: Uint8Array): string {
+	return createHash("sha256").update(bytes).digest("hex");
+}
+
+function errorText(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
+function jobOf<K extends AssetJob["kind"]>(
+	asset: Asset,
+	kind: K,
+): JobOf<K> | null {
+	if (asset.origin.source !== "generated") return null;
+	const job = asset.origin.job;
+	return job.kind === kind ? (job as JobOf<K>) : null;
+}
+
 function asApiErrorCode(error: string): ApiErrorCode {
 	return (apiErrorCodes as readonly string[]).includes(error)
 		? (error as ApiErrorCode)
@@ -117,10 +154,39 @@ export async function assetReadUrl(
 	});
 }
 
+export function generatedAsset(
+	organizationId: string,
+	job: AssetJob,
+): NewAsset {
+	const id = uuidv7();
+	return {
+		id,
+		organizationId,
+		storageKey: storageKey(organizationId, id),
+		mimeType: UNPRODUCED_MIME_TYPE,
+		byteSize: null,
+		checksum: null,
+		origin: { source: "generated", job },
+		processing: { status: "pending", attempts: 0, lastError: null },
+	};
+}
+
+export async function publishAssetJob(
+	publisher: Publisher,
+	asset: Asset,
+): Promise<void> {
+	if (asset.origin.source !== "generated") {
+		throw new Error(`asset ${asset.id} has no job`);
+	}
+	const message: AssetJobMessage = { assetId: asset.id };
+	await publisher.publish(assetMessageType(asset.origin.job.kind), message);
+}
+
 export class AssetService {
 	constructor(
 		private readonly db: Db,
 		private readonly storage: AssetStorage,
+		private readonly publisher: Publisher,
 	) {}
 
 	async upload(
@@ -153,7 +219,7 @@ export class AssetService {
 			storageKey: key,
 			mimeType,
 			byteSize: bytes.byteLength,
-			checksum: createHash("sha256").update(bytes).digest("hex"),
+			checksum: sha256(bytes),
 			origin: {
 				source: "uploaded",
 				purpose: params.purpose,
@@ -192,5 +258,66 @@ export class AssetService {
 		);
 		if (!asset) return null;
 		return assetReadUrl(this.storage, asset);
+	}
+
+	async runJob<K extends AssetJob["kind"], R>(
+		params: RunJobParams<K, R>,
+	): Promise<void> {
+		const asset = await this.db.assets.claim(
+			params.assetId,
+			new Date(Date.now() - LEASE_MS),
+		);
+		if (!asset) return;
+		const attempts = asset.processing.attempts;
+		const job = jobOf(asset, params.kind);
+		if (!job || attempts > MAX_ATTEMPTS) {
+			await this.db.assets.fail(asset.id, "processing_failed");
+			return;
+		}
+		try {
+			const file = await params.produce(job, asset);
+			await this.storage.put({
+				key: asset.storageKey,
+				bytes: file.bytes,
+				contentType: file.mimeType,
+			});
+			const stored: StoredFile = {
+				mimeType: file.mimeType,
+				byteSize: file.bytes.byteLength,
+				checksum: sha256(file.bytes),
+			};
+			await this.db.transaction(async (tx) => {
+				await tx.assets.complete(asset.id, stored);
+				await params.onComplete?.(
+					tx,
+					{ ...asset, ...stored, processing: { status: "done", attempts } },
+					file.result,
+				);
+			});
+		} catch (error) {
+			if (error instanceof ServiceError && error.kind === "invalid_input") {
+				await this.db.assets.fail(asset.id, error.code);
+				return;
+			}
+			if (attempts >= MAX_ATTEMPTS) {
+				await this.db.assets.fail(asset.id, "processing_failed");
+				return;
+			}
+			await this.db.assets.release(asset.id, errorText(error));
+			throw error;
+		}
+	}
+
+	async sweep(now: Date): Promise<number> {
+		const leaseEnded = now.getTime() - LEASE_MS;
+		const stale = (
+			await this.db.assets.stale(new Date(now.getTime() - STALE_PENDING_MS))
+		).filter(
+			(asset) =>
+				asset.processing.status === "pending" ||
+				asset.updatedAt.getTime() < leaseEnded,
+		);
+		for (const asset of stale) await publishAssetJob(this.publisher, asset);
+		return stale.length;
 	}
 }
