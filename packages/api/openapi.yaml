@@ -311,6 +311,9 @@ components:
         - file_too_large
         - unsupported_file
         - heic_not_supported
+        - photo_unreadable
+        - photo_too_large
+        - no_ink_found
     ApiError:
       type: object
       additionalProperties: false
