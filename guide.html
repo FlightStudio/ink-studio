@@ -68,8 +68,8 @@ summary { cursor: pointer; }
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
   <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave are ready on your own computer. Formatting from the toolbar is next.</p>
-  <div class="progress" aria-hidden="true"><span style="width:39%"></span></div>
-  <p class="log">14 of 36 steps in the repository. Step 19 lifts ink out of a photo. Step 11 adds the floating toolbar.</p>
+  <div class="progress" aria-hidden="true"><span style="width:42%"></span></div>
+  <p class="log">15 of 36 steps in the repository. Step 30 renders pages for the printer. Step 11 adds the floating toolbar.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -346,7 +346,20 @@ pnpm dev</pre>
     <details id="step-29"><summary><span class="tag later">Later</span> 29. Font from an uploaded TTF or OTF</summary><p>Rebuilt from its outlines in a locked-down thread, never served as uploaded.</p></details>
 
     <h3>M8. Proofs and postcards</h3>
-    <details id="step-30"><summary><span class="tag later">Later</span> 30. Render pages with Chromium</summary><p>Full-size raster PDFs and PNGs, with the network blocked.</p></details>
+    <details id="step-30">
+      <summary><span class="tag done">Done</span> 30. Render pages with Chromium</summary>
+      <p>The piece that turns a page into the file the printer gets. It runs in the worker, not the website. Nothing in the app calls it yet; step 31 uses it to export a proof.</p>
+      <ul class="points">
+        <li>A letter becomes a PDF of one full-size picture per side at 300 dots per inch, 2550 by 3300 pixels on a US Letter page. A letter with an odd number of sides gets a blank back page, so it prints double-sided.</li>
+        <li>A postcard side becomes one PNG of the whole card, 2738 by 1838 pixels, because Thanks.io takes postcards only as pictures.</li>
+        <li>Nothing outside the letter is ever fetched. Fonts and pictures are handed to the page, and every other request is blocked, so a letter cannot reach the internet while it prints.</li>
+        <li>The page is measured and photographed at the same scale, so the side count it measures is the side count it prints. Rendering the same letter twice gives the same pictures.</li>
+      </ul>
+      <p>The tests use hand-written pages and a small test font whose a is a solid square, with Docker running for Chromium:</p>
+      <pre>pnpm --filter @repo/integrations test --reporter=verbose</pre>
+      <p>The names read like “a three-side letter is four pages” and “an outside URL is never fetched”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including all 7 renderer tests. A separate PDF reader confirmed the page sizes and picture sizes.</p>
+    </details>
     <details id="step-31"><summary><span class="tag later">Later</span> 31. Export a proof</summary><p>The render pool exports a PDF proof, refused with a reason when text does not fit.</p></details>
     <details id="step-32"><summary><span class="tag later">Later</span> 32. Postcards</summary><p>Pick the product, choose the front image, export two PNGs.</p></details>
 
