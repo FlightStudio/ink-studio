@@ -281,7 +281,7 @@ pnpm --filter @repo/integrations test --reporter=verbose</pre>
         <li>A job that fails is handed back to Pub/Sub, which delivers it again.</li>
       </ul>
       <p>To try it on your computer, after <code>git pull</code> and <code>pnpm install</code>, add two lines to <code>apps/web/.env.local</code>:</p>
-      <pre>PUBSUB_EMULATOR_HOST=localhost:8086
+      <pre>PUBSUB_EMULATOR_HOST=127.0.0.1:8086
 PUBSUB_JOBS_TOPIC=jobs</pre>
       <p>Then give the worker its own settings, start the emulator, and start everything:</p>
       <pre>cp apps/worker/.env.example apps/worker/.env
