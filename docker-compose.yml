@@ -29,3 +29,18 @@ services:
       - "4443:4443"
     volumes:
       - ./tools/docker/gcs:/data
+  pubsub:
+    build:
+      context: ./tools/docker
+      dockerfile: Dockerfile.pubsub
+    environment:
+      PUBSUB_PROJECT_ID: ink-studio-local
+    ports:
+      - "127.0.0.1:8086:8086"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -fs http://localhost:8086/v1/projects/ink-studio-local/subscriptions/jobs-worker-render
+      interval: 2s
+      timeout: 5s
+      retries: 30

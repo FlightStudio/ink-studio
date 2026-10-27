@@ -1,0 +1,12 @@
+{
+	"extends": "@repo/typescript-config/react-library.json",
+	"compilerOptions": {
+		"types": ["node"]
+	},
+	"include": [
+		"src/**/*.ts",
+		"src/**/*.tsx",
+		"tsdown.config.ts",
+		"vitest.config.ts"
+	]
+}

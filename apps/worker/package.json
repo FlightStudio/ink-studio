@@ -1,0 +1,30 @@
+{
+	"name": "worker",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "tsx watch --env-file-if-exists=.env src/index.ts",
+		"dev:render": "WORKER_POOL=render PUBSUB_JOBS_SUBSCRIPTION=jobs-worker-render tsx watch --env-file-if-exists=.env src/index.ts",
+		"build": "tsdown",
+		"start": "node --env-file-if-exists=.env dist/index.mjs",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run --passWithNoTests"
+	},
+	"dependencies": {
+		"@google-cloud/pubsub": "catalog:",
+		"@repo/db": "workspace:*",
+		"@repo/integrations": "workspace:*",
+		"@repo/logger": "workspace:*",
+		"@repo/services": "workspace:*",
+		"@t3-oss/env-core": "catalog:",
+		"zod": "catalog:"
+	},
+	"devDependencies": {
+		"@repo/typescript-config": "workspace:*",
+		"@types/node": "catalog:",
+		"tsdown": "^0.23.2",
+		"tsx": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	}
+}
