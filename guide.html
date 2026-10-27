@@ -68,8 +68,8 @@ summary { cursor: pointer; }
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
   <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave are ready on your own computer. Formatting from the toolbar is next.</p>
-  <div class="progress" aria-hidden="true"><span style="width:31%"></span></div>
-  <p class="log">11 of 36 steps in the repository. Step 10 puts the editor on the page, with autosave. Step 11 adds the floating toolbar.</p>
+  <div class="progress" aria-hidden="true"><span style="width:33%"></span></div>
+  <p class="log">12 of 36 steps in the repository. Step 14 starts the worker in two pools. Step 11 adds the floating toolbar.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -272,7 +272,27 @@ pnpm --filter @repo/integrations test --reporter=verbose</pre>
       <p>The names read like “HEIC is refused with its own code”, “a body that grows past the limit is refused”, and “another organization's asset is invisible”.</p>
       <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including 18 service and 3 storage tests, and every answer above against the local database and storage.</p>
     </details>
-    <details id="step-14"><summary><span class="tag later">Later</span> 14. Both worker pools on the Pub/Sub emulator</summary><p>A Pub/Sub emulator on port 8086 and a worker that runs twice in <code>pnpm dev</code>, once per pool.</p></details>
+    <details id="step-14">
+      <summary><span class="tag done">Done</span> 14. Both worker pools on the Pub/Sub emulator</summary>
+      <p>There is now a worker, <code>apps/worker</code>, that will do the slow jobs: lifting ink from photos, building fonts, and rendering proofs. It runs as two pools. The render pool takes only proof rendering, which needs Chromium; the standard pool takes everything else. Work reaches them through a Google Pub/Sub topic called <code>jobs</code>. On your computer a Pub/Sub emulator runs in Docker on port 8086, and each pool has its own filtered subscription. No job exists yet, so the pools only listen; step 15 adds the first one.</p>
+      <ul class="points">
+        <li><code>pnpm dev</code> now starts the website and both pools together.</li>
+        <li>A message nobody handles is logged as <code>unknown message type</code> and dropped, so it never loops forever.</li>
+        <li>A job that fails is handed back to Pub/Sub, which delivers it again.</li>
+      </ul>
+      <p>To try it on your computer, after <code>git pull</code> and <code>pnpm install</code>, add two lines to <code>apps/web/.env.local</code>:</p>
+      <pre>PUBSUB_EMULATOR_HOST=localhost:8086
+PUBSUB_JOBS_TOPIC=jobs</pre>
+      <p>Then give the worker its own settings, start the emulator, and start everything:</p>
+      <pre>cp apps/worker/.env.example apps/worker/.env
+docker compose up -d --wait
+pnpm dev</pre>
+      <p>The first <code>docker compose up</code> builds the emulator image, about 1.1 GB, so it takes a few minutes once. <code>docker compose ps</code> then lists <code>pubsub</code> as healthy next to <code>postgres</code> and <code>gcs</code>. In the <code>pnpm dev</code> output, look for <code>worker listening</code> twice, once with <code>"pool":"standard"</code> and once with <code>"pool":"render"</code>. A <code>MetadataLookupWarning</code> at start is harmless; the emulator needs no Google credentials.</p>
+      <p>The tests for the queue run in <code>pnpm test</code>:</p>
+      <pre>pnpm --filter @repo/services test --reporter=verbose</pre>
+      <p>The names read like “a message whose processor throws is nacked and logged” and “two processors for one type are refused”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including 7 queue tests. Both pools ran against the emulator, and a test message for each pool reached only that pool.</p>
+    </details>
     <details id="step-15"><summary><span class="tag later">Later</span> 15. Jobs, retries, sweep</summary><p>One lifecycle for every generated file: pending, running, done or failed, with retries and a sweep that picks up stuck work.</p></details>
 
     <h3>M5. Doodles by drawing</h3>
