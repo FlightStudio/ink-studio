@@ -4,6 +4,7 @@
 	"type": "module",
 	"exports": {
 		"./shared/gcp": "./src/shared/gcp/index.ts",
+		"./worker/chromium": "./src/worker/chromium/index.ts",
 		"./worker/font": "./src/worker/font/index.ts",
 		"./worker/image": "./src/worker/image/index.ts"
 	},
@@ -18,13 +19,13 @@
 		"@repo/services": "workspace:*",
 		"@types/opentype.js": "^1.3.10",
 		"opentype.js": "catalog:",
+		"playwright-core": "catalog:",
 		"sharp": "catalog:"
 	},
 	"devDependencies": {
 		"@repo/testing": "workspace:*",
 		"@repo/typescript-config": "workspace:*",
 		"@types/node": "catalog:",
-		"playwright-core": "catalog:",
 		"testcontainers": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
