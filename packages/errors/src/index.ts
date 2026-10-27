@@ -13,6 +13,9 @@ export const apiErrorCodes = [
 	"file_too_large",
 	"unsupported_file",
 	"heic_not_supported",
+	"photo_unreadable",
+	"photo_too_large",
+	"no_ink_found",
 ] as const;
 
 export type ApiErrorCode = (typeof apiErrorCodes)[number];
@@ -33,6 +36,9 @@ export const errorMessages = {
 	unsupported_file: "That kind of file cannot be used here.",
 	heic_not_supported:
 		"HEIC photos cannot be uploaded, so choose a JPEG, PNG or WebP.",
+	photo_unreadable: "That photo could not be opened, so try another one.",
+	photo_too_large: "That photo has too many pixels, so try a smaller one.",
+	no_ink_found: "No ink was found in that photo.",
 } as const satisfies Record<ApiErrorCode, string>;
 
 export type ApiErrorBody = {

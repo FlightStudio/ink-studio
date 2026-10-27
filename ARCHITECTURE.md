@@ -40,10 +40,14 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | services          | `packages/services/src/assets/assets.service.ts`            | `UPLOADS`, the sniff and `READ_URL_EXPIRES_IN_SECONDS`             |
 | services          | `packages/services/src/assets/assets.types.ts`              | `AssetStorage`, the provider integrations implements               |
 | services          | `packages/services/src/queue/index.ts`                      | `QueueManager`, `Publisher`, `MessageProcessor`, `Subscriber`      |
+| services          | `packages/services/src/drawings/drawings.types.ts`          | `ImageProcessor`, the lift provider integrations implements        |
 | integrations      | `packages/integrations/src/shared/gcp/index.ts`             | `@repo/integrations/shared/gcp`, storage and Pub/Sub classes       |
 | integrations      | `packages/integrations/src/shared/gcp/pubsub/publisher.ts`  | `PubSubPublisher`, a message per call with its type attribute      |
 | integrations      | `packages/integrations/src/shared/gcp/pubsub/subscriber.ts` | `PubSubSubscriber`, streaming pull into a `MessageHandler`         |
 | integrations      | `packages/integrations/src/worker/font/index.ts`            | `@repo/integrations/worker/font`, `buildFont` and `UNITS_PER_EM`   |
+| integrations      | `packages/integrations/src/worker/image/index.ts`           | `@repo/integrations/worker/image`, `SharpImageProcessor`           |
+| integrations      | `packages/integrations/src/worker/image/lift.ts`            | `liftInk`, `liftMask` and `LIFT_LIMITS`                            |
+| integrations      | `packages/integrations/src/worker/image/synthetic.ts`       | Test-only SVG pages with their ground-truth ink and ruling masks   |
 | ui                | `packages/ui/src/styles/globals.css`                        | Stationery tokens inside the studio class                          |
 | ui                | `packages/ui/components.json`                               | shadcn CLI config for the primitives                               |
 | ui                | `packages/ui/src/components/ui`                             | Generated shadcn primitives                                        |
@@ -96,6 +100,7 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 10. `packages/testing` is dev-only. Render, integrations and worker tests, the web's e2e files and `tools/dev` import it.
 11. Services take a `Member` and throw `ServiceError` with a kind and an `ApiErrorCode`. `handleJson` checks the origin with `isPlatformOrigin`, the content type and the body, finds the member, and turns each kind into one status; nothing else in a route touches errors. `handleRequest` does the same for routes without a JSON body, such as the upload, which reads the raw body stream. Services that touch only assets take the `UserOrganization`.
 12. A provider is an interface a service declares, such as `AssetStorage`. `packages/integrations` implements it and imports only types from services; services never import integrations. Apps build the implementation and pass it in, in `apps/web/src/server/services.ts`. Integration classes read no environment; apps pass every setting, including the emulator hosts.
+13. `sharp` is imported only under `packages/integrations/src/worker` and its tests, which only the worker imports; the web and its bundle never load it. `biome.json` refuses the import anywhere else.
 
 ## Pages
 
@@ -178,6 +183,21 @@ An upload is checked before it is stored. `upload` in `AssetService` refuses a d
 The browser never holds a signed URL. Pages and the letter use `/api/assets/{assetId}`, which finds the member's organization, asks `getAssetReadUrl`, and answers a redirect to a fresh signed URL with `private, no-store` caching, or 404 for another organization's asset. Nothing expires in an open editor because every read signs again. `isServable` decides which assets are ever read back, and a raw photo never is; `assetReadUrl` is the one place that rule meets `READ_URL_EXPIRES_IN_SECONDS`. `AssetStatus` carries no URL.
 
 `GcsAssetStorage` in `packages/integrations/src/shared/gcp/storage/gcs-asset-storage.ts` signs V4 read URLs. Given `emulatorBaseUrl`, which the web passes from `STORAGE_EMULATOR_HOST`, it returns the emulator's download URL instead of signing. Locally the `gcs` service in `docker-compose.yml` runs fake-gcs-server, loads the bucket from `tools/docker/gcs/ink-studio-assets`, and allows the browser's cross-origin reads. `GCS_ASSETS_BUCKET` names the bucket.
+
+## Ink lift
+
+A photo of ink on paper becomes a soft alpha mask in `packages/integrations/src/worker/image/lift.ts`. `SharpImageProcessor` implements `ImageProcessor` from `packages/services/src/drawings/drawings.types.ts` with `liftInk`, which writes the mask as a PNG with black colour channels so the ink is tinted at render. `liftMask` returns the raw mask and can keep the full frame. Both go through the same decode, so every path into the lift has the same pixel cap, `maxInputPixels` in `LIFT_LIMITS`, read from the header before anything is decoded. Failures are `ServiceError("invalid_input", code)` with `photo_unreadable`, `photo_too_large` or `no_ink_found`.
+
+The stages, in order:
+
+1. Decode. `sharp` reads the header and refuses a photo over the cap, then applies EXIF orientation, flattens transparency onto white, shrinks to `workingLongSidePx` in `LIFT_LIMITS` without enlarging, and hands over raw RGB. Only this stage and the final PNG encode use `sharp`; every other stage is plain TypeScript over the raw buffer.
+2. Lighting. A background estimate per channel (block mean, max filter, blur, bilinear upscale) divides each channel, so shadows and paper tint go to white.
+3. Colour separation. Brightness is the brightest channel, so light coloured rulings and margins read as paper and dark ink of any hue stays dark.
+4. Sauvola on brightness, from integral images of the value and its square, with a window that scales with the image's short side. A pixel darker than its threshold is hard ink; a page with none is `no_ink_found`.
+5. Soft matte. Alpha ramps with the distance below the threshold, inside a one-pixel dilation of the hard mask.
+6. Crop. `liftInk` crops to the ink plus a margin that scales with the image.
+
+The constants for each stage live at the top of the lift file. A stroke wider than the Sauvola window lifts hollow. `packages/integrations/src/worker/image/lift.test.ts` scores each stage against the ground truth from `packages/integrations/src/worker/image/synthetic.ts`.
 
 ## Jobs
 
