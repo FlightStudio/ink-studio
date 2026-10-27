@@ -39,7 +39,10 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | services          | `packages/services/src/assets/index.ts`                     | `AssetService`, `isServable`, `assetReadUrl`                       |
 | services          | `packages/services/src/assets/assets.service.ts`            | `UPLOADS`, the sniff and `READ_URL_EXPIRES_IN_SECONDS`             |
 | services          | `packages/services/src/assets/assets.types.ts`              | `AssetStorage`, the provider integrations implements               |
-| integrations      | `packages/integrations/src/shared/gcp/index.ts`             | `@repo/integrations/shared/gcp`, `GcsAssetStorage`                 |
+| services          | `packages/services/src/queue/index.ts`                      | `QueueManager`, `Publisher`, `MessageProcessor`, `Subscriber`      |
+| integrations      | `packages/integrations/src/shared/gcp/index.ts`             | `@repo/integrations/shared/gcp`, storage and Pub/Sub classes       |
+| integrations      | `packages/integrations/src/shared/gcp/pubsub/publisher.ts`  | `PubSubPublisher`, a message per call with its type attribute      |
+| integrations      | `packages/integrations/src/shared/gcp/pubsub/subscriber.ts` | `PubSubSubscriber`, streaming pull into a `MessageHandler`         |
 | ui                | `packages/ui/src/styles/globals.css`                        | Stationery tokens inside the studio class                          |
 | ui                | `packages/ui/components.json`                               | shadcn CLI config for the primitives                               |
 | ui                | `packages/ui/src/components/ui`                             | Generated shadcn primitives                                        |
@@ -71,11 +74,15 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | web               | `apps/web/src/lib/autosave.ts`                              | `autosave`, the pure save reducer, and `SAVE_DELAY_MS`             |
 | web               | `apps/web/src/lib/use-autosave.ts`                          | `useAutosave`, timers, unload and visibility                       |
 | web               | `apps/web/e2e/harness.ts`                                   | `startHarness` for the web journeys                                |
+| worker            | `apps/worker/src/index.ts`                                  | `main`, one pool per process, picked by `WORKER_POOL`              |
+| worker            | `apps/worker/src/env.ts`                                    | The worker's validated environment                                 |
+| worker            | `apps/worker/package.json`                                  | `dev` runs the standard pool, `dev:render` the render pool         |
 | tools             | `tools/check-comments.ts`                                   | No-comment check                                                   |
 | tools             | `tools/check-architecture.ts`                               | This map stays honest                                              |
 | tools             | `tools/migrate.ts`                                          | Applies `packages/db/drizzle`                                      |
 | tools             | `tools/dev/screens.ts`                                      | `pnpm screens` writes both viewports of `WEB_BASE_URL`             |
 | tools             | `tools/docker/gcs/ink-studio-assets`                        | The local bucket, loaded by the `gcs` compose service              |
+| tools             | `tools/docker/pubsub-entrypoint.sh`                         | The emulator's jobs topic and one filtered subscription per pool   |
 1. An app may import packages. A package never imports an app.
 2. Dependencies point toward `packages/types`. `packages/errors` stands alone. `packages/api` may import `packages/errors`.
 3. Drizzle and `pg` live only in `packages/db`.
@@ -87,7 +94,7 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 9. Only the worker imports `@repo/render`. The web never does, and integrations never import `packages/render`: the worker passes outlines and the measure function in.
 10. `packages/testing` is dev-only. Render, integrations and worker tests, the web's e2e files and `tools/dev` import it.
 11. Services take a `Member` and throw `ServiceError` with a kind and an `ApiErrorCode`. `handleJson` checks the origin with `isPlatformOrigin`, the content type and the body, finds the member, and turns each kind into one status; nothing else in a route touches errors. `handleRequest` does the same for routes without a JSON body, such as the upload, which reads the raw body stream. Services that touch only assets take the `UserOrganization`.
-12. A provider is an interface a service declares, such as `AssetStorage`. `packages/integrations` implements it and imports only types from services; services never import integrations. Apps build the implementation and pass it in, in `apps/web/src/server/services.ts`. Integration classes read no environment; apps pass every setting.
+12. A provider is an interface a service declares, such as `AssetStorage`. `packages/integrations` implements it and imports only types from services; services never import integrations. Apps build the implementation and pass it in, in `apps/web/src/server/services.ts`. Integration classes read no environment; apps pass every setting, including the emulator hosts.
 
 ## Pages
 
@@ -163,7 +170,18 @@ The browser never holds a signed URL. Pages and the letter use `/api/assets/{ass
 
 ## Jobs
 
-Filled as jobs land.
+Work leaves the web as a Pub/Sub message on the one topic `PUBSUB_JOBS_TOPIC` names. A message's data is JSON and its `type` attribute names the work. `Publisher` in `packages/services/src/queue/queue.types.ts` is the one call services make, `publish(type, data)`; `PubSubPublisher` implements it.
+
+The worker runs as two pools from one codebase, `apps/worker`. Each process reads `WORKER_POOL` and pulls from the subscription `PUBSUB_JOBS_SUBSCRIPTION` names. The render pool's subscription filters on the letter render job's type and the standard pool's takes every other type, so headless Chromium work never queues behind image or font work. The filters live in `tools/docker/pubsub-entrypoint.sh` locally and in Terraform after the move.
+
+`QueueManager` in `packages/services/src/queue/queue.manager.ts` dispatches each message to the one `MessageProcessor` whose `type` matches the attribute. A processor that resolves acks the message; one that throws nacks it, so Pub/Sub redelivers it. A message with no type, a type no processor in that pool takes, or data that is not JSON is logged and acked, because redelivering it can never succeed. Two processors for one type refuse to start.
+
+`main` in `apps/worker/src/index.ts` builds the db and its processors, starts `PubSubSubscriber`, which checks its subscription exists first, logs `worker listening` with its pool, and runs until `SIGINT` or `SIGTERM`, then closes the subscription and the db.
+
+Locally the `pubsub` service in `docker-compose.yml` runs the emulator from `tools/docker/Dockerfile.pubsub`, and its healthcheck passes once the subscriptions exist. `pnpm dev` runs `turbo run dev dev:render`, so the web, the standard pool (`dev`) and the render pool (`dev:render`, which sets `WORKER_POOL` and `PUBSUB_JOBS_SUBSCRIPTION` for the render pool) start together. Both pools read the worker's `.env`, copied from `apps/worker/.env.example`.
+
+| Message type | Pool | Processor | Data |
+| ------------ | ---- | --------- | ---- |
 
 ## Tables
 
@@ -182,6 +200,8 @@ Repo checks live in `tools/check.ts`.
 ## Moving into project-post
 
 Shared packages are shaped so the move is a folder merge. The plan is `PLAN.md`.
+
+`packages/services/src/queue` and the Pub/Sub classes in `packages/integrations/src/shared/gcp/pubsub` are v2's copies of project-post's and are dropped on the move. The render pool's filter moves from `tools/docker/pubsub-entrypoint.sh` into project-post's entrypoint and its Terraform subscriptions.
 
 The `assets` table extends the assets outline in project-post's schema file: it adds `purpose`, `filename`, `uploaded_by_user_id` and a `job` jsonb column, makes `source` the `asset_source` enum where the outline has a varchar, and adds `assets_origin_check`, which ties an uploaded source to a purpose and no job. The schema file gains these on the move.
 

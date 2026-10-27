@@ -1,0 +1,9 @@
+FROM gcr.io/google.com/cloudsdktool/google-cloud-cli:591.0.0-emulators
+
+COPY pubsub-entrypoint.sh /usr/local/bin/pubsub-entrypoint.sh
+RUN chmod +x /usr/local/bin/pubsub-entrypoint.sh
+
+ENV PUBSUB_PROJECT_ID=ink-studio-local
+EXPOSE 8086
+
+ENTRYPOINT ["/usr/local/bin/pubsub-entrypoint.sh"]

@@ -10,6 +10,7 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
+		"@google-cloud/pubsub": "catalog:",
 		"@google-cloud/storage": "catalog:",
 		"@repo/services": "workspace:*"
 	},
