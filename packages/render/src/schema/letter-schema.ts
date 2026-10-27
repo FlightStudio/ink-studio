@@ -155,7 +155,13 @@ const LetterHistory = Extension.create({
 			command(this.editor.state, (transaction) =>
 				this.editor.view.dispatch(transaction),
 			);
-		return { "Mod-z": run(undo), "Shift-Mod-z": run(redo), "Mod-y": run(redo) };
+		return {
+			"Mod-z": run(undo),
+			"Shift-Mod-z": run(redo),
+			"Mod-y": run(redo),
+			"Meta-z": run(undo),
+			"Shift-Meta-z": run(redo),
+		};
 	},
 });
 

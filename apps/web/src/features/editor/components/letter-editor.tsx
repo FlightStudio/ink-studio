@@ -24,6 +24,7 @@ import {
 	useState,
 } from "react";
 import { useAutosave } from "@/lib/use-autosave";
+import { EditorToolbar, useCoarsePointer } from "./editor-toolbar.tsx";
 import { LetterTitle } from "./letter-title.tsx";
 import { SaveLine } from "./save-line.tsx";
 
@@ -105,6 +106,8 @@ export function LetterEditor({ letter }: LetterEditorProps) {
 	const pageRef = useRef<HTMLDivElement>(null);
 	const inkReady = useInkReady(letter.content);
 	const desk = useDeskScale(spec.widthIn);
+	const coarsePointer = useCoarsePointer();
+	const [keyboardClearancePx, setKeyboardClearancePx] = useState(0);
 
 	const editor = useEditor({
 		extensions: letterExtensions,
@@ -199,7 +202,22 @@ export function LetterEditor({ letter }: LetterEditorProps) {
 					Letters
 				</Link>
 			</header>
-			<main className="flex flex-1 flex-col items-center px-4 pt-4 pb-6 sm:px-8">
+			<main
+				className="flex flex-1 flex-col items-center px-4 pt-4 pb-6 sm:px-8"
+				style={
+					keyboardClearancePx > 0
+						? { paddingBottom: `calc(1.5rem + ${keyboardClearancePx}px)` }
+						: undefined
+				}
+			>
+				{editor && letter.editable ? (
+					<EditorToolbar
+						editor={editor}
+						defaults={letter.content.defaults}
+						coarsePointer={coarsePointer}
+						onKeyboardClearance={setKeyboardClearancePx}
+					/>
+				) : null}
 				<div ref={desk.ref} className="flex w-full justify-center">
 					<div
 						className="-mx-2 -mt-2 -mb-10 overflow-hidden px-2 pt-2 pb-10 transition-opacity duration-(--duration-settle) ease-settle data-[ready=false]:opacity-0"
@@ -250,7 +268,14 @@ export function LetterEditor({ letter }: LetterEditorProps) {
 						</div>
 					</div>
 				</div>
-				<footer className="sticky bottom-4 z-10 mt-8 flex max-w-full items-center gap-4 rounded-full bg-paper py-1.5 pr-2 pl-5 shadow-float ring-1 ring-[oklch(0.3_0.03_60/0.06)]">
+				<footer
+					className="sticky bottom-4 z-10 mt-8 flex max-w-full items-center gap-4 rounded-full bg-paper py-1.5 pr-2 pl-5 shadow-float ring-1 ring-[oklch(0.3_0.03_60/0.06)]"
+					style={
+						keyboardClearancePx > 0
+							? { bottom: `calc(1rem + ${keyboardClearancePx}px)` }
+							: undefined
+					}
+				>
 					<LetterTitle
 						title={title}
 						editable={letter.editable}
