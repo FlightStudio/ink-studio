@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave and a formatting toolbar are ready on your own computer. Removing rulings, grids and specks from lifted ink is next.</p>
-  <div class="progress" aria-hidden="true"><span style="width:53%"></span></div>
-  <p class="log">19 of 36 steps in the repository. Step 15 runs generated files as jobs with retries and a sweep. Step 20 removes rulings, grids and specks.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave and a formatting toolbar are ready on your own computer.</p>
+  <div class="progress" aria-hidden="true"><span style="width:56%"></span></div>
+  <p class="log">20 of 36 steps in the repository. Step 20 removes rulings, grids and specks from lifted ink.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -380,7 +380,27 @@ pnpm --filter @repo/render test --reporter=verbose</pre>
       <p>The names read like “a shadow across the page does not become ink” and “blue ballpoint on blue rulings is kept”.</p>
       <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including all 12 lift tests.</p>
     </details>
-    <details id="step-20"><summary><span class="tag later">Later</span> 20. Remove rulings, grids and specks</summary><p>Lined and graph paper disappear; the dot on an i stays.</p></details>
+    <details id="step-20">
+      <summary><span class="tag done">Done</span> 20. Remove rulings, grids and specks</summary>
+      <p>The second half of the photo lift. After the ink is found, long straight lines and small dirt are taken out, so a page written on lined or graph paper lifts as only the writing.</p>
+      <ul class="points">
+        <li>The lines of lined paper and graph paper disappear, and so do dark notebook rulings that step 19 kept. A letter that crosses a line stays whole.</li>
+        <li>Only long, thin, straight lines are removed. A wavy underline drawn by hand stays.</li>
+        <li>Tiny specks, a few pixels across, vanish. The dot on an i is bigger than that and stays.</li>
+        <li>When the photo shows a dark table around the paper, the table edge is dropped.</li>
+      </ul>
+      <p>Some things are not removed yet:</p>
+      <ul class="points">
+        <li>A mid-grey grid, from about <code>#8c8c8c</code> to <code>#a8a8a8</code>, leaves short pieces of line between letters. A lighter grid leaves only a few.</li>
+        <li>A table edge wider than about 40 pixels stays, and so can a narrow one when the photo is not tilted at all.</li>
+        <li>Specks bigger than a few pixels stay.</li>
+      </ul>
+      <p>Step 22 adds an eraser for what is left. There is no button for this yet; step 21 runs it in the worker. The pull request for this step shows a graph-paper page and a notebook page after the lift, on a checkerboard so the clear parts show.</p>
+      <p>The tests build pages with known ink, rulings, grids, specks and a table, and score the result against them:</p>
+      <pre>pnpm --filter @repo/integrations test --reporter=verbose</pre>
+      <p>The names read like “a grey graph-paper grid is removed and the writing kept”, “a wavy hand-drawn underline is kept”, and “specks are dropped and the dot on an i is kept”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including 6 new lift tests, and a graph-paper page, a notebook page and a mid-grey grid lifted and looked at by eye.</p>
+    </details>
     <details id="step-21"><summary><span class="tag later">Later</span> 21. Lift a photo in the worker</summary><p>The worker lifts the ink and stores the result.</p></details>
     <details id="step-22"><summary><span class="tag later">Later</span> 22. Crop and erase a photo doodle</summary><p>Crop, erase leftovers, save to the library.</p></details>
 
