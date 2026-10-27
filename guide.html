@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ink Studio v2 — setup guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --desk: oklch(0.94 0.012 75);
+  --paper: oklch(0.98 0.008 85);
+  --ink: oklch(0.25 0.02 262);
+  --muted: oklch(0.48 0.02 262);
+  --accent: oklch(0.42 0.13 262);
+  --rule: oklch(0.86 0.012 80);
+  --ok: oklch(0.42 0.08 150);
+  --now: oklch(0.55 0.12 70);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--desk);
+  color: var(--ink);
+  font-family: Outfit, "Segoe UI", sans-serif;
+  line-height: 1.5;
+}
+header, main { width: min(980px, calc(100% - 32px)); margin: 0 auto; }
+header { padding: 40px 0 8px; }
+h1, h2, h3 { font-family: "Libre Baskerville", Georgia, serif; font-weight: 400; }
+h1 { font-size: 2.4rem; margin: 0 0 8px; }
+.lede { color: var(--muted); max-width: 62ch; }
+.progress { height: 8px; background: var(--rule); border-radius: 99px; margin: 20px 0; }
+.progress span { display: block; height: 100%; width: 2.8%; background: var(--accent); border-radius: 99px; }
+.panel {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 16px;
+  padding: 22px 24px;
+  margin: 16px 0 28px;
+  box-shadow: 0 10px 30px oklch(0.4 0.02 70 / 0.06);
+}
+.kicker { letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.75rem; color: var(--accent); margin: 0 0 6px; }
+ol.steps { margin: 0; padding-left: 1.2rem; }
+ol.steps li { margin: 0.35rem 0; }
+code, pre { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+pre {
+  background: oklch(0.96 0.01 80);
+  border-radius: 10px;
+  padding: 14px 16px;
+  overflow: auto;
+  font-size: 0.92rem;
+}
+.locked { opacity: 0.72; }
+.tag { display: inline-block; font-size: 0.72rem; padding: 2px 8px; border-radius: 99px; margin-right: 6px; }
+.tag.done { background: oklch(0.92 0.04 150); color: var(--ok); }
+.tag.now { background: oklch(0.94 0.05 80); color: var(--now); }
+.tag.later { background: oklch(0.94 0.01 80); color: var(--muted); }
+details { border-top: 1px solid var(--rule); padding: 10px 0; }
+summary { cursor: pointer; }
+.milestone { margin-top: 28px; }
+.log { color: var(--muted); font-size: 0.95rem; }
+</style>
+</head>
+<body>
+<header>
+  <p class="kicker">Ink Studio v2</p>
+  <h1>Build guide</h1>
+  <p class="lede">This page is the map. It updates after each plan step. The app is not finished. Postgres is the part you can run on your own computer once step 3 is in the repository.</p>
+  <div class="progress" aria-hidden="true"><span></span></div>
+  <p class="log">1 of 36 steps in the repository. Step 2 is next.</p>
+</header>
+<main>
+  <section class="panel" id="your-machine">
+    <p class="kicker">On your computer</p>
+    <h2>Prepare the machine, then the database</h2>
+    <p>Do this now. The database commands stay locked until <code>docker-compose.yml</code> exists.</p>
+    <ol class="steps">
+      <li>Install <a href="https://www.docker.com/products/docker-desktop/">Docker Desktop</a> and leave it running. On Linux, Docker Engine plus the Compose plugin is enough.</li>
+      <li>Install Node.js 22 from <a href="https://nodejs.org/">nodejs.org</a>.</li>
+      <li>In a terminal: <code>corepack enable</code> then <code>corepack prepare pnpm@10.33.4 --activate</code>.</li>
+      <li>Clone this repository and check out the branch <code>cursor/ink-studio-guide-8700</code>.</li>
+      <li><code>pnpm install</code></li>
+      <li><code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code> should pass. There is no website yet.</li>
+    </ol>
+    <div class="locked" id="postgres">
+      <h3>Postgres 17 on port 5434</h3>
+      <p>Not in the repository yet. Step 3 adds Compose, the identity tables, and <code>pnpm db:migrate</code>. When that lands, this box becomes the thing you run, and the connection is:</p>
+      <pre>postgresql://postgres:postgres@127.0.0.1:5434/ink_studio</pre>
+      <p>That password is only for this local database. Do not reuse it anywhere else.</p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <p class="kicker">Just landed</p>
+    <h2>Step 1. Monorepo and the two repo checks</h2>
+    <p>An empty workspace with pnpm, Turborepo, Biome, and two checks: no comments in code, and <code>ARCHITECTURE.md</code> only names files that exist. Shared packages were rebuilt from the plan because project-post is not in this workspace.</p>
+    <p>Checked here: <code>pnpm lint</code>, <code>pnpm typecheck</code>, <code>pnpm test</code> (9 tests).</p>
+  </section>
+
+  <section>
+    <h2 class="milestone">All 36 steps</h2>
+    <p class="log">Done means the code is in this branch. Later means the plan still describes it.</p>
+
+    <h3>M1. Scaffold, database, dev identity</h3>
+    <details open>
+      <summary><span class="tag done">Done</span> 1. Monorepo, toolchain, comment check, architecture check</summary>
+      <p>Goal: a green empty monorepo. You can install and run the three checks above.</p>
+    </details>
+    <details open>
+      <summary><span class="tag now">Now</span> 2. Types, API contract, errors</summary>
+      <p>Shared identity shapes and a health endpoint contract.</p>
+    </details>
+    <details>
+      <summary><span class="tag later">Later</span> 3. Database package and Postgres</summary>
+      <p>This is the step that unlocks the database box. Real Postgres 17, migrations, and tests against a container.</p>
+    </details>
+    <details>
+      <summary><span class="tag later">Later</span> 4. Dev identity and the web shell</summary>
+      <p><code>pnpm seed</code> then <code>pnpm dev</code>. The home page says Ink Studio. <code>/api/health</code> answers 200.</p>
+    </details>
+
+    <h3>M2. Design system and page model</h3>
+    <details><summary><span class="tag later">Later</span> 5. Stationery design system and browser harness</summary><p>Tokens, components, screenshots.</p></details>
+    <details><summary><span class="tag later">Later</span> 6. Page specs and exclusion floats</summary><p>Thanks.io letter and 6×9 postcard as data.</p></details>
+    <details><summary><span class="tag later">Later</span> 7. One letter document and validation</summary><p>Tiptap JSON, validated on save.</p></details>
+    <details><summary><span class="tag later">Later</span> 8. Shared letter page in Chromium and WebKit</summary><p>Text flows across sides.</p></details>
+
+    <h3>M3. Editor</h3>
+    <details><summary><span class="tag later">Later</span> 9. Store letters, titles, revisions</summary><p>Letters persist.</p></details>
+    <details><summary><span class="tag later">Later</span> 10. Write on the page with autosave</summary><p>The editor.</p></details>
+    <details><summary><span class="tag later">Later</span> 11. Floating toolbar, format, undo</summary><p>Selection formatting.</p></details>
+    <details><summary><span class="tag later">Later</span> 12. Sides, overflow, seal, print preview</summary><p>Fit is decided in Chromium.</p></details>
+
+    <h3>M4. Files and jobs</h3>
+    <details><summary><span class="tag later">Later</span> 13. Upload files into fake GCS</summary><p>Org-checked asset route.</p></details>
+    <details><summary><span class="tag later">Later</span> 14. Both worker pools on the Pub/Sub emulator</summary><p>Port 8086.</p></details>
+    <details><summary><span class="tag later">Later</span> 15. Jobs, retries, sweep</summary><p>One message shape.</p></details>
+
+    <h3>M5–M11</h3>
+    <details><summary><span class="tag later">Later</span> 16–18. Draw a doodle and place it</summary><p>Pen, library, move, resize, rotate, recolour.</p></details>
+    <details><summary><span class="tag later">Later</span> 19–22. Lift ink from a photo</summary><p>Lighting, lines, specks, erase.</p></details>
+    <details><summary><span class="tag later">Later</span> 23–29. Handwriting fonts</summary><p>Drawn, photographed, or uploaded TTF/OTF. Separable from the rest.</p></details>
+    <details><summary><span class="tag later">Later</span> 30–32. Proofs and postcards</summary><p>Letter PDF, postcard PNGs.</p></details>
+    <details><summary><span class="tag later">Later</span> 33–34. Merge fields and signature</summary><p>The @ menu and the seal.</p></details>
+    <details><summary><span class="tag later">Later</span> 35. Text wrap around a doodle</summary><p>One footprint.</p></details>
+    <details><summary><span class="tag later">Later</span> 36. Move rehearsal</summary><p>A throwaway clone of project-post. Not this repository.</p></details>
+  </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,5 @@
+pre-commit:
+  commands:
+    comments:
+      glob: "*.{ts,tsx,js,mjs,css}"
+      run: pnpm --filter tools exec tsx check-comments.ts {staged_files}
