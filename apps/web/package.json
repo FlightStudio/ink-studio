@@ -11,6 +11,7 @@
 		"@repo/db": "workspace:*",
 		"@repo/errors": "workspace:*",
 		"@repo/logger": "workspace:*",
+		"@repo/services": "workspace:*",
 		"@repo/types": "workspace:*",
 		"@repo/ui": "workspace:*",
 		"@t3-oss/env-nextjs": "catalog:",
