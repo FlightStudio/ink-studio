@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave and a formatting toolbar are ready on your own computer. Jobs with retries and a sweep are next.</p>
-  <div class="progress" aria-hidden="true"><span style="width:50%"></span></div>
-  <p class="log">18 of 36 steps in the repository. Step 27 traces ink into outlines. Step 15 runs generated files as jobs with retries and a sweep.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave and a formatting toolbar are ready on your own computer. Removing rulings, grids and specks from lifted ink is next.</p>
+  <div class="progress" aria-hidden="true"><span style="width:53%"></span></div>
+  <p class="log">19 of 36 steps in the repository. Step 15 runs generated files as jobs with retries and a sweep. Step 20 removes rulings, grids and specks.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -310,7 +310,38 @@ pnpm dev</pre>
       <p>The names read like “a message whose processor throws is nacked and logged” and “two processors for one type are refused”.</p>
       <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including 7 queue tests. Both pools ran against the emulator, and a test message for each pool reached only that pool.</p>
     </details>
-    <details id="step-15"><summary><span class="tag later">Later</span> 15. Jobs, retries, sweep</summary><p>One lifecycle for every generated file: pending, running, done or failed, with retries and a sweep that picks up stuck work.</p></details>
+    <details id="step-15">
+      <summary><span class="tag done">Done</span> 15. Jobs, retries, sweep</summary>
+      <p>Every file the worker makes, such as lifted ink, a font or a proof, now follows one path. The file is recorded first as pending, with no bytes yet. A worker takes it and marks it running, makes it, stores it, and marks it done. If it cannot be made, it is marked failed with a reason. Nothing makes such a file yet; step 21, lifting a photo, is the first job to use this.</p>
+      <ul class="points">
+        <li>A job gets three tries. A passing problem, such as storage not answering, puts the file back to pending and the job is delivered again. After the third failed try the file fails with “That file could not be made, so try again.”</li>
+        <li>A problem with the input itself, such as a photo that cannot be opened, fails the file at once, because trying again would fail the same way.</li>
+        <li>Two workers that pick up the same job make the file once. A job delivered again after its file is done does nothing.</li>
+        <li>A worker that stops in the middle of a job keeps it for 15 minutes; after that another worker may take it over.</li>
+        <li>Once a minute the worker runs a sweep. It sends again any file left pending for 5 minutes and any running file whose 15 minutes are up, so work lost on the way is picked up again. Each sweep logs <code>sweep processed</code> with how many files it sent again.</li>
+      </ul>
+      <p>To try it on your computer, after <code>git pull</code> and <code>pnpm install</code>, the worker needs three new settings. Either copy its settings again:</p>
+      <pre>cp apps/worker/.env.example apps/worker/.env</pre>
+      <p>or add these three lines to <code>apps/worker/.env</code>:</p>
+      <pre>GCS_ASSETS_BUCKET=ink-studio-assets
+STORAGE_EMULATOR_HOST=http://localhost:4443
+SWEEP_EVERY_MS=60000</pre>
+      <p>Then start the containers and everything else:</p>
+      <pre>docker compose up -d --wait
+pnpm dev</pre>
+      <p>In the <code>pnpm dev</code> output, a minute after <code>worker listening</code>, look for <code>sweep processed</code> with <code>"republished":0</code>. To run a sweep straight away, in a second terminal:</p>
+      <pre>pnpm jobs:sweep</pre>
+      <p>It prints <code>{"published":"sweep","topic":"jobs"}</code>, and the worker logs another <code>sweep processed</code>. It reads <code>tools/.env</code>, so first copy <code>tools/.env.example</code> over it again, or add these three lines to it:</p>
+      <pre>GOOGLE_CLOUD_PROJECT=ink-studio-local
+PUBSUB_EMULATOR_HOST=127.0.0.1:8086
+PUBSUB_JOBS_TOPIC=jobs</pre>
+      <p>To sweep more or less often, change <code>SWEEP_EVERY_MS</code> in <code>apps/worker/.env</code>. Setting it in the terminal before <code>pnpm dev</code> does nothing, because turbo passes on only the settings it knows about. Without the line the worker never sweeps by itself.</p>
+      <p>The tests run on their own throwaway Postgres in Docker, in <code>pnpm test</code>:</p>
+      <pre>pnpm --filter @repo/db test --reporter=verbose
+pnpm --filter @repo/services test --reporter=verbose</pre>
+      <p>The names read like “two workers racing on one asset produce it once”, “the third transient failure fails the asset and stops”, and “the sweep republishes stale work only”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including 7 new database and 9 new job tests. Both pools ran against the emulator, the standard pool logged <code>sweep processed</code> every minute, and <code>pnpm jobs:sweep</code> added one more.</p>
+    </details>
 
     <h3>M5. Doodles by drawing</h3>
     <details id="step-16">
