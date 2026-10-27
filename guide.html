@@ -127,7 +127,7 @@ pnpm dev</pre>
       <li>On the left, the legend: every stationery colour with its name, the four type sizes with real sample text, and the four status pills.</li>
     </ul>
     <p>On an iPad the legend moves above the sheet. The ink colours a person writes with arrive in step 6. The legend shows the stationery colours only.</p>
-    <p>The sheet is plain paper colour for now. The scanned paper texture lives in project-post, which is not in this repository. Copy project-post's <code>paper.png</code> to <code>apps/web/public/images/paper.png</code> and the sheet picks it up without a code change. Until then the browser logs one missing image on the style guide.</p>
+    <p>The sheet carries the scanned paper from project-post, <code>apps/web/public/images/paper.png</code>, repeated at its own size. As printed drops the texture and shows plain white.</p>
     <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, <code>pnpm test</code>, the style guide and home page in Chromium and WebKit, and both screenshots.</p>
   </section>
 
@@ -156,7 +156,7 @@ pnpm dev</pre>
     <h3>M2. Design system and page model</h3>
     <details>
       <summary><span class="tag done">Done</span> 5. Stationery design system and browser harness</summary>
-      <p>A letter on the desk with its floating bar, the Library sheet, named colours, the type scale, and status pills. Open /styleguide. Screenshots land in <code>.local/screens</code>. The paper scan is still to copy from project-post.</p>
+      <p>A letter on the desk with its floating bar, the Library sheet, named colours, the type scale, and status pills. Open /styleguide. Screenshots land in <code>.local/screens</code>.</p>
     </details>
     <details open>
       <summary><span class="tag now">Now</span> 6. Page specs and exclusion floats</summary>
