@@ -299,6 +299,16 @@ body:has(.studio) {
 	transition: background-color var(--duration-quick) var(--ease-settle);
 }
 
+.swatch[data-label-hidden="true"] {
+	padding: 5px;
+}
+
+@media (pointer: coarse) {
+	.swatch[data-label-hidden="true"] {
+		padding: 11px;
+	}
+}
+
 .swatch:hover {
 	background: oklch(0.3 0.03 60 / 0.05);
 }
