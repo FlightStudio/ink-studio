@@ -3,14 +3,18 @@
 	"private": true,
 	"type": "module",
 	"exports": {
-		"./html": "./src/html/index.ts"
+		"./html": "./src/html/index.ts",
+		"./schema": "./src/schema/index.ts"
 	},
 	"scripts": {
 		"test": "vitest run",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@repo/types": "workspace:*"
+		"@repo/types": "workspace:*",
+		"@tiptap/core": "catalog:",
+		"@tiptap/pm": "catalog:",
+		"zod": "catalog:"
 	},
 	"devDependencies": {
 		"@repo/typescript-config": "workspace:*",

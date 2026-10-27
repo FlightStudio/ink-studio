@@ -2,6 +2,27 @@ export type { StockFontId } from "./font.ts";
 export { STOCK_FONTS } from "./font.ts";
 export type { InkColorId, TextSizePt } from "./ink.ts";
 export { INK_COLORS, TEXT_SIZES } from "./ink.ts";
+export type {
+	Align,
+	FontRef,
+	HardBreakNode,
+	InkMark,
+	InkStyle,
+	InlineNode,
+	LetterContent,
+	LetterDoc,
+	ParagraphNode,
+	PlacedElement,
+	SealFont,
+	TextNode,
+} from "./letter.ts";
+export { humanSeal } from "./letter.ts";
+export type { MergeFieldKey, MergeValues } from "./merge-field.ts";
+export {
+	LONGEST_MERGE_VALUES,
+	MERGE_FIELDS,
+	SAMPLE_MERGE_VALUES,
+} from "./merge-field.ts";
 export type { NewOrganization, Organization } from "./organization.ts";
 export type {
 	NewOrganizationUser,

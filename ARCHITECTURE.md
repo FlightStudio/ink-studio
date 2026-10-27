@@ -14,8 +14,11 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | types             | `packages/types/src/page.ts`                      | `PAGE_SPECS`, one entry per provider and product       |
 | types             | `packages/types/src/ink.ts`                       | `INK_COLORS` and `TEXT_SIZES`                          |
 | types             | `packages/types/src/font.ts`                      | `STOCK_FONTS`                                          |
+| types             | `packages/types/src/letter.ts`                    | `LetterContent`, the element union, `humanSeal`        |
+| types             | `packages/types/src/merge-field.ts`               | `MERGE_FIELDS` and the sample and longest values       |
 | render            | `packages/render/src/html/index.ts`               | `@repo/render/html`, client-safe page layout           |
 | render            | `packages/render/src/html/geometry.ts`            | Column, bands, keep-clear exclusions, spacer floats    |
+| render            | `packages/render/src/schema/index.ts`             | `@repo/render/schema`, `letterExtensions` and parser   |
 | errors            | `packages/errors/src/index.ts`                    | `errorMessages`                                        |
 | api               | `packages/api/openapi.yaml`                       | HTTP contract. Client is `packages/api/src/gen/api.ts` |
 | db                | `packages/db/src/index.ts`                        | Identity repositories and migrations                   |
@@ -56,6 +59,16 @@ The page limit is `maxPages`, which a deployment sets up to `providerMaxPages`. 
 Paper coordinates are inches from the top-left of one side's canvas, bleed included. Placed boxes, the safe zone and keep-clear zones use them. Column coordinates are inches from the top-left of the first writing side's text area and run down through every writing side, with `sideTopIn` giving each side's top. `columnBox`, `pageExclusions` and `clipToText` return column coordinates. `sidesUsed` and `overflowIn` take gap-free column inches, as print lays them out.
 
 Exclusions are spacer floats. `pageExclusions` gives a full-width band between consecutive writing sides and every keep-clear zone clipped to its side's text area, floating on the side its corner names; a zone inside the margin adds nothing. `exclusionFloats` turns exclusions into a zero-width spacer and a clearing float each, so exclusions on both edges keep their own tops.
+
+## The letter document
+
+`LetterContent` is defined once, in `packages/types/src/letter.ts`. A letter is Tiptap JSON over `letterExtensions` in `packages/render/src/schema/letter-schema.ts`, never HTML or Markdown. `@repo/render/schema` imports only `@tiptap/core`, `@tiptap/pm`, `zod` and `@repo/types`, so services and Server Components can import it.
+
+`parseLetterContent` in `packages/render/src/schema/parse-letter.ts` is the one parser. Its zod schema is typed against `LetterContent`, builds every enum from the catalogues, refuses unknown keys, requires a UUID for every id, holds the counts to `LETTER_LIMITS`, and checks `minSides` and the front image against the letter's `PAGE_SPECS` entry. It then checks the tree against the Tiptap schema. A refusal throws.
+
+Ids reach CSS only through catalogue lookups. Each extension's `renderHTML` reads `INK_COLORS`, `STOCK_FONTS` and `TEXT_SIZES`; a font family is `stock-<id>` or `own-<fontId>` with the stock fallback behind it. Creator-typed text never reaches CSS.
+
+Placed elements live in the document's root attributes beside `minSides` and the front image, so one undo stack covers text and placement. `humanSeal` derives the seal from the document and the creator's own fonts; nothing stores it.
 
 ## One letter, end to end
 
