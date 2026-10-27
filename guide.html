@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, and the letter and postcard page geometry are ready on your own computer. The editor is still ahead.</p>
-  <div class="progress" aria-hidden="true"><span style="width:16.7%"></span></div>
-  <p class="log">6 of 36 steps in the repository. Step 7 is the letter document and its validation.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the letter and postcard page geometry, and the letter document format are ready on your own computer. The editor is still ahead.</p>
+  <div class="progress" aria-hidden="true"><span style="width:19.4%"></span></div>
+  <p class="log">7 of 36 steps in the repository. Step 8 is the shared letter page, tested in Chromium and WebKit.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -115,22 +115,22 @@ pnpm dev</pre>
     </div>
   </section>
 
-  <section class="panel" id="step-6">
+  <section class="panel" id="step-7">
     <p class="kicker">Just landed</p>
-    <h2>Step 6. Page specs and the page geometry</h2>
-    <p>The paper the printer takes is now data. There is one entry for the Thanks.io windowless letter, the default, and one for the Thanks.io 6×9 postcard. Each entry has the canvas size, the safe zone, the text margin, how many sides a creator may use, and the corners the printer keeps clear. A new printer or product is one more entry.</p>
+    <h2>Step 7. One letter document, checked on every save</h2>
+    <p>A letter is now one defined shape: Tiptap JSON with paragraphs, line breaks, and one ink style per run of text (font, size, and colour). Doodles placed on the page live in the same document, so one undo will cover typing and moving a doodle alike. The document also records how many sides the creator added and, for a postcard, the front image.</p>
     <ul class="points">
-      <li>A letter writes on every side up to its page limit. The default limit is 3 sides, and Thanks.io allows up to 12. The barcode corners of the first side sit inside the margin, so they never push text aside.</li>
-      <li>A postcard has an image front and a writing back. The address and postage block on the back is cut out of the text area, so text flows around it.</li>
-      <li>Text skips the gap between sides, and the postcard's address block, through ordinary CSS floats. Exclusions on the left and the right can overlap and both hold.</li>
-      <li>The same pure functions count the sides in use, measure how far text runs past the last side, and flag a doodle that sits outside the safe zone, over a kept-clear corner, or beyond the last side.</li>
+      <li>One parser checks every letter against the catalogues. An ink colour, size, font, or alignment that is not in the catalogue is refused, so a saved letter can never carry made-up CSS such as <code>red;background:url(x)</code>.</li>
+      <li>Every id must be a UUID. Unknown fields, unknown node types, bold, HTML strings, and future schema versions are refused.</li>
+      <li>A letter is held to 20,000 characters and 200 placed doodles. It may not ask for more sides than its product allows, and only a postcard may have a front image.</li>
+      <li>The Human Seal is worked out from the document. All in Karla's handwriting reads “Written in Karla's own handwriting”. Some of it reads “Partly written in Karla's own handwriting”. Doodles add “doodles hand-drawn”. A letter with nothing human in it has no seal.</li>
+      <li>The merge fields first name and last name are in the catalogue, with sample values for the preview. The <code>@</code> menu that inserts them comes in step 33.</li>
     </ul>
-    <p>Nothing on the page moves yet. That comes in step 8. To check this step on your computer:</p>
-    <pre>pnpm --filter @repo/types test
-pnpm --filter @repo/render test</pre>
-    <p>Each test is named for what it proves, for example “the band between side 1 and side 2 covers both margins and the gap” and “the postcard's address block shapes the back's text”. Add <code>--reporter=verbose</code> to see every name.</p>
-    <p>The five ink colours a creator writes with are in the catalogue now: Midnight, Ink blue, Sepia, Forest, and Oxblood. Open <a href="http://127.0.0.1:3000/styleguide">/styleguide</a> and the legend has an Ink section. Pick a colour and the sample line under it changes to that ink.</p>
-    <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, <code>pnpm test</code>, and the style guide at both screenshot sizes.</p>
+    <p>The page that draws a letter comes in step 8. To check this step on your computer:</p>
+    <pre>pnpm --filter @repo/types test --reporter=verbose
+pnpm --filter @repo/render test --reporter=verbose</pre>
+    <p>The seal cases are under <code>humanSeal</code>, and the parser cases read like “an ink colour outside the catalogue is refused”.</p>
+    <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>.</p>
   </section>
 
   <section>
@@ -171,13 +171,27 @@ pnpm --filter @repo/render test</pre>
     </details>
     <details>
       <summary><span class="tag done">Done</span> 6. Page specs and exclusion floats</summary>
-      <p>The Thanks.io letter and 6×9 postcard as data, and the page geometry as pure functions. See <a href="#step-6">Just landed</a>.</p>
+      <p>The paper the printer takes is now data. There is one entry for the Thanks.io windowless letter, the default, and one for the Thanks.io 6×9 postcard. Each entry has the canvas size, the safe zone, the text margin, how many sides a creator may use, and the corners the printer keeps clear. A new printer or product is one more entry.</p>
+      <ul class="points">
+        <li>A letter writes on every side up to its page limit. The default limit is 3 sides, and Thanks.io allows up to 12. The barcode corners of the first side sit inside the margin, so they never push text aside.</li>
+        <li>A postcard has an image front and a writing back. The address and postage block on the back is cut out of the text area, so text flows around it.</li>
+        <li>Text skips the gap between sides, and the postcard's address block, through ordinary CSS floats. Exclusions on the left and the right can overlap and both hold.</li>
+        <li>The same pure functions count the sides in use, measure how far text runs past the last side, and flag a doodle that sits outside the safe zone, over a kept-clear corner, or beyond the last side.</li>
+      </ul>
+      <p>To check this step on your computer:</p>
+      <pre>pnpm --filter @repo/types test
+pnpm --filter @repo/render test</pre>
+      <p>Each test is named for what it proves, for example “the band between side 1 and side 2 covers both margins and the gap” and “the postcard's address block shapes the back's text”. Add <code>--reporter=verbose</code> to see every name.</p>
+      <p>The five ink colours a creator writes with are in the catalogue now: Midnight, Ink blue, Sepia, Forest, and Oxblood. Open <a href="http://127.0.0.1:3000/styleguide">/styleguide</a> and the legend has an Ink section. Pick a colour and the sample line under it changes to that ink.</p>
+    </details>
+    <details>
+      <summary><span class="tag done">Done</span> 7. One letter document and validation</summary>
+      <p>Tiptap JSON checked against the catalogues on every save, and the Human Seal. See <a href="#step-7">Just landed</a>.</p>
     </details>
     <details open>
-      <summary><span class="tag now">Now</span> 7. One letter document and validation</summary>
-      <p>A letter is stored as Tiptap JSON and checked against the catalogues on every save. Not in the repository yet.</p>
+      <summary><span class="tag now">Now</span> 8. Shared letter page in Chromium and WebKit</summary>
+      <p>One page component for the editor and the print. Text flows across sides and around the postcard's address block in both browser engines. Not in the repository yet.</p>
     </details>
-    <details><summary><span class="tag later">Later</span> 8. Shared letter page in Chromium and WebKit</summary><p>Text flows across sides.</p></details>
 
     <h3>M3. Editor</h3>
     <details><summary><span class="tag later">Later</span> 9. Store letters, titles, revisions</summary><p>Letters persist.</p></details>
