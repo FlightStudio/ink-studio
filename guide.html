@@ -68,8 +68,8 @@ summary { cursor: pointer; }
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
   <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave are ready on your own computer. Formatting from the toolbar is next.</p>
-  <div class="progress" aria-hidden="true"><span style="width:42%"></span></div>
-  <p class="log">15 of 36 steps in the repository. Step 30 renders pages for the printer. Step 11 adds the floating toolbar.</p>
+  <div class="progress" aria-hidden="true"><span style="width:44%"></span></div>
+  <p class="log">16 of 36 steps in the repository. Step 16 draws with a pen, a mouse or a finger. Step 11 adds the floating toolbar.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -296,7 +296,23 @@ pnpm dev</pre>
     <details id="step-15"><summary><span class="tag later">Later</span> 15. Jobs, retries, sweep</summary><p>One lifecycle for every generated file: pending, running, done or failed, with retries and a sweep that picks up stuck work.</p></details>
 
     <h3>M5. Doodles by drawing</h3>
-    <details id="step-16"><summary><span class="tag later">Later</span> 16. Draw with a pen, a mouse or a finger</summary><p>One ink canvas with pencil pressure and palm rejection.</p></details>
+    <details id="step-16">
+      <summary><span class="tag done">Done</span> 16. Draw with a pen, a mouse or a finger</summary>
+      <p>One drawing surface that doodles, signatures and handwriting cells will all use. Try it in the style guide: open <a href="http://127.0.0.1:3000/styleguide">/styleguide</a> and the legend has a Drawing card, a small sheet of paper with Undo and Clear under it.</p>
+      <ul class="points">
+        <li>With an Apple Pencil the line follows how hard you press, thin when light and full when firm.</li>
+        <li>A mouse or a finger cannot press, so the line swells and thins with speed instead, the way a pen moves.</li>
+        <li>Once the pencil has drawn, a hand resting on the screen is ignored, so the palm leaves no marks. A mouse still draws.</li>
+        <li>A second finger stops the first finger's line, so pinching does not scribble.</li>
+        <li>Undo takes back the last line; Clear empties the card. The page does not scroll while you draw on it.</li>
+      </ul>
+      <p>The pencil and the finger still need checking on a real iPad. Here they were driven by simulated pen and touch input.</p>
+      <p>The tests run in <code>pnpm test</code>:</p>
+      <pre>pnpm --filter web test --reporter=verbose
+pnpm --filter @repo/render test --reporter=verbose</pre>
+      <p>The names read like “after a pen has drawn, touches are palms, and a mouse still draws” and “a pen's pressure shapes its outline and a mouse's does not”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including 7 pointer tests and 3 stroke tests, and drawing with a mouse, a simulated pen and a simulated finger on <code>/styleguide</code>.</p>
+    </details>
     <details id="step-17"><summary><span class="tag later">Later</span> 17. Doodle library, tap onto the letter</summary><p>Drawn doodles saved per organization and placed on the page in one undoable step.</p></details>
     <details id="step-18"><summary><span class="tag later">Later</span> 18. Move, resize, rotate, recolour doodles</summary><p>Every gesture is one undo step.</p></details>
 

@@ -26,6 +26,7 @@ export {
 	sideTopIn,
 	writingSides,
 } from "./geometry.ts";
+export { outlinePath, STROKE_OPTIONS, strokeOutline } from "./ink.ts";
 export { LETTER_CSS } from "./letter-css.ts";
 export type { LetterPageProps } from "./letter-page.tsx";
 export {
