@@ -26,6 +26,7 @@ The dev server listens on every interface, port 3000.
 
 `pnpm test:e2e` drives the running dev server from a Playwright container, which reaches this computer as `localhost`. It is not part of `pnpm test`.
 
-1. In `apps/web/.env.local`, set `NEXT_PUBLIC_PLATFORM_URL` to `http://localhost:3000` so saves from that browser pass the origin check.
-2. Run `pnpm dev`, then `pnpm test:e2e`.
-3. For a dev server on another port, start it with `NEXT_PUBLIC_PLATFORM_URL=http://localhost:<port>` and run `WEB_BASE_URL=http://localhost:<port> pnpm test:e2e`. `pnpm screens` reads `WEB_BASE_URL` too, and `SCREENS_DEV_USER` to take the screens as another seeded email.
+The origin check treats `localhost`, `127.0.0.1` and `[::1]` on the same port as one origin, so `NEXT_PUBLIC_PLATFORM_URL` can name either.
+
+1. Run `pnpm dev`, then `pnpm test:e2e`.
+2. For a dev server on another port, start it with `NEXT_PUBLIC_PLATFORM_URL=http://127.0.0.1:<port>` and run `WEB_BASE_URL=http://localhost:<port> pnpm test:e2e`. `pnpm screens` reads `WEB_BASE_URL` too, and `SCREENS_DEV_USER` to take the screens as another seeded email.

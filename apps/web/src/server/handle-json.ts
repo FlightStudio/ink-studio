@@ -9,6 +9,7 @@ import type { z } from "zod";
 import { env } from "../env.ts";
 import { logger } from "../lib/logger.ts";
 import { requireUserOrganization, SessionError } from "./auth.ts";
+import { isPlatformOrigin } from "./origin.ts";
 
 type Handler<Context> = (context: Context) => Promise<Response> | Response;
 
@@ -71,9 +72,9 @@ async function respond(
 }
 
 function hasPlatformOrigin(request: Request): boolean {
-	return (
-		request.headers.get("origin") ===
-		new URL(env.NEXT_PUBLIC_PLATFORM_URL).origin
+	return isPlatformOrigin(
+		request.headers.get("origin"),
+		env.NEXT_PUBLIC_PLATFORM_URL,
 	);
 }
 

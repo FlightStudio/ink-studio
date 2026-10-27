@@ -56,6 +56,7 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | web               | `apps/web/src/app/(studio)/styleguide/page.tsx`             | Style guide as a letter on the desk                                |
 | web               | `apps/web/src/server/auth.ts`                               | `getSession`, the function the move replaces                       |
 | web               | `apps/web/src/server/handle-json.ts`                        | `handleJson`, the one wrapper around every API route               |
+| web               | `apps/web/src/server/origin.ts`                             | `isPlatformOrigin`, loopback names count as one origin             |
 | web               | `apps/web/src/server/letters.ts`                            | `getLetter` and `listLetters` for pages                            |
 | web               | `apps/web/src/app/api/letters/route.ts`                     | Create a letter                                                    |
 | web               | `apps/web/src/app/api/letters/[letterId]/route.ts`          | Read, save and delete one letter                                   |
@@ -85,7 +86,7 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 8. Client components import `@repo/render/html` and `@repo/render/schema`. Services import `@repo/render/schema` to validate a letter against the real schema. `@repo/render/html` imports `perfect-freehand`.
 9. Only the worker imports `@repo/render`. The web never does, and integrations never import `packages/render`: the worker passes outlines and the measure function in.
 10. `packages/testing` is dev-only. Render, integrations and worker tests, the web's e2e files and `tools/dev` import it.
-11. Services take a `Member` and throw `ServiceError` with a kind and an `ApiErrorCode`. `handleJson` checks the origin, the content type and the body, finds the member, and turns each kind into one status; nothing else in a route touches errors. `handleRequest` does the same for routes without a JSON body, such as the upload, which reads the raw body stream. Services that touch only assets take the `UserOrganization`.
+11. Services take a `Member` and throw `ServiceError` with a kind and an `ApiErrorCode`. `handleJson` checks the origin with `isPlatformOrigin`, the content type and the body, finds the member, and turns each kind into one status; nothing else in a route touches errors. `handleRequest` does the same for routes without a JSON body, such as the upload, which reads the raw body stream. Services that touch only assets take the `UserOrganization`.
 12. A provider is an interface a service declares, such as `AssetStorage`. `packages/integrations` implements it and imports only types from services; services never import integrations. Apps build the implementation and pass it in, in `apps/web/src/server/services.ts`. Integration classes read no environment; apps pass every setting.
 
 ## Pages
@@ -148,7 +149,7 @@ Autosave is one pure reducer, `autosave` in `apps/web/src/lib/autosave.ts`. An e
 
 Stock fonts come from `apps/web/src/app/fonts/stock/[fontId]/route.ts`, which reads `packages/render/fonts` by `STOCK_FONTS` file name and answers as immutable; `apps/web/next.config.ts` traces that folder into the build.
 
-Web journeys live in `apps/web/e2e` and run with `pnpm test:e2e`, never inside `pnpm test`, against a running dev server at `WEB_BASE_URL`. `startHarness` in `apps/web/e2e/harness.ts` starts the browser container, seeds a fresh identity with `seedDevIdentity`, signs in through the `dev_user` cookie and creates a fresh letter per test. The browser reaches the host as `localhost`, so `NEXT_PUBLIC_PLATFORM_URL` must name the same origin as `WEB_BASE_URL` for saves to pass the origin check.
+Web journeys live in `apps/web/e2e` and run with `pnpm test:e2e`, never inside `pnpm test`, against a running dev server at `WEB_BASE_URL`. `startHarness` in `apps/web/e2e/harness.ts` starts the browser container, seeds a fresh identity with `seedDevIdentity`, signs in through the `dev_user` cookie and creates a fresh letter per test. The browser reaches the host as `localhost`; the origin check treats loopback names on one port as one origin, so `NEXT_PUBLIC_PLATFORM_URL` may name either loopback address.
 
 ## Files
 
