@@ -11,6 +11,11 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | typescript-config | `packages/typescript-config`                      | Shared TypeScript presets                              |
 | logger            | `packages/logger`                                 | Structured log helper                                  |
 | types             | `packages/types/src/index.ts`                     | Identity shapes, including `Member`                    |
+| types             | `packages/types/src/page.ts`                      | `PAGE_SPECS`, one entry per provider and product       |
+| types             | `packages/types/src/ink.ts`                       | `INK_COLORS` and `TEXT_SIZES`                          |
+| types             | `packages/types/src/font.ts`                      | `STOCK_FONTS`                                          |
+| render            | `packages/render/src/html/index.ts`               | `@repo/render/html`, client-safe page layout           |
+| render            | `packages/render/src/html/geometry.ts`            | Column, bands, keep-clear exclusions, spacer floats    |
 | errors            | `packages/errors/src/index.ts`                    | `errorMessages`                                        |
 | api               | `packages/api/openapi.yaml`                       | HTTP contract. Client is `packages/api/src/gen/api.ts` |
 | db                | `packages/db/src/index.ts`                        | Identity repositories and migrations                   |
@@ -37,6 +42,20 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 4. Pages read through `apps/web/src/server`. Mutations go through `apps/web/src/app/api`.
 5. `getSession` in `apps/web/src/server/auth.ts` is the one function the move replaces.
 6. Stationery tokens in `packages/ui/src/styles/globals.css` apply on the studio class set by `apps/web/src/app/(studio)/layout.tsx`, so every page in that group sits on the desk. Primitives in `packages/ui/src/components/ui` are regenerated with the shadcn CLI, never edited by hand. The browser harness in `packages/testing/src/browser.ts` is dev-only.
+7. `packages/render` has three subpaths. `@repo/render/schema` is the letter's schema and parser, with no JSX and no React. `@repo/render/html` is client-safe layout. `@repo/render` renders the print document. All three read catalogues such as `PAGE_SPECS` from `packages/types`.
+8. Client components import `@repo/render/html` and `@repo/render/schema`. Services import `@repo/render/schema` to validate a letter against the real schema. `@repo/render/html` imports `perfect-freehand`.
+9. Only the worker imports `@repo/render`. The web never does, and integrations never import `packages/render`: the worker passes outlines and the measure function in.
+10. `packages/testing` is dev-only. Render, integrations and worker tests, the web's e2e files and `tools/dev` import it.
+
+## Pages
+
+A new provider or product is one `PAGE_SPECS` entry. Nothing in code names a product or a page count; `packages/render/src/html/geometry.ts` reads everything from the `PageSpec`.
+
+The page limit is `maxPages`, which a deployment sets up to `providerMaxPages`. Sides are numbered from 0. A spec whose `front` is `image` writes from side 1, and `writingSides` runs to `maxPages`.
+
+Paper coordinates are inches from the top-left of one side's canvas, bleed included. Placed boxes, the safe zone and keep-clear zones use them. Column coordinates are inches from the top-left of the first writing side's text area and run down through every writing side, with `sideTopIn` giving each side's top. `columnBox`, `pageExclusions` and `clipToText` return column coordinates. `sidesUsed` and `overflowIn` take gap-free column inches, as print lays them out.
+
+Exclusions are spacer floats. `pageExclusions` gives a full-width band between consecutive writing sides and every keep-clear zone clipped to its side's text area, floating on the side its corner names; a zone inside the margin adds nothing. `exclusionFloats` turns exclusions into a zero-width spacer and a clearing float each, so exclusions on both edges keep their own tops.
 
 ## One letter, end to end
 

@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, and the stationery style guide are ready on your own computer. The editor is still ahead.</p>
-  <div class="progress" aria-hidden="true"><span style="width:13.9%"></span></div>
-  <p class="log">5 of 36 steps in the repository. Step 6 is the letter and postcard page geometry.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, and the letter and postcard page geometry are ready on your own computer. The editor is still ahead.</p>
+  <div class="progress" aria-hidden="true"><span style="width:16.7%"></span></div>
+  <p class="log">6 of 36 steps in the repository. Step 7 is the letter document and its validation.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -80,7 +80,7 @@ summary { cursor: pointer; }
       <li>Install <a href="https://www.docker.com/products/docker-desktop/">Docker Desktop</a> and leave it running. On Linux, Docker Engine plus the Compose plugin is enough. If <code>docker compose</code> says permission denied, open a new terminal after your user is in the <code>docker</code> group, or run the compose commands with <code>sg docker -c '…'</code>.</li>
       <li>Install Node.js 22 from <a href="https://nodejs.org/">nodejs.org</a>.</li>
       <li>In a terminal: <code>corepack enable</code> then <code>corepack prepare pnpm@10.33.4 --activate</code>.</li>
-      <li>Clone this repository and check out the branch <code>cursor/ink-studio-guide-8700</code>.</li>
+      <li>Clone this repository and stay on <code>main</code>. After a pull request is merged, <code>git pull</code> brings it in.</li>
       <li><code>pnpm install</code></li>
     </ol>
     <div id="postgres">
@@ -115,25 +115,27 @@ pnpm dev</pre>
     </div>
   </section>
 
-  <section class="panel">
+  <section class="panel" id="step-6">
     <p class="kicker">Just landed</p>
-    <h2>Step 5. Stationery design system</h2>
-    <p>Open <a href="http://127.0.0.1:3000/styleguide">/styleguide</a> while <code>pnpm dev</code> is running. You should see one sheet of letter paper on a warm desk, the way the editor will look:</p>
+    <h2>Step 6. Page specs and the page geometry</h2>
+    <p>The paper the printer takes is now data. There is one entry for the Thanks.io windowless letter, the default, and one for the Thanks.io 6×9 postcard. Each entry has the canvas size, the safe zone, the text margin, how many sides a creator may use, and the corners the printer keeps clear. A new printer or product is one more entry.</p>
     <ul class="points">
-      <li>A small white bar floats over the top edge of the sheet: undo, redo, align left, centre and right, and Library. Hover a button for its name. Undo and redo follow the alignment you pick.</li>
-      <li>The sheet says Start with a blank sheet. That line and the page title, Quiet stationery, are the only places the serif display face appears.</li>
-      <li>Under the sheet: the letter title, Saved, a View menu that switches between On the desk and As printed, and Delete, which asks before it does anything.</li>
-      <li>Library slides in from the right with two tabs, Drawn and From a photo. Photo doodles carry status pills, and Erase opens a small eraser size slider.</li>
-      <li>On the left, the legend: every stationery colour with its name, the four type sizes with real sample text, and the four status pills.</li>
+      <li>A letter writes on every side up to its page limit. The default limit is 3 sides, and Thanks.io allows up to 12. The barcode corners of the first side sit inside the margin, so they never push text aside.</li>
+      <li>A postcard has an image front and a writing back. The address and postage block on the back is cut out of the text area, so text flows around it.</li>
+      <li>Text skips the gap between sides, and the postcard's address block, through ordinary CSS floats. Exclusions on the left and the right can overlap and both hold.</li>
+      <li>The same pure functions count the sides in use, measure how far text runs past the last side, and flag a doodle that sits outside the safe zone, over a kept-clear corner, or beyond the last side.</li>
     </ul>
-    <p>On an iPad the legend moves above the sheet. The ink colours a person writes with arrive in step 6. The legend shows the stationery colours only.</p>
-    <p>The sheet carries the scanned paper from project-post, <code>apps/web/public/images/paper.png</code>, repeated at its own size. As printed drops the texture and shows plain white.</p>
-    <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, <code>pnpm test</code>, the style guide and home page in Chromium and WebKit, and both screenshots.</p>
+    <p>Nothing on the page moves yet. That comes in step 8. To check this step on your computer:</p>
+    <pre>pnpm --filter @repo/types test
+pnpm --filter @repo/render test</pre>
+    <p>Each test is named for what it proves, for example “the band between side 1 and side 2 covers both margins and the gap” and “the postcard's address block shapes the back's text”. Add <code>--reporter=verbose</code> to see every name.</p>
+    <p>The five ink colours a creator writes with are in the catalogue now: Midnight, Ink blue, Sepia, Forest, and Oxblood. Open <a href="http://127.0.0.1:3000/styleguide">/styleguide</a> and the legend has an Ink section. Pick a colour and the sample line under it changes to that ink.</p>
+    <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, <code>pnpm test</code>, and the style guide at both screenshot sizes.</p>
   </section>
 
   <section>
     <h2 class="milestone">All 36 steps</h2>
-    <p class="log">Done means the code is in this branch. Later means the plan still describes it.</p>
+    <p class="log">Done means the code is merged into <code>main</code>. Later means the plan still describes it.</p>
 
     <h3>M1. Scaffold, database, dev identity</h3>
     <details open>
@@ -156,13 +158,25 @@ pnpm dev</pre>
     <h3>M2. Design system and page model</h3>
     <details>
       <summary><span class="tag done">Done</span> 5. Stationery design system and browser harness</summary>
-      <p>A letter on the desk with its floating bar, the Library sheet, named colours, the type scale, and status pills. Open /styleguide. Screenshots land in <code>.local/screens</code>.</p>
+      <p>Open <a href="http://127.0.0.1:3000/styleguide">/styleguide</a> while <code>pnpm dev</code> is running. One sheet of letter paper lies on a warm desk, the way the editor will look:</p>
+      <ul class="points">
+        <li>A small white bar floats over the top edge of the sheet: undo, redo, align left, centre and right, and Library. Hover a button for its name. Undo and redo follow the alignment you pick.</li>
+        <li>The sheet says Start with a blank sheet. That line and the page title, Quiet stationery, are the only places the serif display face appears.</li>
+        <li>Under the sheet: the letter title, Saved, a View menu that switches between On the desk and As printed, and Delete, which asks before it does anything.</li>
+        <li>Library slides in from the right with two tabs, Drawn and From a photo. Photo doodles carry status pills, and Erase opens a small eraser size slider.</li>
+        <li>On the left, the legend: every stationery colour with its name, the four type sizes with real sample text, and the four status pills.</li>
+      </ul>
+      <p>On an iPad the legend moves above the sheet.</p>
+      <p>The sheet carries the scanned paper from project-post, <code>apps/web/public/images/paper.png</code>, repeated at its own size. As printed drops the texture and shows plain white.</p>
+    </details>
+    <details>
+      <summary><span class="tag done">Done</span> 6. Page specs and exclusion floats</summary>
+      <p>The Thanks.io letter and 6×9 postcard as data, and the page geometry as pure functions. See <a href="#step-6">Just landed</a>.</p>
     </details>
     <details open>
-      <summary><span class="tag now">Now</span> 6. Page specs and exclusion floats</summary>
-      <p>Thanks.io letter and 6×9 postcard as data. Not in the repository yet.</p>
+      <summary><span class="tag now">Now</span> 7. One letter document and validation</summary>
+      <p>A letter is stored as Tiptap JSON and checked against the catalogues on every save. Not in the repository yet.</p>
     </details>
-    <details><summary><span class="tag later">Later</span> 7. One letter document and validation</summary><p>Tiptap JSON, validated on save.</p></details>
     <details><summary><span class="tag later">Later</span> 8. Shared letter page in Chromium and WebKit</summary><p>Text flows across sides.</p></details>
 
     <h3>M3. Editor</h3>

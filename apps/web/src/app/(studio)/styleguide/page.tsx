@@ -1,5 +1,6 @@
 "use client";
 
+import { INK_COLORS, type InkColorId } from "@repo/types";
 import { Desk } from "@repo/ui/components/desk";
 import { FloatingToolbar, Toolbar } from "@repo/ui/components/floating-toolbar";
 import { StatusPill } from "@repo/ui/components/status-pill";
@@ -140,6 +141,7 @@ export default function StyleguidePage() {
 		future: [],
 	});
 	const [token, setToken] = useState("ink");
+	const [ink, setInk] = useState<InkColorId>("ink-blue");
 	const [view, setView] = useState<View>("desk");
 	const selectedToken = tokens.find((item) => item.id === token);
 
@@ -208,6 +210,33 @@ export default function StyleguidePage() {
 						</div>
 						<p className="mt-3 min-h-10 text-ui text-ink-muted">
 							{selectedToken?.use}
+						</p>
+					</section>
+
+					<section aria-labelledby="ink">
+						<SectionLabel>
+							<span id="ink">Ink</span>
+						</SectionLabel>
+						<div
+							role="radiogroup"
+							aria-labelledby="ink"
+							className="-ml-1 grid grid-cols-2 gap-1"
+						>
+							{Object.entries(INK_COLORS).map(([id, color]) => (
+								<Swatch
+									key={id}
+									color={color.css}
+									label={color.label}
+									selected={ink === id}
+									onSelect={() => setInk(id as InkColorId)}
+								/>
+							))}
+						</div>
+						<p
+							className="mt-3 text-title"
+							style={{ color: INK_COLORS[ink].css }}
+						>
+							Dear Alex, the fern came back.
 						</p>
 					</section>
 
