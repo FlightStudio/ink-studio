@@ -63,39 +63,39 @@ The user settled these before building started. They are facts for every step, n
 
 ## Where v2 diverges from v1, and why
 
-| v1 (`PP/ink-studio`)                                                             | v2                                                                                                                           | Why                                                                   |
-| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Letter on the left, controls on the right                                        | The creator types on the page; one floating toolbar                                                                          | Writing on the page is the product                                    |
-| Full-letter photo upload with Tesseract OCR                                      | No full-letter photos, no OCR                                                                                                | It was messy; photos are for doodles, signatures and font templates   |
-| One adaptive-mean threshold (`apps/worker/src/lift.ts`, 41 px window, offset 16) | Staged lift with lighting, colour separation, Sauvola on brightness, run-length line removal, speck removal and a soft matte | A mean threshold keeps rulings, grids and specks                      |
-| Ink baked as black pixels (`INK = [22, 18, 16]`)                                 | Alpha mask tinted at render                                                                                                  | Doodles take any ink colour                                           |
-| Worker code run inside the web request (`POST /api/captures`)                    | Separate worker over Pub/Sub; the web stores and enqueues                                                                    | Image work never runs in a web request                                |
-| Files under `.data`, served by `/api/ink/[id]`                                   | `assets` rows, bytes in GCS, an org-checked route redirecting to short signed URLs                                           | Tenant isolation and project-post's storage                           |
-| Draft in React state, lost on reload                                             | `letters` table, Tiptap JSON, autosave with revisions and conflict recovery                                                  | Letters persist across devices                                        |
-| `@ink-studio/core` pure Draft functions                                          | project-post's layers of types, db, services, integrations and apps                                                          | It drops into project-post                                            |
-| TLA+ model and `pnpm verify` for the Human Seal                                  | One pure `humanSeal` function                                                                                                | The seal is a label, not a stored proof                               |
-| HEIC in the file picker, rejected after upload                                   | HEIC never offered; Safari converts to JPEG                                                                                  | No dead-end upload                                                    |
-| Eight mail sizes, margin `max(0.375 in, short side / 10)`                        | Provider and product specs as data: the Thanks.io windowless letter and 6×9 postcard                                         | Print rules come from the printer, and a second provider is one entry |
-| Page turn, zoom and photo crop controls                                          | Fixed page, positions in inches                                                                                              | Nothing to rotate when you write on the page                          |
-| Three typed styles with no seal                                                  | Stock fonts and the creator's own handwriting font                                                                           | Own handwriting is the human part                                     |
-| Fonts through `next/font/local`, which renames families                          | Self-served files with fixed family ids, the same bytes in editor and print                                                  | Identical metrics in both                                             |
-| ESLint and a root vitest config                                                  | Biome and per-package vitest                                                                                                 | Same toolchain as the destination                                     |
+| v1 (`PP/ink-studio`) | v2 | Why |
+| --- | --- | --- |
+| Letter on the left, controls on the right | The creator types on the page; one floating toolbar | Writing on the page is the product |
+| Full-letter photo upload with Tesseract OCR | No full-letter photos, no OCR | It was messy; photos are for doodles, signatures and font templates |
+| One adaptive-mean threshold (`apps/worker/src/lift.ts`, 41 px window, offset 16) | Staged lift with lighting, colour separation, Sauvola on brightness, run-length line removal, speck removal and a soft matte | A mean threshold keeps rulings, grids and specks |
+| Ink baked as black pixels (`INK = [22, 18, 16]`) | Alpha mask tinted at render | Doodles take any ink colour |
+| Worker code run inside the web request (`POST /api/captures`) | Separate worker over Pub/Sub; the web stores and enqueues | Image work never runs in a web request |
+| Files under `.data`, served by `/api/ink/[id]` | `assets` rows, bytes in GCS, an org-checked route redirecting to short signed URLs | Tenant isolation and project-post's storage |
+| Draft in React state, lost on reload | `letters` table, Tiptap JSON, autosave with revisions and conflict recovery | Letters persist across devices |
+| `@ink-studio/core` pure Draft functions | project-post's layers of types, db, services, integrations and apps | It drops into project-post |
+| TLA+ model and `pnpm verify` for the Human Seal | One pure `humanSeal` function | The seal is a label, not a stored proof |
+| HEIC in the file picker, rejected after upload | HEIC never offered; Safari converts to JPEG | No dead-end upload |
+| Eight mail sizes, margin `max(0.375 in, short side / 10)` | Provider and product specs as data: the Thanks.io windowless letter and 6×9 postcard | Print rules come from the printer, and a second provider is one entry |
+| Page turn, zoom and photo crop controls | Fixed page, positions in inches | Nothing to rotate when you write on the page |
+| Three typed styles with no seal | Stock fonts and the creator's own handwriting font | Own handwriting is the human part |
+| Fonts through `next/font/local`, which renames families | Self-served files with fixed family ids, the same bytes in editor and print | Identical metrics in both |
+| ESLint and a root vitest config | Biome and per-package vitest | Same toolchain as the destination |
 
 ## Milestones
 
-| Milestone                            | Steps    | Demo at the end                                                                                       |
-| ------------------------------------ | -------- | ----------------------------------------------------------------------------------------------------- |
-| M1. Scaffold, database, dev identity | 1 to 4   | `pnpm dev` serves the app for the seeded dev user                                                     |
-| M2. Design system and page model     | 5 to 8   | Text flows across every allowed side around left and right exclusions at once, in Chromium and WebKit |
-| M3. Editor                           | 9 to 12  | Write, title, format, undo, autosave, sides, overflow, print preview, seal                            |
-| M4. Files and jobs                   | 13 to 15 | Files upload into GCS; both worker pools run asset jobs with retries                                  |
-| M5. Doodles by drawing               | 16 to 18 | Draw a doodle, tap it onto the letter, move, resize, rotate, recolour, undo                           |
-| M6. Photo ink lift                   | 19 to 22 | Photograph a doodle on ruled paper, lift, erase leftovers, place it                                   |
-| M7. Fonts (separable)                | 23 to 29 | "My handwriting" by drawing, by template photo, or by uploading a TTF or OTF                          |
-| M8. Proofs and postcards             | 30 to 32 | Export a letter's PDF proof and a postcard's two PNGs from the render pool                            |
-| M9. Merge fields and signature       | 33 to 34 | `@` merge fields; sign the letter; the seal reads it all                                              |
-| M10. Text wrap                       | 35       | Text wraps around a doodle that asks for it                                                           |
-| M11. Move rehearsal                  | 36       | v2 merged by hand into a throwaway clone of project-post                                              |
+| Milestone | Steps | Demo at the end |
+| --- | --- | --- |
+| M1. Scaffold, database, dev identity | 1 to 4 | `pnpm dev` serves the app for the seeded dev user |
+| M2. Design system and page model | 5 to 8 | Text flows across every allowed side around left and right exclusions at once, in Chromium and WebKit |
+| M3. Editor | 9 to 12 | Write, title, format, undo, autosave, sides, overflow, print preview, seal |
+| M4. Files and jobs | 13 to 15 | Files upload into GCS; both worker pools run asset jobs with retries |
+| M5. Doodles by drawing | 16 to 18 | Draw a doodle, tap it onto the letter, move, resize, rotate, recolour, undo |
+| M6. Photo ink lift | 19 to 22 | Photograph a doodle on ruled paper, lift, erase leftovers, place it |
+| M7. Fonts (separable) | 23 to 29 | "My handwriting" by drawing, by template photo, or by uploading a TTF or OTF |
+| M8. Proofs and postcards | 30 to 32 | Export a letter's PDF proof and a postcard's two PNGs from the render pool |
+| M9. Merge fields and signature | 33 to 34 | `@` merge fields; sign the letter; the seal reads it all |
+| M10. Text wrap | 35 | Text wraps around a doodle that asks for it |
+| M11. Move rehearsal | 36 | v2 merged by hand into a throwaway clone of project-post |
 
 Files and jobs come after the editor because nothing before the doodle library needs them, so the creator writes on the page three steps sooner.
 
@@ -157,10 +157,7 @@ export type FindCommentsParams = { file: string; source: string };
 export function findComments(params: FindCommentsParams): CommentFinding[];
 
 export type MissingPath = { line: number; path: string };
-export type FindMissingPathsParams = {
-	markdown: string;
-	exists: (path: string) => boolean;
-};
+export type FindMissingPathsParams = { markdown: string; exists: (path: string) => boolean };
 export function findMissingPaths(params: FindMissingPathsParams): MissingPath[];
 ```
 
@@ -207,17 +204,7 @@ export function findMissingPaths(params: FindMissingPathsParams): MissingPath[];
 ```yaml
 ApiErrorCode:
   type: string
-  enum:
-    [
-      invalid_request,
-      unauthenticated,
-      forbidden,
-      not_found,
-      invalid_origin,
-      unsupported_media_type,
-      internal_error,
-      no_organization,
-    ]
+  enum: [invalid_request, unauthenticated, forbidden, not_found, invalid_origin, unsupported_media_type, internal_error, no_organization]
 ```
 
 **Tests first.** None. This step is shapes, a copied class and generated code.
@@ -254,11 +241,7 @@ export interface OrganizationUsers {
 	userOrganizationByUserId(userId: string): Promise<UserOrganization | null>;
 	create(input: NewOrganizationUser): Promise<OrganizationUser>;
 }
-export interface Tx {
-	users: Users;
-	organizations: Organizations;
-	organizationUsers: OrganizationUsers;
-}
+export interface Tx { users: Users; organizations: Organizations; organizationUsers: OrganizationUsers }
 export interface Db extends Tx {
 	transaction<T>(fn: (tx: Tx) => Promise<T>): Promise<T>;
 	close(): Promise<void>;
@@ -294,27 +277,18 @@ export type TestDb = { db: Db; stop(): Promise<void> };
 
 ```ts
 export type SeedParams = { email: string; organizationName: string };
-export async function seedDevIdentity(
-	db: Db,
-	params: SeedParams,
-): Promise<Member>;
+export async function seedDevIdentity(db: Db, params: SeedParams): Promise<Member>;
 
 export const getSession = cache(async (): Promise<Session | null> => {
 	const cookieStore = await cookies();
 	const devUserCookie = cookieStore.get("dev_user")?.value;
 	const devUserAllowed = env.NODE_ENV !== "production";
-	const email =
-		devUserAllowed && devUserCookie ? devUserCookie : env.DEV_USER_EMAIL;
+	const email = devUserAllowed && devUserCookie ? devUserCookie : env.DEV_USER_EMAIL;
 	const user = await db.users.byExternalId(`dev:${email}`);
 	if (!user) {
 		return null;
 	}
-	return {
-		user,
-		userOrganization: await db.organizationUsers.userOrganizationByUserId(
-			user.id,
-		),
-	};
+	return { user, userOrganization: await db.organizationUsers.userOrganizationByUserId(user.id) };
 });
 ```
 
@@ -398,30 +372,13 @@ export const getSession = cache(async (): Promise<Session | null> => {
 The paper, its shadow and the keep-clear hatching are not here; they belong to the letter and live in `LETTER_CSS` (step 8), which `LetterPage` renders in the editor and the print alike.
 
 ```ts
-export type FloatingToolbarProps = ComponentProps<typeof Toolbar.Root> & {
-	placement: "top" | "bottom";
-};
-export type SwatchProps = {
-	color: string;
-	label: string;
-	selected: boolean;
-	onSelect: () => void;
-};
-export type StatusPillProps = {
-	status: "pending" | "running" | "done" | "failed";
-	label: string;
-};
+export type FloatingToolbarProps = ComponentProps<typeof Toolbar.Root> & { placement: "top" | "bottom" };
+export type SwatchProps = { color: string; label: string; selected: boolean; onSelect: () => void };
+export type StatusPillProps = { status: "pending" | "running" | "done" | "failed"; label: string };
 
 export type StartTestBrowserParams = { chromiumArgs?: string[] };
-export type TestBrowsers = {
-	wsEndpoint: string;
-	chromium: Browser;
-	webkit: Browser;
-	stop(): Promise<void>;
-};
-export async function startTestBrowser(
-	params?: StartTestBrowserParams,
-): Promise<TestBrowsers>;
+export type TestBrowsers = { wsEndpoint: string; chromium: Browser; webkit: Browser; stop(): Promise<void> };
+export async function startTestBrowser(params?: StartTestBrowserParams): Promise<TestBrowsers>;
 ```
 
 **Tests first.** None in vitest. Tokens and components are visual; the live check is screenshots.
@@ -445,12 +402,7 @@ export async function startTestBrowser(
 
 ```ts
 export type Corner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
-export type KeepClearZone = {
-	side: number;
-	corner: Corner;
-	widthIn: number;
-	heightIn: number;
-};
+export type KeepClearZone = { side: number; corner: Corner; widthIn: number; heightIn: number };
 export type ProductKind = "letter" | "postcard";
 export type PageSpec = {
 	provider: string;
@@ -485,12 +437,7 @@ export const PAGE_SPECS = {
 		output: "pdf",
 		keepClear: [
 			{ side: 0, corner: "top-right", widthIn: 135 / 300, heightIn: 140 / 300 },
-			{
-				side: 0,
-				corner: "bottom-left",
-				widthIn: 200 / 300,
-				heightIn: 260 / 300,
-			},
+			{ side: 0, corner: "bottom-left", widthIn: 200 / 300, heightIn: 260 / 300 },
 		],
 	},
 	"thanksio:postcard-6x9": {
@@ -507,14 +454,7 @@ export const PAGE_SPECS = {
 		front: "image",
 		duplex: true,
 		output: "png",
-		keepClear: [
-			{
-				side: 1,
-				corner: "bottom-right",
-				widthIn: 1193 / 300,
-				heightIn: 923 / 300,
-			},
-		],
+		keepClear: [{ side: 1, corner: "bottom-right", widthIn: 1193 / 300, heightIn: 923 / 300 }],
 	},
 } as const satisfies Record<string, PageSpec>;
 export type PageFormatId = keyof typeof PAGE_SPECS;
@@ -538,65 +478,31 @@ export type TextSizePt = (typeof TEXT_SIZES)[number];
 export const STOCK_FONTS = {
 	caveat: { label: "Caveat", file: "Caveat-Regular.ttf" },
 	"patrick-hand": { label: "Patrick Hand", file: "PatrickHand-Regular.ttf" },
-	"homemade-apple": {
-		label: "Homemade Apple",
-		file: "HomemadeApple-Regular.ttf",
-	},
+	"homemade-apple": { label: "Homemade Apple", file: "HomemadeApple-Regular.ttf" },
 } as const satisfies Record<string, { label: string; file: string }>;
 export type StockFontId = keyof typeof STOCK_FONTS;
 ```
 
 ```ts
-export type Rect = {
-	xIn: number;
-	yIn: number;
-	widthIn: number;
-	heightIn: number;
-};
+export type Rect = { xIn: number; yIn: number; widthIn: number; heightIn: number };
 export type PlacedBox = Rect & { side: number; rotationDeg: number };
 export type Exclusion = Rect & { wrap: "left" | "right" | "both" };
-export type FloatBox = {
-	float: "left" | "right";
-	clear: "none" | "left" | "right" | "both";
-	widthIn: number;
-	heightIn: number;
-};
-export type PlacementIssue = {
-	elementId: string;
-	kind: "outside-safe" | "keep-clear" | "beyond-sides";
-};
+export type FloatBox = { float: "left" | "right"; clear: "none" | "left" | "right" | "both"; widthIn: number; heightIn: number };
+export type PlacementIssue = { elementId: string; kind: "outside-safe" | "keep-clear" | "beyond-sides" };
 
 export function writingSides(spec: PageSpec): number[];
 export function sideTopIn(spec: PageSpec, side: number, gapIn: number): number;
 export function columnBox(spec: PageSpec, gapIn: number): Rect;
 export function pageExclusions(spec: PageSpec, gapIn: number): Exclusion[];
-export function clipToText(
-	spec: PageSpec,
-	side: number,
-	rect: Rect,
-	gapIn: number,
-): Rect | null;
+export function clipToText(spec: PageSpec, side: number, rect: Rect, gapIn: number): Rect | null;
 export function boundsOf(box: PlacedBox): Rect;
 export function sidesUsed(spec: PageSpec, params: SidesUsedParams): number;
 export function overflowIn(spec: PageSpec, params: OverflowParams): number;
-export function placementIssues(
-	spec: PageSpec,
-	params: PlacementIssuesParams,
-): PlacementIssue[];
-export function exclusionFloats(
-	column: Rect,
-	exclusions: readonly Exclusion[],
-): FloatBox[];
-export type SidesUsedParams = {
-	textBottomIn: number;
-	boxes: readonly PlacedBox[];
-	minSides: number;
-};
+export function placementIssues(spec: PageSpec, params: PlacementIssuesParams): PlacementIssue[];
+export function exclusionFloats(column: Rect, exclusions: readonly Exclusion[]): FloatBox[];
+export type SidesUsedParams = { textBottomIn: number; boxes: readonly PlacedBox[]; minSides: number };
 export type OverflowParams = { textBottomIn: number };
-export type PlacementIssuesParams = {
-	boxes: readonly (PlacedBox & { id: string })[];
-	sides: number;
-};
+export type PlacementIssuesParams = { boxes: readonly (PlacedBox & { id: string })[]; sides: number };
 ```
 
 Column coordinates start at the top-left of the first writing side's text area and run every writing side up to `maxPages`. `pageExclusions` is the bands between writing sides plus every keep-clear zone clipped to the text area by `clipToText`.
@@ -841,61 +747,26 @@ export interface Letters {
 	byId(organizationId: string, id: string): Promise<Letter | null>;
 	list(organizationId: string): Promise<Letter[]>;
 	create(input: NewLetter): Promise<Letter>;
-	save(
-		organizationId: string,
-		id: string,
-		change: LetterChange,
-	): Promise<number | null>;
+	save(organizationId: string, id: string, change: LetterChange): Promise<number | null>;
 	softDelete(organizationId: string, id: string): Promise<boolean>;
 }
-export type LetterChange = {
-	title: string;
-	content: LetterContent;
-	expectedRevision: number;
-};
+export type LetterChange = { title: string; content: LetterContent; expectedRevision: number };
 ```
 
 ```ts
-export type LetterListItem = {
-	id: string;
-	title: string;
-	updatedAt: Date;
-	humanSeal: string | null;
-};
-export type EditableLetter = {
-	id: string;
-	title: string;
-	content: LetterContent;
-	revision: number;
-	resources: LetterResources;
-	editable: boolean;
-};
+export type LetterListItem = { id: string; title: string; updatedAt: Date; humanSeal: string | null };
+export type EditableLetter = { id: string; title: string; content: LetterContent; revision: number; resources: LetterResources; editable: boolean };
 export type SaveLetterParams = SaveLetterRequest;
 export type CreateLetterParams = CreateLetterRequest;
-export async function letterResources(
-	tx: Tx,
-	organizationId: string,
-	content: LetterContent,
-): Promise<LetterResources>;
-export async function letterOwnerIds(
-	tx: Tx,
-	organizationId: string,
-	content: LetterContent,
-): Promise<Set<string>>;
+export async function letterResources(tx: Tx, organizationId: string, content: LetterContent): Promise<LetterResources>;
+export async function letterOwnerIds(tx: Tx, organizationId: string, content: LetterContent): Promise<Set<string>>;
 
 export class LetterService {
 	constructor(private readonly db: Db) {}
-	createLetter(
-		member: Member,
-		params: CreateLetterParams,
-	): Promise<{ id: string }>;
+	createLetter(member: Member, params: CreateLetterParams): Promise<{ id: string }>;
 	getLetter(member: Member, letterId: string): Promise<EditableLetter | null>;
 	listLetters(member: Member): Promise<LetterListItem[]>;
-	saveLetter(
-		member: Member,
-		letterId: string,
-		params: SaveLetterParams,
-	): Promise<{ revision: number }>;
+	saveLetter(member: Member, letterId: string, params: SaveLetterParams): Promise<{ revision: number }>;
 	deleteLetter(member: Member, letterId: string): Promise<void>;
 }
 ```
@@ -950,10 +821,7 @@ export type AutosaveEvent =
 	| { type: "saveConflicted" }
 	| { type: "keptMine"; latestRevision: number; now: number };
 
-export function autosave(
-	state: AutosaveState,
-	event: AutosaveEvent,
-): AutosaveState;
+export function autosave(state: AutosaveState, event: AutosaveEvent): AutosaveState;
 ```
 
 `SAVE_DELAY_MS = 800`. Retries wait 2 s and double, up to 30 s.
@@ -1020,12 +888,7 @@ export function autosave(
 **Shapes.**
 
 ```ts
-export type PageState = {
-	measure: LetterMeasure;
-	sides: number;
-	overflowIn: number;
-	issues: PlacementIssue[];
-};
+export type PageState = { measure: LetterMeasure; sides: number; overflowIn: number; issues: PlacementIssue[] };
 ```
 
 **Tests first.** `sides.e2e.ts`, at 1440 px (scale 1.25) and at 900 px:
@@ -1072,19 +935,10 @@ export type PageState = {
 export type UploadPurpose = "photo" | "mask" | "font-file";
 export type AssetJob = { kind: "lift-ink"; photoAssetId: string };
 export type AssetOrigin =
-	| {
-			source: "uploaded";
-			purpose: UploadPurpose;
-			filename: string;
-			uploadedByUserId: string;
-	  }
+	| { source: "uploaded"; purpose: UploadPurpose; filename: string; uploadedByUserId: string }
 	| { source: "generated"; job: AssetJob };
 export type AssetProcessing =
-	| {
-			status: "pending" | "running";
-			attempts: number;
-			lastError: string | null;
-	  }
+	| { status: "pending" | "running"; attempts: number; lastError: string | null }
 	| { status: "done"; attempts: number }
 	| { status: "failed"; attempts: number; error: string };
 export type Asset = {
@@ -1109,59 +963,24 @@ export interface AssetStorage {
 	get(key: string): Promise<Uint8Array>;
 	signedReadUrl(params: SignedReadUrlParams): Promise<string>;
 }
-export type PutObjectParams = {
-	key: string;
-	bytes: Uint8Array;
-	contentType: string;
-};
-export type SignedReadUrlParams = {
-	key: string;
-	expiresInSeconds: number;
-	downloadName?: string;
-};
+export type PutObjectParams = { key: string; bytes: Uint8Array; contentType: string };
+export type SignedReadUrlParams = { key: string; expiresInSeconds: number; downloadName?: string };
 
-export type UploadParams = {
-	purpose: UploadPurpose;
-	filename: string;
-	declaredBytes: number | null;
-	body: ReadableStream<Uint8Array>;
-	uploadedByUserId: string;
-};
-export type AssetStatus = {
-	status: AssetProcessing["status"];
-	error: ApiErrorCode | null;
-};
+export type UploadParams = { purpose: UploadPurpose; filename: string; declaredBytes: number | null; body: ReadableStream<Uint8Array>; uploadedByUserId: string };
+export type AssetStatus = { status: AssetProcessing["status"]; error: ApiErrorCode | null };
 
 export function isServable(asset: Asset): boolean;
-export async function assetReadUrl(
-	storage: AssetStorage,
-	asset: Asset,
-): Promise<string | null>;
+export async function assetReadUrl(storage: AssetStorage, asset: Asset): Promise<string | null>;
 
 export class AssetService {
-	constructor(
-		private readonly db: Db,
-		private readonly storage: AssetStorage,
-	) {}
-	upload(
-		userOrganization: UserOrganization,
-		params: UploadParams,
-	): Promise<Asset>;
-	getAssetStatus(
-		userOrganization: UserOrganization,
-		assetId: string,
-	): Promise<AssetStatus | null>;
-	getAssetReadUrl(
-		userOrganization: UserOrganization,
-		assetId: string,
-	): Promise<string | null>;
+	constructor(private readonly db: Db, private readonly storage: AssetStorage) {}
+	upload(userOrganization: UserOrganization, params: UploadParams): Promise<Asset>;
+	getAssetStatus(userOrganization: UserOrganization, assetId: string): Promise<AssetStatus | null>;
+	getAssetReadUrl(userOrganization: UserOrganization, assetId: string): Promise<string | null>;
 }
 
 const UPLOADS = {
-	photo: {
-		maxBytes: 15 * MiB,
-		mimeTypes: ["image/jpeg", "image/png", "image/webp"],
-	},
+	photo: { maxBytes: 15 * MiB, mimeTypes: ["image/jpeg", "image/png", "image/webp"] },
 	mask: { maxBytes: 8 * MiB, mimeTypes: ["image/png"] },
 	"font-file": { maxBytes: 4 * MiB, mimeTypes: ["font/ttf", "font/otf"] },
 } as const;
@@ -1231,9 +1050,7 @@ The `assets` table extends project-post's `schema.dbml` outline with a `purpose`
 **Shapes.**
 
 ```ts
-export function assetMessageType<K extends AssetJob["kind"]>(
-	kind: K,
-): `asset.${K}`;
+export function assetMessageType<K extends AssetJob["kind"]>(kind: K): `asset.${K}`;
 
 export interface Assets {
 	byId(organizationId: string, id: string): Promise<Asset | null>;
@@ -1244,17 +1061,9 @@ export interface Assets {
 	fail(id: string, error: string): Promise<void>;
 	stale(before: Date): Promise<Asset[]>;
 }
-export type StoredFile = {
-	mimeType: string;
-	byteSize: number;
-	checksum: string;
-};
+export type StoredFile = { mimeType: string; byteSize: number; checksum: string };
 
-export type ProducedFile<R> = {
-	bytes: Uint8Array;
-	mimeType: string;
-	result: R;
-};
+export type ProducedFile<R> = { bytes: Uint8Array; mimeType: string; result: R };
 export type AssetJobMessage = { assetId: string };
 export type JobOf<K extends AssetJob["kind"]> = Extract<AssetJob, { kind: K }>;
 export type RunJobParams<K extends AssetJob["kind"], R> = {
@@ -1265,20 +1074,11 @@ export type RunJobParams<K extends AssetJob["kind"], R> = {
 };
 
 export function generatedAsset(organizationId: string, job: AssetJob): NewAsset;
-export async function publishAssetJob(
-	publisher: Publisher,
-	asset: Asset,
-): Promise<void>;
+export async function publishAssetJob(publisher: Publisher, asset: Asset): Promise<void>;
 
 export class AssetService {
-	constructor(
-		private readonly db: Db,
-		private readonly storage: AssetStorage,
-		private readonly publisher: Publisher,
-	) {}
-	runJob<K extends AssetJob["kind"], R>(
-		params: RunJobParams<K, R>,
-	): Promise<void>;
+	constructor(private readonly db: Db, private readonly storage: AssetStorage, private readonly publisher: Publisher) {}
+	runJob<K extends AssetJob["kind"], R>(params: RunJobParams<K, R>): Promise<void>;
 	sweep(now: Date): Promise<number>;
 }
 ```
@@ -1321,39 +1121,15 @@ export class AssetService {
 
 ```ts
 export type StrokeInput = "pen" | "mouse" | "touch";
-export type StrokePoint = readonly [
-	x: number,
-	y: number,
-	pressure: number,
-	t: number,
-];
+export type StrokePoint = readonly [x: number, y: number, pressure: number, t: number];
 export type Stroke = { input: StrokeInput; points: StrokePoint[] };
 
-export const STROKE_OPTIONS = {
-	size: 8,
-	thinning: 0.6,
-	smoothing: 0.55,
-	streamline: 0.4,
-} as const;
-export function strokeOutline(
-	stroke: Stroke,
-	scale: number,
-): [number, number][];
+export const STROKE_OPTIONS = { size: 8, thinning: 0.6, smoothing: 0.55, streamline: 0.4 } as const;
+export function strokeOutline(stroke: Stroke, scale: number): [number, number][];
 export function outlinePath(outline: readonly [number, number][]): string;
 
-export type PointerSample = {
-	pointerId: number;
-	input: StrokeInput;
-	x: number;
-	y: number;
-	pressure: number;
-	t: number;
-};
-export type PointerSessionState = {
-	strokes: Stroke[];
-	active: { pointerId: number; stroke: Stroke; startedAt: number } | null;
-	penSeen: boolean;
-};
+export type PointerSample = { pointerId: number; input: StrokeInput; x: number; y: number; pressure: number; t: number };
+export type PointerSessionState = { strokes: Stroke[]; active: { pointerId: number; stroke: Stroke; startedAt: number } | null; penSeen: boolean };
 export type PointerSessionEvent =
 	| { type: "down"; sample: PointerSample }
 	| { type: "move"; samples: PointerSample[] }
@@ -1361,10 +1137,7 @@ export type PointerSessionEvent =
 	| { type: "cancel"; pointerId: number }
 	| { type: "undo" }
 	| { type: "clear" };
-export function pointerSession(
-	state: PointerSessionState,
-	event: PointerSessionEvent,
-): PointerSessionState;
+export function pointerSession(state: PointerSessionState, event: PointerSessionEvent): PointerSessionState;
 ```
 
 **Tests first.** `pointer-session.test.ts`:
@@ -1404,11 +1177,7 @@ export function pointerSession(
 ```ts
 export type DrawingKind = "doodle" | "signature";
 export type DrawingSource =
-	| {
-			kind: "drawn";
-			box: { widthPx: number; heightPx: number };
-			strokes: Stroke[];
-	  }
+	| { kind: "drawn"; box: { widthPx: number; heightPx: number }; strokes: Stroke[] }
 	| { kind: "photo"; photoAssetId: string };
 export type Drawing = {
 	id: string;
@@ -1422,42 +1191,21 @@ export type Drawing = {
 	createdAt: Date;
 	deletedAt: Date | null;
 };
-export type LibraryDrawing = {
-	id: string;
-	kind: DrawingKind;
-	name: string;
-	aspect: number;
-	maskAssetId: string;
-};
+export type LibraryDrawing = { id: string; kind: DrawingKind; name: string; aspect: number; maskAssetId: string };
 
 export type CreateDrawingParams = CreateDrawingRequest;
 export class DrawingService {
-	constructor(
-		private readonly db: Db,
-		private readonly storage: AssetStorage,
-	) {}
-	createDrawing(
-		member: Member,
-		params: CreateDrawingParams,
-	): Promise<{ id: string }>;
+	constructor(private readonly db: Db, private readonly storage: AssetStorage) {}
+	createDrawing(member: Member, params: CreateDrawingParams): Promise<{ id: string }>;
 	listDrawings(member: Member, kind: DrawingKind): Promise<LibraryDrawing[]>;
 	renameDrawing(member: Member, drawingId: string, name: string): Promise<void>;
 	deleteDrawing(member: Member, drawingId: string): Promise<void>;
 }
 
-export function placeElement(
-	state: EditorState,
-	element: PlacedElement,
-): Transaction;
-export function updateElement(
-	state: EditorState,
-	id: string,
-	change: ElementChange,
-): Transaction;
+export function placeElement(state: EditorState, element: PlacedElement): Transaction;
+export function updateElement(state: EditorState, id: string, change: ElementChange): Transaction;
 export function removeElement(state: EditorState, id: string): Transaction;
-export type ElementChange = Partial<
-	Omit<PlacedElement, "id" | "kind" | "drawingId">
->;
+export type ElementChange = Partial<Omit<PlacedElement, "id" | "kind" | "drawingId">>;
 ```
 
 The `drawings` table: `id`, `organization_id`, `owner_user_id`, `kind`, `name`, `source` (jsonb), `mask_asset_id`, `aspect`, `created_at`, `deleted_at`. Doodles are shared with the organization; a signature is usable, listed, renamed and deleted only by its owner (settled decision 9). `isUsableBy(member, drawing)` is the one rule. `letterResources` fills `resources.drawings` with every drawing the letter references, deleted or not.
@@ -1514,19 +1262,9 @@ The `drawings` table: `id`, `organization_id`, `owner_user_id`, `kind`, `name`, 
 export type Handle = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 export type PointIn = { xIn: number; yIn: number };
 export type PointerParams = { pointer: PointIn; spec: PageSpec; gapIn: number };
-export function moveTo(
-	element: PlacedElement,
-	params: PointerParams,
-): Pick<PlacedElement, "side" | "xIn" | "yIn">;
-export function resizeFrom(
-	element: PlacedElement,
-	handle: Handle,
-	params: PointerParams,
-): Pick<PlacedElement, "xIn" | "yIn" | "widthIn" | "heightIn">;
-export function rotateToward(
-	element: PlacedElement,
-	params: PointerParams,
-): number;
+export function moveTo(element: PlacedElement, params: PointerParams): Pick<PlacedElement, "side" | "xIn" | "yIn">;
+export function resizeFrom(element: PlacedElement, handle: Handle, params: PointerParams): Pick<PlacedElement, "xIn" | "yIn" | "widthIn" | "heightIn">;
+export function rotateToward(element: PlacedElement, params: PointerParams): number;
 export const MIN_ELEMENT_IN = 0.25;
 export const SNAP_DEG = 4;
 ```
@@ -1578,14 +1316,8 @@ export interface ImageProcessor {
 }
 export type LiftMaskOptions = { removeLines: boolean; cropToInk: boolean };
 export type Mask = { widthPx: number; heightPx: number; alpha: Uint8Array };
-export function liftMask(
-	photo: Uint8Array,
-	options: LiftMaskOptions,
-): Promise<Mask>;
-export const LIFT_LIMITS = {
-	maxInputPixels: 40_000_000,
-	workingLongSidePx: 2400,
-} as const;
+export function liftMask(photo: Uint8Array, options: LiftMaskOptions): Promise<Mask>;
+export const LIFT_LIMITS = { maxInputPixels: 40_000_000, workingLongSidePx: 2400 } as const;
 export class SharpImageProcessor implements ImageProcessor {
 	liftInk(photo: Uint8Array): Promise<Uint8Array>;
 }
@@ -1655,21 +1387,11 @@ export class SharpImageProcessor implements ImageProcessor {
 ```ts
 export type RequestLiftParams = RequestLiftRequest;
 export class DrawingService {
-	requestLift(
-		member: Member,
-		params: RequestLiftParams,
-	): Promise<{ assetId: string }>;
+	requestLift(member: Member, params: RequestLiftParams): Promise<{ assetId: string }>;
 }
 export class AssetLiftInkProcessor implements MessageProcessor {
 	readonly type = assetMessageType("lift-ink");
-	constructor(
-		private readonly params: {
-			db: Db;
-			assets: AssetService;
-			storage: AssetStorage;
-			images: ImageProcessor;
-		},
-	) {}
+	constructor(private readonly params: { db: Db; assets: AssetService; storage: AssetStorage; images: ImageProcessor }) {}
 	process(message: Message): Promise<void>;
 }
 ```
@@ -1741,18 +1463,8 @@ export type PathSegment =
 	| ["Q", number, number, number, number]
 	| ["C", number, number, number, number, number, number];
 export type Contour = PathSegment[];
-export type GlyphOutline = {
-	char: string;
-	variant: number;
-	contours: Contour[];
-	advanceWidth: number;
-};
-export type BuildFontParams = {
-	familyName: string;
-	ascender: number;
-	descender: number;
-	glyphs: GlyphOutline[];
-};
+export type GlyphOutline = { char: string; variant: number; contours: Contour[]; advanceWidth: number };
+export type BuildFontParams = { familyName: string; ascender: number; descender: number; glyphs: GlyphOutline[] };
 export const UNITS_PER_EM = 1000;
 export function buildFont(params: BuildFontParams): Uint8Array;
 ```
@@ -1807,19 +1519,8 @@ export function variantFeatureSettings(letterId: string): string;
 export const HANDWRITING_GLYPHS = [
 	{ char: "a", variants: 3, required: true },
 	{ char: "A", variants: 1, required: false },
-] as const satisfies readonly {
-	char: string;
-	variants: 1 | 2 | 3;
-	required: boolean;
-}[];
-export const CELL = {
-	size: 1000,
-	ascender: 150,
-	xHeight: 450,
-	baseline: 750,
-	descender: 950,
-	strokeScale: 5,
-} as const;
+] as const satisfies readonly { char: string; variants: 1 | 2 | 3; required: boolean }[];
+export const CELL = { size: 1000, ascender: 150, xHeight: 450, baseline: 750, descender: 950, strokeScale: 5 } as const;
 export const GLYPH_LIMITS = { strokes: 40, pointsPerStroke: 2000 } as const;
 export function missingChars(glyphs: readonly DrawnGlyph[]): string[];
 
@@ -1838,34 +1539,15 @@ export type Font = {
 	updatedAt: Date;
 	deletedAt: Date | null;
 };
-export type FontOption = {
-	id: string;
-	ownerName: string;
-	assetId: string | null;
-	building: boolean;
-	chars: string;
-};
-export type EditableFont = {
-	id: string;
-	ownerName: string;
-	glyphs: DrawnGlyph[];
-	assetId: string | null;
-	building: boolean;
-};
+export type FontOption = { id: string; ownerName: string; assetId: string | null; building: boolean; chars: string };
+export type EditableFont = { id: string; ownerName: string; glyphs: DrawnGlyph[]; assetId: string | null; building: boolean };
 
 export type CreateFontParams = CreateFontRequest;
 export type SaveGlyphParams = SaveGlyphRequest;
 export class FontService {
-	constructor(
-		private readonly db: Db,
-		private readonly publisher: Publisher,
-	) {}
+	constructor(private readonly db: Db, private readonly publisher: Publisher) {}
 	createFont(member: Member, params: CreateFontParams): Promise<{ id: string }>;
-	saveGlyph(
-		member: Member,
-		fontId: string,
-		params: SaveGlyphParams,
-	): Promise<void>;
+	saveGlyph(member: Member, fontId: string, params: SaveGlyphParams): Promise<void>;
 	listFonts(member: Member): Promise<FontOption[]>;
 	getFont(member: Member, fontId: string): Promise<EditableFont | null>;
 	deleteFont(member: Member, fontId: string): Promise<void>;
@@ -1911,19 +1593,10 @@ The full `HANDWRITING_GLYPHS` list is settled decision 18's 94 glyphs. The `font
 **Shapes.**
 
 ```ts
-export type AssetJob =
-	| { kind: "lift-ink"; photoAssetId: string }
-	| { kind: "build-font"; fontId: string };
+export type AssetJob = { kind: "lift-ink"; photoAssetId: string } | { kind: "build-font"; fontId: string };
 
-export type OutlineGlyph = {
-	char: string;
-	variant: number;
-	polygons: [number, number][][];
-};
-export type FromStrokeOutlinesParams = {
-	familyName: string;
-	glyphs: OutlineGlyph[];
-};
+export type OutlineGlyph = { char: string; variant: number; polygons: [number, number][][] };
+export type FromStrokeOutlinesParams = { familyName: string; glyphs: OutlineGlyph[] };
 export type BuiltFont = { bytes: Uint8Array; chars: string };
 export interface FontBuilder {
 	fromStrokeOutlines(params: FromStrokeOutlinesParams): Promise<BuiltFont>;
@@ -1933,14 +1606,7 @@ export class FontService {
 }
 export class AssetBuildFontProcessor implements MessageProcessor {
 	readonly type = assetMessageType("build-font");
-	constructor(
-		private readonly params: {
-			db: Db;
-			assets: AssetService;
-			storage: AssetStorage;
-			builder: FontBuilder;
-		},
-	) {}
+	constructor(private readonly params: { db: Db; assets: AssetService; storage: AssetStorage; builder: FontBuilder }) {}
 	process(message: Message): Promise<void>;
 }
 ```
@@ -2031,10 +1697,7 @@ export function toCellUnits(stroke: Stroke, cellPx: number): Stroke;
 
 ```ts
 export type VectorizeParams = { tolerancePx: number };
-export function vectorize(
-	mask: Mask,
-	params: VectorizeParams,
-): [number, number][][];
+export function vectorize(mask: Mask, params: VectorizeParams): [number, number][][];
 ```
 
 **Tests first.** `vectorize.test.ts`:
@@ -2071,21 +1734,8 @@ export const HANDWRITING_TEMPLATE = {
 	version: 1,
 	page: { widthIn: 8.5, heightIn: 11 },
 	marker: { sizeIn: 0.4, insetIn: 0.4, notchIn: 0.12 },
-	grid: {
-		columns: 8,
-		rows: 13,
-		xIn: 0.9,
-		yIn: 1.2,
-		cellWidthIn: 0.84,
-		cellHeightIn: 0.72,
-		cellInsetIn: 0.06,
-	},
-	printColors: {
-		border: "#8fd3e8",
-		guide: "#c4ecf6",
-		label: "#8fd3e8",
-		marker: "#000000",
-	},
+	grid: { columns: 8, rows: 13, xIn: 0.9, yIn: 1.2, cellWidthIn: 0.84, cellHeightIn: 0.72, cellInsetIn: 0.06 },
+	printColors: { border: "#8fd3e8", guide: "#c4ecf6", label: "#8fd3e8", marker: "#000000" },
 } as const;
 export type FontSource =
 	| { kind: "drawn"; glyphs: DrawnGlyph[] }
@@ -2140,13 +1790,7 @@ export type FontSource =
 	| { kind: "upload"; fileAssetId: string };
 export type FromUploadParams = { familyName: string; file: Uint8Array };
 export class OpentypeFontBuilder implements FontBuilder {
-	constructor(
-		private readonly params: {
-			thread: { url: URL; execArgv: string[] };
-			parseTimeoutMs: number;
-			parseMaxMemoryMb: number;
-		},
-	) {}
+	constructor(private readonly params: { thread: { url: URL; execArgv: string[] }; parseTimeoutMs: number; parseMaxMemoryMb: number }) {}
 	fromUpload(params: FromUploadParams): Promise<BuiltFont>;
 }
 ```
@@ -2192,15 +1836,8 @@ Defaults are 5,000 ms and 256 MB. The worker's `main` passes the bundled thread 
 
 ```ts
 export type PrintResource = { bytes: Uint8Array; contentType: string };
-export type PrintOutput =
-	| { format: "pdf"; duplex: boolean }
-	| { format: "png"; side: number };
-export type MeasureParams = {
-	html: string;
-	resources: ReadonlyMap<string, PrintResource>;
-	measure: typeof measureLetter;
-	input: MeasureInput;
-};
+export type PrintOutput = { format: "pdf"; duplex: boolean } | { format: "png"; side: number };
+export type MeasureParams = { html: string; resources: ReadonlyMap<string, PrintResource>; measure: typeof measureLetter; input: MeasureInput };
 export type RenderParams = MeasureParams & {
 	sheet: { widthIn: number; heightIn: number };
 	output: PrintOutput;
@@ -2211,9 +1848,7 @@ export interface PrintRenderer {
 	render(params: RenderParams): Promise<Uint8Array>;
 }
 export class PlaywrightPrintRenderer implements PrintRenderer {
-	static connect(params: {
-		wsEndpoint: string;
-	}): Promise<PlaywrightPrintRenderer>;
+	static connect(params: { wsEndpoint: string }): Promise<PlaywrightPrintRenderer>;
 	static launch(): Promise<PlaywrightPrintRenderer>;
 	close(): Promise<void>;
 }
@@ -2266,23 +1901,11 @@ export type AssetJob =
 
 export type RequestExportParams = RequestExportRequest;
 export class LetterService {
-	requestExport(
-		member: Member,
-		letterId: string,
-		params: RequestExportParams,
-	): Promise<{ assetIds: string[] }>;
+	requestExport(member: Member, letterId: string, params: RequestExportParams): Promise<{ assetIds: string[] }>;
 }
 export class AssetRenderLetterProcessor implements MessageProcessor {
 	readonly type = assetMessageType("render-letter");
-	constructor(
-		private readonly params: {
-			db: Db;
-			assets: AssetService;
-			storage: AssetStorage;
-			renderer: PrintRenderer;
-			stockFontsDir: URL;
-		},
-	) {}
+	constructor(private readonly params: { db: Db; assets: AssetService; storage: AssetStorage; renderer: PrintRenderer; stockFontsDir: URL }) {}
 	process(message: Message): Promise<void>;
 }
 ```
@@ -2428,22 +2051,14 @@ export const mergeFieldSuggestion: Extension;
 export const SIGNATURE_WIDTHS = [1.5, 2.25, 3] as const;
 export type SignatureNode = {
 	type: "signature";
-	attrs: {
-		drawingId: string;
-		widthIn: (typeof SIGNATURE_WIDTHS)[number];
-		align: Align;
-		color: InkColorId;
-	};
+	attrs: { drawingId: string; widthIn: (typeof SIGNATURE_WIDTHS)[number]; align: Align; color: InkColorId };
 };
 export type LetterDoc = {
 	type: "doc";
 	attrs: { elements: PlacedElement[]; minSides: number };
 	content: (ParagraphNode | SignatureNode)[];
 };
-export function signLetter(
-	state: EditorState,
-	signature: SignatureNode["attrs"],
-): Transaction;
+export function signLetter(state: EditorState, signature: SignatureNode["attrs"]): Transaction;
 export function SignatureMark(props: SignatureNode["attrs"]): ReactElement;
 ```
 
@@ -2499,11 +2114,7 @@ The document's content expression is `paragraph+ signature?`, so a signature any
 **Shapes.**
 
 ```ts
-export function wrapExclusions(
-	spec: PageSpec,
-	elements: readonly PlacedElement[],
-	gapIn: number,
-): Exclusion[];
+export function wrapExclusions(spec: PageSpec, elements: readonly PlacedElement[], gapIn: number): Exclusion[];
 export const WRAP_PADDING_IN = 0.12;
 ```
 
@@ -2553,60 +2164,60 @@ export const WRAP_PADDING_IN = 0.12;
 
 ## Appendix A. Where each piece lands in project-post
 
-| v2 path                                                                                                                                              | project-post destination                                | Action                                                                                                                                                                                                             |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `packages/typescript-config`, `packages/logger`, `packages/errors`, `packages/services/src/queue`, the Pub/Sub classes                               | same                                                    | Drop v2's copy; add v2's error codes                                                                                                                                                                               |
-| `packages/api/openapi.yaml`                                                                                                                          | same                                                    | Merge paths, schemas, codes                                                                                                                                                                                        |
-| `packages/types/src/{asset,page,ink,font,stroke,drawing,letter,merge-field,handwriting}.ts`                                                          | same                                                    | Merge                                                                                                                                                                                                              |
-| `assets` table                                                                                                                                       | same                                                    | Schema change: `purpose`, `job`, the `source` enum and the check constraint extend the outline; update `schema.dbml`                                                                                               |
-| `letters` table, `services/letters`, `/api/letters*`                                                                                                 | `product_editions`, `services/editions`                 | Rewrite (settled decision 13): content becomes a component entry in `product_editions.content`; revision moves to editions                                                                                         |
-| `asset.render-letter` and its processor                                                                                                              | `edition.preflight`                                     | Rewrite: the proof becomes `preflight_proof_asset_id`; the job snapshot becomes `approved_render_spec`; per-recipient renders join fulfilment                                                                      |
-| `drawings`, `services/drawings`, `asset.lift-ink`                                                                                                    | same                                                    | Merge; replaces `catalog.uploadSignature` and `asset.process-signature` (settled decision 13)                                                                                                                      |
-| `fonts`, `services/fonts`, `asset.build-font`                                                                                                        | same                                                    | Merge; `owner_user_id` and the `Member` caller come with them                                                                                                                                                      |
-| `packages/testing`                                                                                                                                   | same                                                    | Merge as a dev-only package                                                                                                                                                                                        |
-| `packages/integrations/src/shared/gcp/storage`                                                                                                       | same                                                    | Merge; the Cloud Storage class the layout plans                                                                                                                                                                    |
-| `packages/integrations/src/worker/{image,font,chromium}`                                                                                             | same                                                    | Merge                                                                                                                                                                                                              |
-| `packages/render`                                                                                                                                    | same                                                    | Merge; file the ADR in settled decision 3                                                                                                                                                                          |
-| `packages/ui`                                                                                                                                        | same                                                    | Merge components; v2 tokens are already scoped to `.studio`                                                                                                                                                        |
-| `apps/web/src/app/(studio)`                                                                                                                          | `apps/web/src/app/(studio)` beside `(org)`              | Move as its own route group with the same session check, outside the onboarding chrome                                                                                                                             |
-| `apps/web/src/app/page.tsx` redirect                                                                                                                 | none                                                    | Drop; project-post's marketing page owns `/`                                                                                                                                                                       |
-| `apps/web/src/app/(studio)/styleguide`                                                                                                               | none                                                    | Drop                                                                                                                                                                                                               |
-| `apps/web/src/app/fonts/stock`, `/api/assets/*`, `/api/uploads`, `/api/letters*`, `/api/drawings*`, `/api/fonts*`                                    | same                                                    | Merge                                                                                                                                                                                                              |
-| `apps/web/src/features/{editor,ink,library,fonts}`, `apps/web/src/lib/{autosave,use-autosave}.ts`, `apps/web/src/server/{letters,drawings,fonts}.ts` | same                                                    | Merge                                                                                                                                                                                                              |
-| `packages/types/src/session.ts` `Member`                                                                                                             | project-post's `session.ts`                             | Add the type; `requireUserOrganization` already returns that shape                                                                                                                                                 |
-| `packages/services/src/assets`                                                                                                                       | same                                                    | Merge                                                                                                                                                                                                              |
-| `packages/db/src/testing/seed-dev-identity.ts`, the `dev_user` cookie in `getSession`                                                                | none                                                    | Drop with the dev identity                                                                                                                                                                                         |
-| `apps/web/e2e`, `apps/web/vitest.e2e.config.ts`, root `test:e2e`                                                                                     | same                                                    | Merge; the harness signs in through project-post's auth emulator instead of the `dev_user` cookie                                                                                                                  |
-| `tools/dev/{screens,sweep}.ts`, root `screens` and `jobs:sweep`                                                                                      | same                                                    | Merge as dev tools                                                                                                                                                                                                 |
-| `docker-compose.yml` `gcs` and `browser` services                                                                                                    | same                                                    | Merge                                                                                                                                                                                                              |
-| `tools/check-comments.ts`, `tools/check-architecture.ts`, their tests, the `check` script, `@babel/parser`, the lefthook `comments` command          | same                                                    | Merge; check-architecture reads project-post's `docs/project-layout.md` or a moved `ARCHITECTURE.md`, decided then                                                                                                 |
-| `apps/web/src/server/auth.ts` `getSession`                                                                                                           | project-post's                                          | Replace                                                                                                                                                                                                            |
-| `tools/dev/seed.ts`                                                                                                                                  | none                                                    | Drop                                                                                                                                                                                                               |
-| `apps/worker/src/processors/*`                                                                                                                       | same                                                    | Merge; register in `main`                                                                                                                                                                                          |
-| `Dockerfile.worker`                                                                                                                                  | per pool                                                | Decide (settled decision 14): Playwright base for the render pool, `node:26-slim` plus `sharp` for standard                                                                                                        |
-| `renderLetterHtml`, `AssetRenderLetterProcessor`, `PrintRenderer` (one recipient's `mergeValues` per render)                                         | project-post's fulfilment worker                        | Mail merge: for each recipient, fill `mergeValues` from the customer record, render once, submit, then the next address. The template, the render and the fit check are reused unchanged; v2 has no recipient list |
-| `PAGE_SPECS` (`thanksio:letter-windowless`, `thanksio:postcard-6x9`)                                                                                 | same                                                    | Merge; add each further provider or size (Thanks.io 4×6, 6×11) as one entry                                                                                                                                        |
-| Pub/Sub render filter                                                                                                                                | `tools/docker/pubsub-entrypoint.sh`, Terraform `pubsub` | Add `asset.render-letter`; Cloud Scheduler publishes `sweep`                                                                                                                                                       |
-| Bucket access                                                                                                                                        | Terraform `storage`, `iam`                              | Add a CORS rule (GET from the platform origin, `Content-Type`); grant `roles/iam.serviceAccountTokenCreator` to the web and worker accounts on themselves for signBlob                                             |
-| `.github/workflows/ci.yml` lint job                                                                                                                  | same                                                    | Add `pnpm --filter tools check` (a CI change you approve)                                                                                                                                                          |
+| v2 path | project-post destination | Action |
+| --- | --- | --- |
+| `packages/typescript-config`, `packages/logger`, `packages/errors`, `packages/services/src/queue`, the Pub/Sub classes | same | Drop v2's copy; add v2's error codes |
+| `packages/api/openapi.yaml` | same | Merge paths, schemas, codes |
+| `packages/types/src/{asset,page,ink,font,stroke,drawing,letter,merge-field,handwriting}.ts` | same | Merge |
+| `assets` table | same | Schema change: `purpose`, `job`, the `source` enum and the check constraint extend the outline; update `schema.dbml` |
+| `letters` table, `services/letters`, `/api/letters*` | `product_editions`, `services/editions` | Rewrite (settled decision 13): content becomes a component entry in `product_editions.content`; revision moves to editions |
+| `asset.render-letter` and its processor | `edition.preflight` | Rewrite: the proof becomes `preflight_proof_asset_id`; the job snapshot becomes `approved_render_spec`; per-recipient renders join fulfilment |
+| `drawings`, `services/drawings`, `asset.lift-ink` | same | Merge; replaces `catalog.uploadSignature` and `asset.process-signature` (settled decision 13) |
+| `fonts`, `services/fonts`, `asset.build-font` | same | Merge; `owner_user_id` and the `Member` caller come with them |
+| `packages/testing` | same | Merge as a dev-only package |
+| `packages/integrations/src/shared/gcp/storage` | same | Merge; the Cloud Storage class the layout plans |
+| `packages/integrations/src/worker/{image,font,chromium}` | same | Merge |
+| `packages/render` | same | Merge; file the ADR in settled decision 3 |
+| `packages/ui` | same | Merge components; v2 tokens are already scoped to `.studio` |
+| `apps/web/src/app/(studio)` | `apps/web/src/app/(studio)` beside `(org)` | Move as its own route group with the same session check, outside the onboarding chrome |
+| `apps/web/src/app/page.tsx` redirect | none | Drop; project-post's marketing page owns `/` |
+| `apps/web/src/app/(studio)/styleguide` | none | Drop |
+| `apps/web/src/app/fonts/stock`, `/api/assets/*`, `/api/uploads`, `/api/letters*`, `/api/drawings*`, `/api/fonts*` | same | Merge |
+| `apps/web/src/features/{editor,ink,library,fonts}`, `apps/web/src/lib/{autosave,use-autosave}.ts`, `apps/web/src/server/{letters,drawings,fonts}.ts` | same | Merge |
+| `packages/types/src/session.ts` `Member` | project-post's `session.ts` | Add the type; `requireUserOrganization` already returns that shape |
+| `packages/services/src/assets` | same | Merge |
+| `packages/db/src/testing/seed-dev-identity.ts`, the `dev_user` cookie in `getSession` | none | Drop with the dev identity |
+| `apps/web/e2e`, `apps/web/vitest.e2e.config.ts`, root `test:e2e` | same | Merge; the harness signs in through project-post's auth emulator instead of the `dev_user` cookie |
+| `tools/dev/{screens,sweep}.ts`, root `screens` and `jobs:sweep` | same | Merge as dev tools |
+| `docker-compose.yml` `gcs` and `browser` services | same | Merge |
+| `tools/check-comments.ts`, `tools/check-architecture.ts`, their tests, the `check` script, `@babel/parser`, the lefthook `comments` command | same | Merge; check-architecture reads project-post's `docs/project-layout.md` or a moved `ARCHITECTURE.md`, decided then |
+| `apps/web/src/server/auth.ts` `getSession` | project-post's | Replace |
+| `tools/dev/seed.ts` | none | Drop |
+| `apps/worker/src/processors/*` | same | Merge; register in `main` |
+| `Dockerfile.worker` | per pool | Decide (settled decision 14): Playwright base for the render pool, `node:26-slim` plus `sharp` for standard |
+| `renderLetterHtml`, `AssetRenderLetterProcessor`, `PrintRenderer` (one recipient's `mergeValues` per render) | project-post's fulfilment worker | Mail merge: for each recipient, fill `mergeValues` from the customer record, render once, submit, then the next address. The template, the render and the fit check are reused unchanged; v2 has no recipient list |
+| `PAGE_SPECS` (`thanksio:letter-windowless`, `thanksio:postcard-6x9`) | same | Merge; add each further provider or size (Thanks.io 4×6, 6×11) as one entry |
+| Pub/Sub render filter | `tools/docker/pubsub-entrypoint.sh`, Terraform `pubsub` | Add `asset.render-letter`; Cloud Scheduler publishes `sweep` |
+| Bucket access | Terraform `storage`, `iam` | Add a CORS rule (GET from the platform origin, `Content-Type`); grant `roles/iam.serviceAccountTokenCreator` to the web and worker accounts on themselves for signBlob |
+| `.github/workflows/ci.yml` lint job | same | Add `pnpm --filter tools check` (a CI change you approve) |
 
 ## Appendix B. Risks
 
-| Risk                                                                                                                 | Lands in            | What the owner watches                                                                                  |
-| -------------------------------------------------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------- |
-| Safari on iPad breaks lines differently from Linux Chromium                                                          | Steps 8, 12         | The recorded iPad side counts; settled decision 8 keeps the export honest                               |
-| Spacer floats confuse the caret in contenteditable on iPad Safari                                                    | Steps 8, 10         | The caret cases in both engines and a manual check on a real iPad                                       |
-| opentype.js 2.x writes the chained lookups wrongly                                                                   | Step 23             | The cycle cases in both engines                                                                         |
-| The Playwright run-server downloads its package at test start                                                        | Step 5              | CI needs network for that container; the version comes from `playwright-core`                           |
-| Lift quality on real photos differs from synthetic fixtures                                                          | Steps 19 to 22, 28  | Add real phone photos as fixtures as soon as they exist                                                 |
-| A recipient's name longer than the catalogue's longest overflows                                                     | Step 33             | project-post's fulfilment preflights per recipient                                                      |
-| Chromium raster output changes between image versions                                                                | Step 30             | The determinism case per image version; bump the image deliberately                                     |
-| Thanks.io reads its rules differently than settled decision 7 assumes                                                | Step 6              | Confirm with Thanks.io; one `PAGE_SPECS` entry                                                          |
-| A creator uploads a font they have no licence for                                                                    | Step 29             | Terms of service; flag before launch                                                                    |
+| Risk | Lands in | What the owner watches |
+| --- | --- | --- |
+| Safari on iPad breaks lines differently from Linux Chromium | Steps 8, 12 | The recorded iPad side counts; settled decision 8 keeps the export honest |
+| Spacer floats confuse the caret in contenteditable on iPad Safari | Steps 8, 10 | The caret cases in both engines and a manual check on a real iPad |
+| opentype.js 2.x writes the chained lookups wrongly | Step 23 | The cycle cases in both engines |
+| The Playwright run-server downloads its package at test start | Step 5 | CI needs network for that container; the version comes from `playwright-core` |
+| Lift quality on real photos differs from synthetic fixtures | Steps 19 to 22, 28 | Add real phone photos as fixtures as soon as they exist |
+| A recipient's name longer than the catalogue's longest overflows | Step 33 | project-post's fulfilment preflights per recipient |
+| Chromium raster output changes between image versions | Step 30 | The determinism case per image version; bump the image deliberately |
+| Thanks.io reads its rules differently than settled decision 7 assumes | Step 6 | Confirm with Thanks.io; one `PAGE_SPECS` entry |
+| A creator uploads a font they have no licence for | Step 29 | Terms of service; flag before launch |
 | project-post is being rebuilt around a new MVP shape (creators create a storefront) in work Calum has not pushed yet | Step 36, Appendix A | Re-check every project-post path, table and job named in Appendix A once his PR merges, before the move |
-| Printed signatures may carry legal requirements                                                                      | Step 34             | Signatures print as normal for now; Calum is checking, and a rule would be a spec or export change      |
-| The 6×9 postcard's address block, bleed and safe values read differently than Thanks.io prints them                  | Steps 6, 32         | Confirm with a Thanks.io test print; each is one value in `PAGE_SPECS`                                  |
-| A member's read-only view of a teammate's letter is mistaken for permission to export it                             | Steps 25, 31, 34    | The `not_owner` cases on save and export                                                                |
+| Printed signatures may carry legal requirements | Step 34 | Signatures print as normal for now; Calum is checking, and a rule would be a spec or export change |
+| The 6×9 postcard's address block, bleed and safe values read differently than Thanks.io prints them | Steps 6, 32 | Confirm with a Thanks.io test print; each is one value in `PAGE_SPECS` |
+| A member's read-only view of a teammate's letter is mistaken for permission to export it | Steps 25, 31, 34 | The `not_owner` cases on save and export |
 
 ## Appendix C. Reading list for every agent
 

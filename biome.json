@@ -6,7 +6,8 @@
 		"useIgnoreFile": true
 	},
 	"files": {
-		"ignoreUnknown": true
+		"ignoreUnknown": true,
+		"includes": ["**", "!PLAN.md", "!pnpm-lock.yaml"]
 	},
 	"formatter": {
 		"enabled": true,
