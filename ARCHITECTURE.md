@@ -11,7 +11,7 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | typescript-config | `packages/typescript-config`                                 | Shared TypeScript presets                                          |
 | logger            | `packages/logger`                                            | Structured log helper                                              |
 | types             | `packages/types/src/index.ts`                                | Identity shapes, including `Member`                                |
-| types             | `packages/types/src/asset.ts`                                | `Asset`, its origin and its processing                             |
+| types             | `packages/types/src/asset.ts`                                | `Asset`, its origin and processing, `assetMessageType`             |
 | types             | `packages/types/src/page.ts`                                 | `PAGE_SPECS`, one entry per provider and product                   |
 | types             | `packages/types/src/ink.ts`                                  | `INK_COLORS` and `TEXT_SIZES`                                      |
 | types             | `packages/types/src/font.ts`                                 | `STOCK_FONTS`                                                      |
@@ -36,11 +36,14 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | api               | `packages/api/src/zod.ts`                                    | Request and response schemas typed against the generated types     |
 | db                | `packages/db/src/index.ts`                                   | Identity and letter repositories and migrations                    |
 | db                | `packages/db/src/drizzle/letters.ts`                         | `Letters`, the revision-checked save and soft delete               |
-| db                | `packages/db/src/drizzle/assets.ts`                          | `Assets`, rows mapped to and from `Asset`                          |
+| db                | `packages/db/src/drizzle/assets.ts`                          | `Assets`, the claim, the job's moves and the stale read            |
 | services          | `packages/services/src/letters/index.ts`                     | `LetterService`, `letterResources`, `letterOwnerIds`               |
 | services          | `packages/services/src/assets/index.ts`                      | `AssetService`, `isServable`, `assetReadUrl`                       |
 | services          | `packages/services/src/assets/assets.service.ts`             | `UPLOADS`, the sniff and `READ_URL_EXPIRES_IN_SECONDS`             |
+| services          | `packages/services/src/assets/assets.service.ts`             | `runJob`, `sweep`, `MAX_ATTEMPTS`, `LEASE_MS`, `STALE_PENDING_MS`  |
 | services          | `packages/services/src/assets/assets.types.ts`               | `AssetStorage`, the provider integrations implements               |
+| services          | `packages/services/src/assets/assets.types.ts`               | `RunJobParams`, `ProducedFile`, `AssetJobMessage`                  |
+| services          | `packages/services/src/assets/assets.schemas.ts`             | `assetJobMessageSchema`, the one job message                       |
 | services          | `packages/services/src/queue/index.ts`                       | `QueueManager`, `Publisher`, `MessageProcessor`, `Subscriber`      |
 | services          | `packages/services/src/drawings/drawings.types.ts`           | `ImageProcessor`, the lift provider integrations implements        |
 | services          | `packages/services/src/letters/letters.types.ts`             | `PrintRenderer`, the provider integrations implements              |
@@ -74,7 +77,7 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | web               | `apps/web/src/server/letters.ts`                             | `getLetter` and `listLetters` for pages                            |
 | web               | `apps/web/src/app/api/letters/route.ts`                      | Create a letter                                                    |
 | web               | `apps/web/src/app/api/letters/[letterId]/route.ts`           | Read, save and delete one letter                                   |
-| web               | `apps/web/src/server/services.ts`                            | Builds the db, the storage and each service lazily                 |
+| web               | `apps/web/src/server/services.ts`                            | Builds the db, the storage, the publisher and each service lazily  |
 | web               | `apps/web/src/app/api/uploads/route.ts`                      | Upload one file                                                    |
 | web               | `apps/web/src/app/api/assets/[assetId]/route.ts`             | Redirect to a fresh signed URL                                     |
 | web               | `apps/web/src/app/api/assets/[assetId]/status/route.ts`      | An asset's processing status                                       |
@@ -90,11 +93,13 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | web               | `apps/web/src/features/editor/components/editor-toolbar.tsx` | `EditorToolbar`, font, size, ink, align, undo and redo             |
 | worker            | `apps/worker/src/index.ts`                                   | `main`, one pool per process, picked by `WORKER_POOL`              |
 | worker            | `apps/worker/src/env.ts`                                     | The worker's validated environment                                 |
+| worker            | `apps/worker/src/processors/sweep.ts`                        | `sweepProcessor`, the `sweep` message                              |
 | worker            | `apps/worker/package.json`                                   | `dev` runs the standard pool, `dev:render` the render pool         |
 | tools             | `tools/check-comments.ts`                                    | No-comment check                                                   |
 | tools             | `tools/check-architecture.ts`                                | This map stays honest                                              |
 | tools             | `tools/migrate.ts`                                           | Applies `packages/db/drizzle`                                      |
 | tools             | `tools/dev/screens.ts`                                       | `pnpm screens` writes both viewports of `WEB_BASE_URL`             |
+| tools             | `tools/dev/sweep.ts`                                         | `pnpm jobs:sweep` publishes one `sweep`                            |
 | tools             | `tools/docker/gcs/ink-studio-assets`                         | The local bucket, loaded by the `gcs` compose service              |
 | tools             | `tools/docker/pubsub-entrypoint.sh`                          | The emulator's jobs topic and one filtered subscription per pool   |
 1. An app may import packages. A package never imports an app.
@@ -225,7 +230,7 @@ An upload is checked before it is stored. `upload` in `AssetService` refuses a d
 
 The browser never holds a signed URL. Pages and the letter use `/api/assets/{assetId}`, which finds the member's organization, asks `getAssetReadUrl`, and answers a redirect to a fresh signed URL with `private, no-store` caching, or 404 for another organization's asset. Nothing expires in an open editor because every read signs again. `isServable` decides which assets are ever read back, and a raw photo never is; `assetReadUrl` is the one place that rule meets `READ_URL_EXPIRES_IN_SECONDS`. `AssetStatus` carries no URL.
 
-`GcsAssetStorage` in `packages/integrations/src/shared/gcp/storage/gcs-asset-storage.ts` signs V4 read URLs. Given `emulatorBaseUrl`, which the web passes from `STORAGE_EMULATOR_HOST`, it returns the emulator's download URL instead of signing. Locally the `gcs` service in `docker-compose.yml` runs fake-gcs-server, loads the bucket from `tools/docker/gcs/ink-studio-assets`, and allows the browser's cross-origin reads. `GCS_ASSETS_BUCKET` names the bucket.
+`GcsAssetStorage` in `packages/integrations/src/shared/gcp/storage/gcs-asset-storage.ts` signs V4 read URLs. Given `emulatorBaseUrl`, which the web and the worker pass from `STORAGE_EMULATOR_HOST`, it returns the emulator's download URL instead of signing. Locally the `gcs` service in `docker-compose.yml` runs fake-gcs-server, loads the bucket from `tools/docker/gcs/ink-studio-assets`, and allows the browser's cross-origin reads. `GCS_ASSETS_BUCKET` names the bucket.
 
 ## Ink lift
 
@@ -250,12 +255,25 @@ The worker runs as two pools from one codebase, `apps/worker`. Each process read
 
 `QueueManager` in `packages/services/src/queue/queue.manager.ts` dispatches each message to the one `MessageProcessor` whose `type` matches the attribute. A processor that resolves acks the message; one that throws nacks it, so Pub/Sub redelivers it. A message with no type, a type no processor in that pool takes, or data that is not JSON is logged and acked, because redelivering it can never succeed. Two processors for one type refuse to start.
 
-`main` in `apps/worker/src/index.ts` builds the db and its processors, starts `PubSubSubscriber`, which checks its subscription exists first, logs `worker listening` with its pool, and runs until `SIGINT` or `SIGTERM`, then closes the subscription and the db.
+`main` in `apps/worker/src/index.ts` builds the db, `GcsAssetStorage`, `PubSubPublisher`, `AssetService` and the pool's processors, starts `PubSubSubscriber`, which checks its subscription exists first, logs `worker listening` with its pool, and runs until `SIGINT` or `SIGTERM`, then stops its timer and closes the subscription, the publisher and the db.
 
 Locally the `pubsub` service in `docker-compose.yml` runs the emulator from `tools/docker/Dockerfile.pubsub`, and its healthcheck passes once the subscriptions exist. `pnpm dev` runs `turbo run dev dev:render`, so the web, the standard pool (`dev`) and the render pool (`dev:render`, which sets `WORKER_POOL` and `PUBSUB_JOBS_SUBSCRIPTION` for the render pool) start together. Both pools read the worker's `.env`, copied from `apps/worker/.env.example`.
 
-| Message type | Pool | Processor | Data |
-| ------------ | ---- | --------- | ---- |
+| Message type | Pool     | Processor                             | Data |
+| ------------ | -------- | ------------------------------------- | ---- |
+| `sweep`      | standard | `apps/worker/src/processors/sweep.ts` | `{}` |
+
+### One lifecycle for every generated file
+
+A generated asset carries the job that produces it in its origin. A feature service inserts `generatedAsset` inside its own transaction, which makes the row `pending` with no bytes, and calls `publishAssetJob` only after the commit, so a message never names a row that is not there. The message's type is `assetMessageType` of the job's kind, from `packages/types/src/asset.ts`, and its data is `AssetJobMessage`, the asset's id and nothing else; `assetJobMessageSchema` in `packages/services/src/assets/assets.schemas.ts` parses it.
+
+`runJob` in `AssetService` runs one delivery. `claim` in `packages/db/src/drizzle/assets.ts` is one conditional update that takes a pending asset, or a running one whose lease of `LEASE_MS` ran out, marks it running and counts the attempt; a redelivery of a finished asset and the loser of a race get nothing and the message is acked. The producer returns bytes, their type and a result. The bytes go to storage first, under the key the row already holds; then one transaction runs `complete`, which records the type, size and SHA-256 checksum and marks the asset done, together with the optional `onComplete`, so a feature's own rows commit beside `done` or not at all.
+
+The error rule. A `ServiceError` of kind `invalid_input` is an input failure: the asset fails at once with that code, such as `photo_unreadable`, and the message is acked, because the same input fails again. Every other error is transient: `release` puts the asset back to pending with the error's text and the error is rethrown, so the message is nacked and redelivered. The transient failure on attempt `MAX_ATTEMPTS` fails the asset with `processing_failed` and acks instead, and a claim that finds the attempts already spent fails it the same way. `complete`, `release` and `fail` move only a running asset, so a late worker cannot undo a finished one.
+
+One processor per kind, typed by `assetMessageType`. Each job kind gets one processor in `apps/worker/src/processors`, whose `type` is `assetMessageType` of that kind; it parses the message and calls `runJob` with a producer built on the worker-only provider. Services never hold a worker-only provider.
+
+The sweep. The `sweep` processor calls `sweep` on `AssetService`, which reads `stale` work and republishes every pending asset untouched for `STALE_PENDING_MS` and every running asset past its lease, so a publish lost after a commit or a worker that died mid-job is picked up again. Only the standard pool takes `sweep` and only it publishes the timer: when `SWEEP_EVERY_MS` is set, `main` publishes `sweep` on that interval, and the render pool, whose subscription never receives `sweep`, publishes nothing. `pnpm jobs:sweep` runs `tools/dev/sweep.ts`, which publishes one `sweep` by hand.
 
 ## Tables
 
@@ -276,6 +294,8 @@ Repo checks live in `tools/check.ts`.
 Shared packages are shaped so the move is a folder merge. The plan is `PLAN.md`.
 
 `packages/services/src/queue` and the Pub/Sub classes in `packages/integrations/src/shared/gcp/pubsub` are v2's copies of project-post's and are dropped on the move. The render pool's filter moves from `tools/docker/pubsub-entrypoint.sh` into project-post's entrypoint and its Terraform subscriptions.
+
+In production Cloud Scheduler publishes `sweep` to the jobs topic every minute with the `type` attribute set, and `SWEEP_EVERY_MS` stays unset, so one schedule sweeps however many workers run.
 
 The `assets` table extends the assets outline in project-post's schema file: it adds `purpose`, `filename`, `uploaded_by_user_id` and a `job` jsonb column, makes `source` the `asset_source` enum where the outline has a varchar, and adds `assets_origin_check`, which ties an uploaded source to a purpose and no job. The schema file gains these on the move.
 

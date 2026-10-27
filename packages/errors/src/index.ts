@@ -13,6 +13,7 @@ export const apiErrorCodes = [
 	"file_too_large",
 	"unsupported_file",
 	"heic_not_supported",
+	"processing_failed",
 	"photo_unreadable",
 	"photo_too_large",
 	"no_ink_found",
@@ -36,6 +37,7 @@ export const errorMessages = {
 	unsupported_file: "That kind of file cannot be used here.",
 	heic_not_supported:
 		"HEIC photos cannot be uploaded, so choose a JPEG, PNG or WebP.",
+	processing_failed: "That file could not be made, so try again.",
 	photo_unreadable: "That photo could not be opened, so try another one.",
 	photo_too_large: "That photo has too many pixels, so try a smaller one.",
 	no_ink_found: "No ink was found in that photo.",

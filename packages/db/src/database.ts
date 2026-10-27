@@ -4,7 +4,7 @@ import type { OrganizationUsers } from "./drizzle/organization-users.ts";
 import type { Organizations } from "./drizzle/organizations.ts";
 import type { Users } from "./drizzle/users.ts";
 
-export type { NewAsset } from "./drizzle/assets.ts";
+export type { NewAsset, StoredFile } from "./drizzle/assets.ts";
 export type { Letter, NewLetter } from "./drizzle/letters.ts";
 export type {
 	Assets,
@@ -30,5 +30,6 @@ export type Db = Tx & {
 
 export type TestDb = {
 	db: Db;
+	execute: (text: string, values?: unknown[]) => Promise<void>;
 	stop: () => Promise<void>;
 };

@@ -2,6 +2,12 @@ export type UploadPurpose = "photo" | "mask" | "font-file";
 
 export type AssetJob = { kind: "lift-ink"; photoAssetId: string };
 
+export function assetMessageType<K extends AssetJob["kind"]>(
+	kind: K,
+): `asset.${K}` {
+	return `asset.${kind}`;
+}
+
 export type AssetOrigin =
 	| {
 			source: "uploaded";

@@ -8,6 +8,7 @@ export type {
 	NewLetter,
 	Organizations,
 	OrganizationUsers,
+	StoredFile,
 	TestDb,
 	Tx,
 	Users,
