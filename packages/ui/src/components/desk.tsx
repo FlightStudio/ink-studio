@@ -1,12 +1,6 @@
-import type { ReactNode } from "react";
-import { cn } from "../lib/cn.ts";
+import { cn } from "cn";
+import type { ComponentProps } from "react";
 
-export function Desk({
-	children,
-	className,
-}: {
-	children: ReactNode;
-	className?: string;
-}) {
-	return <div className={cn("desk", className)}>{children}</div>;
+export function Desk({ className, ...props }: ComponentProps<"div">) {
+	return <div data-slot="desk" className={cn("desk", className)} {...props} />;
 }

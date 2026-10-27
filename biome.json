@@ -59,6 +59,16 @@
 					}
 				}
 			}
+		},
+		{
+			"includes": ["packages/ui/src/components/ui/**"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noArrayIndexKey": "off"
+					}
+				}
+			}
 		}
 	]
 }

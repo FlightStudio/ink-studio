@@ -42,8 +42,8 @@ h1 { font-size: 2.4rem; margin: 0 0 8px; }
   box-shadow: 0 10px 30px oklch(0.4 0.02 70 / 0.06);
 }
 .kicker { letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.75rem; color: var(--accent); margin: 0 0 6px; }
-ol.steps { margin: 0; padding-left: 1.2rem; }
-ol.steps li { margin: 0.35rem 0; }
+ol.steps, ul.points { margin: 0; padding-left: 1.2rem; }
+ol.steps li, ul.points li { margin: 0.35rem 0; }
 code, pre { font-family: "IBM Plex Mono", ui-monospace, monospace; }
 pre {
   background: oklch(0.96 0.01 80);
@@ -106,9 +106,10 @@ pnpm db:migrate</pre>
       <pre>cp apps/web/.env.example apps/web/.env.local
 pnpm seed
 pnpm dev</pre>
-      <p>Open <a href="http://127.0.0.1:3000">http://127.0.0.1:3000</a>. The page says Ink Studio, then <code>dev@inkstudio.local · Ink Studio</code>. Health is <a href="http://127.0.0.1:3000/api/health">http://127.0.0.1:3000/api/health</a> and answers <code>{"ok":true}</code>.</p>
-      <p>The stationery style guide is <a href="http://127.0.0.1:3000/styleguide">http://127.0.0.1:3000/styleguide</a>. With the dev server already running, this writes a desktop screenshot and an iPad screenshot under <code>.local/screens</code>:</p>
+      <p>Open <a href="http://127.0.0.1:3000">http://127.0.0.1:3000</a>. The home page sits on the warm desk colour. It says Signed in, Ink Studio in the serif title face, then <code>dev@inkstudio.local · Ink Studio</code> and a button, Open the style guide. Health is <a href="http://127.0.0.1:3000/api/health">http://127.0.0.1:3000/api/health</a> and answers <code>{"ok":true}</code>.</p>
+      <p>The stationery style guide is <a href="http://127.0.0.1:3000/styleguide">http://127.0.0.1:3000/styleguide</a>. With the dev server already running, this writes <code>.local/screens/styleguide-1440x900.png</code> and <code>.local/screens/styleguide-ipad.png</code>:</p>
       <pre>pnpm screens /styleguide</pre>
+      <p>Docker has to be running for the screenshots. The first run downloads the Playwright browser image.</p>
       <p>Running <code>pnpm seed</code> again keeps that same user and organization. The password in the connection string is only for this local database.</p>
       <p>An iPad on the same network needs <code>DEV_LAN_HOST</code> set to this computer's LAN address in the root <code>.env</code> and in <code>apps/web/.env.local</code>, and <code>NEXT_PUBLIC_PLATFORM_URL=http://&lt;that-address&gt;:3000</code> in <code>apps/web/.env.local</code>. Restart <code>pnpm dev</code>, then open that address on the iPad. The dev server listens on port 3000 on every interface.</p>
     </div>
@@ -117,8 +118,17 @@ pnpm dev</pre>
   <section class="panel">
     <p class="kicker">Just landed</p>
     <h2>Step 5. Stationery design system</h2>
-    <p>Tokens and components live in <code>packages/ui</code> and apply on the studio class. Open <a href="http://127.0.0.1:3000/styleguide">/styleguide</a> while <code>pnpm dev</code> is running. <code>pnpm screens /styleguide</code> saves a 1440×900 screenshot and an iPad screenshot.</p>
-    <p>The home page is unchanged: Ink Studio and the seeded email. Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, <code>pnpm test</code>, the style guide in the browser, and the two screenshots.</p>
+    <p>Open <a href="http://127.0.0.1:3000/styleguide">/styleguide</a> while <code>pnpm dev</code> is running. You should see one sheet of letter paper on a warm desk, the way the editor will look:</p>
+    <ul class="points">
+      <li>A small white bar floats over the top edge of the sheet: undo, redo, align left, centre and right, and Library. Hover a button for its name. Undo and redo follow the alignment you pick.</li>
+      <li>The sheet says Start with a blank sheet. That line and the page title, Quiet stationery, are the only places the serif display face appears.</li>
+      <li>Under the sheet: the letter title, Saved, a View menu that switches between On the desk and As printed, and Delete, which asks before it does anything.</li>
+      <li>Library slides in from the right with two tabs, Drawn and From a photo. Photo doodles carry status pills, and Erase opens a small eraser size slider.</li>
+      <li>On the left, the legend: every stationery colour with its name, the four type sizes with real sample text, and the four status pills.</li>
+    </ul>
+    <p>On an iPad the legend moves above the sheet. The ink colours a person writes with arrive in step 6. The legend shows the stationery colours only.</p>
+    <p>The sheet is plain paper colour for now. The scanned paper texture lives in project-post, which is not in this repository. Copy project-post's <code>paper.png</code> to <code>apps/web/public/images/paper.png</code> and the sheet picks it up without a code change. Until then the browser logs one missing image on the style guide.</p>
+    <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, <code>pnpm test</code>, the style guide and home page in Chromium and WebKit, and both screenshots.</p>
   </section>
 
   <section>
@@ -146,7 +156,7 @@ pnpm dev</pre>
     <h3>M2. Design system and page model</h3>
     <details>
       <summary><span class="tag done">Done</span> 5. Stationery design system and browser harness</summary>
-      <p>Tokens, the desk, the toolbar, swatches, and status pills. Open /styleguide. Screenshots land in <code>.local/screens</code>.</p>
+      <p>A letter on the desk with its floating bar, the Library sheet, named colours, the type scale, and status pills. Open /styleguide. Screenshots land in <code>.local/screens</code>. The paper scan is still to copy from project-post.</p>
     </details>
     <details open>
       <summary><span class="tag now">Now</span> 6. Page specs and exclusion floats</summary>

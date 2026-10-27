@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import "./globals.css";
+import "@repo/ui/styles";
 
 export const metadata = {
 	title: "Ink Studio",
