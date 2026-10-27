@@ -6,39 +6,48 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 
 ## Packages and the dependency rule
 
-| Package           | Path                                              | Role                                                   |
-| ----------------- | ------------------------------------------------- | ------------------------------------------------------ |
-| typescript-config | `packages/typescript-config`                      | Shared TypeScript presets                              |
-| logger            | `packages/logger`                                 | Structured log helper                                  |
-| types             | `packages/types/src/index.ts`                     | Identity shapes, including `Member`                    |
-| types             | `packages/types/src/page.ts`                      | `PAGE_SPECS`, one entry per provider and product       |
-| types             | `packages/types/src/ink.ts`                       | `INK_COLORS` and `TEXT_SIZES`                          |
-| types             | `packages/types/src/font.ts`                      | `STOCK_FONTS`                                          |
-| types             | `packages/types/src/letter.ts`                    | `LetterContent`, the element union, `humanSeal`        |
-| types             | `packages/types/src/merge-field.ts`               | `MERGE_FIELDS` and the sample and longest values       |
-| render            | `packages/render/src/html/index.ts`               | `@repo/render/html`, client-safe page layout           |
-| render            | `packages/render/src/html/geometry.ts`            | Column, bands, keep-clear exclusions, spacer floats    |
-| render            | `packages/render/src/schema/index.ts`             | `@repo/render/schema`, `letterExtensions` and parser   |
-| errors            | `packages/errors/src/index.ts`                    | `errorMessages`                                        |
-| api               | `packages/api/openapi.yaml`                       | HTTP contract. Client is `packages/api/src/gen/api.ts` |
-| db                | `packages/db/src/index.ts`                        | Identity repositories and migrations                   |
-| ui                | `packages/ui/src/styles/globals.css`              | Stationery tokens inside the studio class              |
-| ui                | `packages/ui/components.json`                     | shadcn CLI config for the primitives                   |
-| ui                | `packages/ui/src/components/ui`                   | Generated shadcn primitives                            |
-| ui                | `packages/ui/src/components/desk.tsx`             | Full-viewport desk surface                             |
-| ui                | `packages/ui/src/components/floating-toolbar.tsx` | Paper toolbar                                          |
-| ui                | `packages/ui/src/components/swatch.tsx`           | Ink colour radio                                       |
-| ui                | `packages/ui/src/components/status-pill.tsx`      | Pending, running, done, failed                         |
-| testing           | `packages/testing/src/browser.ts`                 | Dev-only Chromium and WebKit harness                   |
-| web               | `apps/web/src/app/(studio)/layout.tsx`            | Studio class, fonts, paper texture                     |
-| web               | `apps/web/public/images/paper.png`                | Paper scan from project-post, tiled on the sheet       |
-| web               | `apps/web/src/app/(studio)/page.tsx`              | Signed-in home on the desk                             |
-| web               | `apps/web/src/app/(studio)/styleguide/page.tsx`   | Style guide as a letter on the desk                    |
-| web               | `apps/web/src/server/auth.ts`                     | `getSession`, the function the move replaces           |
-| tools             | `tools/check-comments.ts`                         | No-comment check                                       |
-| tools             | `tools/check-architecture.ts`                     | This map stays honest                                  |
-| tools             | `tools/migrate.ts`                                | Applies `packages/db/drizzle`                          |
-| tools             | `tools/dev/screens.ts`                            | `pnpm screens` writes both viewports                   |
+| Package           | Path                                                    | Role                                                               |
+| ----------------- | ------------------------------------------------------- | ------------------------------------------------------------------ |
+| typescript-config | `packages/typescript-config`                            | Shared TypeScript presets                                          |
+| logger            | `packages/logger`                                       | Structured log helper                                              |
+| types             | `packages/types/src/index.ts`                           | Identity shapes, including `Member`                                |
+| types             | `packages/types/src/page.ts`                            | `PAGE_SPECS`, one entry per provider and product                   |
+| types             | `packages/types/src/ink.ts`                             | `INK_COLORS` and `TEXT_SIZES`                                      |
+| types             | `packages/types/src/font.ts`                            | `STOCK_FONTS`                                                      |
+| types             | `packages/types/src/letter.ts`                          | `LetterContent`, the element union, `LetterResources`, `humanSeal` |
+| types             | `packages/types/src/merge-field.ts`                     | `MERGE_FIELDS` and the sample and longest values                   |
+| render            | `packages/render/src/html/index.ts`                     | `@repo/render/html`, client-safe page layout                       |
+| render            | `packages/render/src/html/geometry.ts`                  | Column, bands, keep-clear exclusions, spacer floats                |
+| render            | `packages/render/src/html/letter-page.tsx`              | `LetterPage`, the one page, and `useLetterPage`                    |
+| render            | `packages/render/src/html/letter-css.ts`                | `LETTER_CSS`, the letter's whole look                              |
+| render            | `packages/render/src/html/letter-print.tsx`             | `LetterPrint`, the page in print with a static flow                |
+| render            | `packages/render/src/html/measure.ts`                   | `measureLetter`, the scale-aware line measure                      |
+| render            | `packages/render/src/html/fixtures/index.ts`            | `LETTER_FIXTURES`, letters written against `maxPages`              |
+| render            | `packages/render/src/html/letter-page.browser.test.tsx` | The page laid out in Chromium and WebKit                           |
+| render            | `packages/render/src/schema/index.ts`                   | `@repo/render/schema`, `letterExtensions` and parser               |
+| render            | `packages/render/src/index.ts`                          | `@repo/render`, `renderLetterHtml` for the worker                  |
+| render            | `packages/render/src/render-letter-html.tsx`            | The print document around `LetterPrint`                            |
+| render            | `packages/render/fonts`                                 | Stock font files by `STOCK_FONTS` file name, with licences         |
+| errors            | `packages/errors/src/index.ts`                          | `errorMessages`                                                    |
+| api               | `packages/api/openapi.yaml`                             | HTTP contract. Client is `packages/api/src/gen/api.ts`             |
+| db                | `packages/db/src/index.ts`                              | Identity repositories and migrations                               |
+| ui                | `packages/ui/src/styles/globals.css`                    | Stationery tokens inside the studio class                          |
+| ui                | `packages/ui/components.json`                           | shadcn CLI config for the primitives                               |
+| ui                | `packages/ui/src/components/ui`                         | Generated shadcn primitives                                        |
+| ui                | `packages/ui/src/components/desk.tsx`                   | Full-viewport desk surface                                         |
+| ui                | `packages/ui/src/components/floating-toolbar.tsx`       | Paper toolbar                                                      |
+| ui                | `packages/ui/src/components/swatch.tsx`                 | Ink colour radio                                                   |
+| ui                | `packages/ui/src/components/status-pill.tsx`            | Pending, running, done, failed                                     |
+| testing           | `packages/testing/src/browser.ts`                       | Dev-only Chromium and WebKit harness                               |
+| web               | `apps/web/src/app/(studio)/layout.tsx`                  | Studio class, fonts, paper texture                                 |
+| web               | `apps/web/public/images/paper.png`                      | Paper scan from project-post, tiled on the sheet                   |
+| web               | `apps/web/src/app/(studio)/page.tsx`                    | Signed-in home on the desk                                         |
+| web               | `apps/web/src/app/(studio)/styleguide/page.tsx`         | Style guide as a letter on the desk                                |
+| web               | `apps/web/src/server/auth.ts`                           | `getSession`, the function the move replaces                       |
+| tools             | `tools/check-comments.ts`                               | No-comment check                                                   |
+| tools             | `tools/check-architecture.ts`                           | This map stays honest                                              |
+| tools             | `tools/migrate.ts`                                      | Applies `packages/db/drizzle`                                      |
+| tools             | `tools/dev/screens.ts`                                  | `pnpm screens` writes both viewports                               |
 1. An app may import packages. A package never imports an app.
 2. Dependencies point toward `packages/types`. `packages/errors` stands alone. `packages/api` may import `packages/errors`.
 3. Drizzle and `pg` live only in `packages/db`.
@@ -69,6 +78,32 @@ Exclusions are spacer floats. `pageExclusions` gives a full-width band between c
 Ids reach CSS only through catalogue lookups. Each extension's `renderHTML` reads `INK_COLORS`, `STOCK_FONTS` and `TEXT_SIZES`; a font family is `stock-<id>` or `own-<fontId>` with the stock fallback behind it. Creator-typed text never reaches CSS.
 
 Placed elements live in the document's root attributes beside `minSides` and the front image, so one undo stack covers text and placement. `humanSeal` derives the seal from the document and the creator's own fonts; nothing stores it.
+
+## One page
+
+`LetterPage` in `packages/render/src/html/letter-page.tsx` is the one page component, and `LetterPageProps` is its contract: callers pass the letter, its `LetterResources`, the mode, the merge values, how many sheets to draw, the text flow and an optional handles layer. The page computes the spec, the gap between sides (`pageGapIn`), the bands, keep-clear zones, placed elements and font faces itself. It always lays out every writing side up to `maxPages`; `sheets` only decides how many paper sheets are drawn behind the flow. An image front is a full-bleed first sheet and the column starts on the next side. Node components read the resources, merge values and mode through `useLetterPage`, so they render the same in the editor and the static renderer.
+
+`LETTER_CSS` in `packages/render/src/html/letter-css.ts` is the letter's whole look, and `LetterPage` renders it itself, so the editor, the preview, the print document and the browser tests carry the same rules with nothing to import. The paper texture is the `--letter-paper-texture` custom property, which only the studio layout sets; print is plain white. One `letter-text` rule is shared by the editor root and the static root.
+
+The spacer floats from `exclusionFloats` are the first children of the `letter-column` element and ignore the pointer, so empty space beside them is still text. Keep-clear zones are hatched only while editing. Font families are `stock-<id>` and `own-<fontId>`, and every URL in the page is `assetBaseUrl` or `stockFontBaseUrl` plus an id. A placed drawing missing from the resources throws. Apps read stock font bytes from `packages/render/fonts` by `STOCK_FONTS` file name.
+
+`LetterPrint` in `packages/render/src/html/letter-print.tsx` is the print version: `LetterPage` in print mode with every allowed sheet and a flow built by `@tiptap/static-renderer` over `letterExtensions`. An empty paragraph, or one ending in a hard break, gets a trailing break as ProseMirror's does, so it keeps its line. `renderLetterHtml` in `packages/render/src/render-letter-html.tsx` wraps it in a full document whose page size comes from the spec.
+
+The measure is scale-aware. `measureLetter` in `packages/render/src/html/measure.ts` is self-contained so Playwright can send it into a page, and it runs on the `letter-column` element. It divides line rectangles by the column's own scale, so `transform: scale()` and the device scale factor change nothing, and it returns gap-free column inches, so the editor and the print give the same numbers to `sidesUsed` and `overflowIn`. `measureInputFor` builds its input from a spec and a mode.
+
+Parity. `packages/render/src/html/letter-page.browser.test.tsx` runs every case in Chromium and WebKit at device scale factor 1 and at the print factor, in edit and print mode. WebKit agrees with Chromium on sides used for every fixture. Sides used per fixture in `packages/render/src/html/fixtures/index.ts`:
+
+| Fixture        | Chromium | iPad (step 12) |
+| -------------- | -------- | -------------- |
+| note           | 1        | pending        |
+| one-side       | 1        | pending        |
+| blank-lines    | 1        | pending        |
+| one-and-a-half | 2        | pending        |
+| nearly-full    | 3        | pending        |
+| overflow       | 3        | pending        |
+| postcard-back  | 2        | not checked    |
+
+WebKit's own ArrowDown does not follow a paragraph past a band: it lands below the band but at the paragraph's end or in the next paragraph, where Chromium lands on the next line. The editor has to move the caret across bands itself.
 
 ## One letter, end to end
 

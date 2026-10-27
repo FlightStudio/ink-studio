@@ -53,6 +53,13 @@ export type LetterContent = {
 	doc: LetterDoc;
 };
 
+export type LetterResources = {
+	assetBaseUrl: string;
+	stockFontBaseUrl: string;
+	fonts: Record<string, string>;
+	drawings: Record<string, { maskAssetId: string; aspect: number }>;
+};
+
 export type SealFont = { ownerName: string; chars: ReadonlySet<string> };
 
 function listOf(items: readonly string[]): string {

@@ -11,6 +11,7 @@ export type {
 	InlineNode,
 	LetterContent,
 	LetterDoc,
+	LetterResources,
 	ParagraphNode,
 	PlacedElement,
 	SealFont,

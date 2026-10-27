@@ -37,14 +37,33 @@ function fontFamily(font: InkMark["attrs"]["font"]): string | undefined {
 	return undefined;
 }
 
-function inkStyle(attrs: InkMark["attrs"]): string {
+export type InkProperties = {
+	fontFamily?: string;
+	fontSize?: string;
+	color?: string;
+};
+
+export function inkProperties(attrs: InkMark["attrs"]): InkProperties {
 	const family = fontFamily(attrs.font);
 	const size = TEXT_SIZES.find((sizePt) => sizePt === attrs.sizePt);
 	const color = lookup(INK_COLORS, attrs.color);
+	return {
+		...(family === undefined ? {} : { fontFamily: family }),
+		...(size === undefined ? {} : { fontSize: `${size}pt` }),
+		...(color === undefined ? {} : { color: color.css }),
+	};
+}
+
+function inkStyle(attrs: InkMark["attrs"]): string {
+	const properties = inkProperties(attrs);
 	return [
-		family === undefined ? null : `font-family: ${family}`,
-		size === undefined ? null : `font-size: ${size}pt`,
-		color === undefined ? null : `color: ${color.css}`,
+		properties.fontFamily === undefined
+			? null
+			: `font-family: ${properties.fontFamily}`,
+		properties.fontSize === undefined
+			? null
+			: `font-size: ${properties.fontSize}`,
+		properties.color === undefined ? null : `color: ${properties.color}`,
 	]
 		.filter((rule) => rule !== null)
 		.join("; ");

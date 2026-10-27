@@ -3,6 +3,7 @@
 	"private": true,
 	"type": "module",
 	"exports": {
+		".": "./src/index.ts",
 		"./html": "./src/html/index.ts",
 		"./schema": "./src/schema/index.ts"
 	},
@@ -14,10 +15,18 @@
 		"@repo/types": "workspace:*",
 		"@tiptap/core": "catalog:",
 		"@tiptap/pm": "catalog:",
+		"@tiptap/static-renderer": "catalog:",
+		"react": "catalog:",
+		"react-dom": "catalog:",
 		"zod": "catalog:"
 	},
 	"devDependencies": {
+		"@repo/testing": "workspace:*",
 		"@repo/typescript-config": "workspace:*",
+		"@types/node": "catalog:",
+		"@types/react": "catalog:",
+		"@types/react-dom": "catalog:",
+		"playwright-core": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
 	}
