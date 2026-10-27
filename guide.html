@@ -68,8 +68,8 @@ summary { cursor: pointer; }
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
   <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave are ready on your own computer. Formatting from the toolbar is next.</p>
-  <div class="progress" aria-hidden="true"><span style="width:36%"></span></div>
-  <p class="log">13 of 36 steps in the repository. Step 23 settles how handwriting varies its letters. Step 11 adds the floating toolbar.</p>
+  <div class="progress" aria-hidden="true"><span style="width:39%"></span></div>
+  <p class="log">14 of 36 steps in the repository. Step 19 lifts ink out of a photo. Step 11 adds the floating toolbar.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -301,7 +301,22 @@ pnpm dev</pre>
     <details id="step-18"><summary><span class="tag later">Later</span> 18. Move, resize, rotate, recolour doodles</summary><p>Every gesture is one undo step.</p></details>
 
     <h3>M6. Photo ink lift</h3>
-    <details id="step-19"><summary><span class="tag later">Later</span> 19. Lift ink from a photo</summary><p>Lighting, colour separation and a soft edge turn a photo of ink into a doodle.</p></details>
+    <details id="step-19">
+      <summary><span class="tag done">Done</span> 19. Lift ink from a photo</summary>
+      <p>The first half of the photo lift. A photo of ink on paper becomes a transparent picture of only the ink, with soft edges, ready to be a doodle. It replaces v1's single threshold, which turned shadows into ink and kept the rulings.</p>
+      <ul class="points">
+        <li>Uneven light is evened out first, so a shadow across the page or a dark corner goes to white instead of turning into ink.</li>
+        <li>Light coloured rulings and a red margin disappear, because only how dark a pixel is counts, not its colour. Dark ink of any colour stays, including blue ballpoint over blue rulings.</li>
+        <li>Edges are soft rather than jagged, and the result is cropped to the ink with a small margin.</li>
+        <li>A phone photo taken sideways is turned upright. A photo over 40 million pixels is refused with “That photo has too many pixels, so try a smaller one.”, before it is opened. A file that is not a picture reads “That photo could not be opened, so try another one.”, and a blank page reads “No ink was found in that photo.”</li>
+      </ul>
+      <p>There is no button for it yet; step 21 runs it in the worker and step 22 adds the screen. Dark rulings, graph paper and specks are step 20. Here is a test photo and what came out, tinted blue on a checkerboard so the clear parts show:</p>
+      <p><code>/opt/cursor/artifacts/step-19/lift-input.png</code> and <code>lift-output-on-checkerboard.png</code> in the pull request.</p>
+      <p>The tests build pages with known ink and score the result against them:</p>
+      <pre>pnpm --filter @repo/integrations test --reporter=verbose</pre>
+      <p>The names read like “a shadow across the page does not become ink” and “blue ballpoint on blue rulings is kept”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including all 12 lift tests.</p>
+    </details>
     <details id="step-20"><summary><span class="tag later">Later</span> 20. Remove rulings, grids and specks</summary><p>Lined and graph paper disappear; the dot on an i stays.</p></details>
     <details id="step-21"><summary><span class="tag later">Later</span> 21. Lift a photo in the worker</summary><p>The worker lifts the ink and stores the result.</p></details>
     <details id="step-22"><summary><span class="tag later">Later</span> 22. Crop and erase a photo doodle</summary><p>Crop, erase leftovers, save to the library.</p></details>
