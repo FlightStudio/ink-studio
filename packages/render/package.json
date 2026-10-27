@@ -16,6 +16,7 @@
 		"@tiptap/core": "catalog:",
 		"@tiptap/pm": "catalog:",
 		"@tiptap/static-renderer": "catalog:",
+		"perfect-freehand": "catalog:",
 		"react": "catalog:",
 		"react-dom": "catalog:",
 		"zod": "catalog:"

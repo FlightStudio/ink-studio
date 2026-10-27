@@ -67,7 +67,8 @@ import {
 	Trash2,
 	Undo2,
 } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
+import { InkCanvas, type InkCanvasHandle } from "@/features/ink/ink-canvas";
 
 type Align = "left" | "center" | "right";
 type History = { past: Align[]; present: Align; future: Align[] };
@@ -143,6 +144,8 @@ export default function StyleguidePage() {
 	const [token, setToken] = useState("ink");
 	const [ink, setInk] = useState<InkColorId>("ink-blue");
 	const [view, setView] = useState<View>("desk");
+	const inkCanvas = useRef<InkCanvasHandle>(null);
+	const [strokeCount, setStrokeCount] = useState(0);
 	const selectedToken = tokens.find((item) => item.id === token);
 
 	function alignTo(next: Align) {
@@ -252,6 +255,46 @@ export default function StyleguidePage() {
 							<dt className="text-label text-ink-muted">Label</dt>
 							<dd className="text-label">Side 1</dd>
 						</dl>
+					</section>
+
+					<section aria-labelledby="drawing">
+						<SectionLabel>
+							<span id="drawing">Drawing</span>
+						</SectionLabel>
+						<div className="w-fit max-w-full rounded-[3px] bg-paper bg-(image:--letter-paper-texture) bg-size-[125px] bg-repeat shadow-sheet">
+							<InkCanvas
+								ref={inkCanvas}
+								widthPx={320}
+								heightPx={180}
+								aria-label="Drawing sample"
+								onStrokeEnd={(strokes) => setStrokeCount(strokes.length)}
+							/>
+						</div>
+						<div className="mt-2 flex items-center justify-between gap-2">
+							<p className="text-ui text-ink-muted">
+								A pen, a mouse or a finger.
+							</p>
+							<div className="flex items-center">
+								<Button
+									variant="ghost"
+									size="sm"
+									disabled={strokeCount === 0}
+									onClick={() => inkCanvas.current?.undo()}
+								>
+									<Undo2 />
+									Undo
+								</Button>
+								<Button
+									variant="ghost"
+									size="sm"
+									disabled={strokeCount === 0}
+									onClick={() => inkCanvas.current?.clear()}
+								>
+									<Eraser />
+									Clear
+								</Button>
+							</div>
+						</div>
 					</section>
 
 					<section>

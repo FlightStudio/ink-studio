@@ -17,12 +17,14 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | types             | `packages/types/src/font.ts`                                | `STOCK_FONTS`                                                      |
 | types             | `packages/types/src/letter.ts`                              | `LetterContent`, the element union, `LetterResources`, `humanSeal` |
 | types             | `packages/types/src/merge-field.ts`                         | `MERGE_FIELDS` and the sample and longest values                   |
+| types             | `packages/types/src/stroke.ts`                              | `Stroke`, its input and its timed points                           |
 | render            | `packages/render/src/html/index.ts`                         | `@repo/render/html`, client-safe page layout                       |
 | render            | `packages/render/src/html/geometry.ts`                      | Column, bands, keep-clear exclusions, spacer floats                |
 | render            | `packages/render/src/html/letter-page.tsx`                  | `LetterPage`, the one page, and `useLetterPage`                    |
 | render            | `packages/render/src/html/letter-css.ts`                    | `LETTER_CSS`, the letter's whole look                              |
 | render            | `packages/render/src/html/letter-print.tsx`                 | `LetterPrint`, the page in print with a static flow                |
 | render            | `packages/render/src/html/measure.ts`                       | `measureLetter`, the scale-aware line measure                      |
+| render            | `packages/render/src/html/ink.ts`                           | `STROKE_OPTIONS`, `strokeOutline` and `outlinePath`                |
 | render            | `packages/render/src/html/fixtures/index.ts`                | `LETTER_FIXTURES`, letters written against `maxPages`              |
 | render            | `packages/render/src/html/letter-page.browser.test.tsx`     | The page laid out in Chromium and WebKit                           |
 | render            | `packages/render/src/schema/index.ts`                       | `@repo/render/schema`, `letterExtensions` and parser               |
@@ -81,6 +83,8 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | web               | `apps/web/src/features/editor/components/letter-card.tsx`   | A letter in the list, with Delete in its menu                      |
 | web               | `apps/web/src/lib/autosave.ts`                              | `autosave`, the pure save reducer, and `SAVE_DELAY_MS`             |
 | web               | `apps/web/src/lib/use-autosave.ts`                          | `useAutosave`, timers, unload and visibility                       |
+| web               | `apps/web/src/features/ink/pointer-session.ts`              | `pointerSession`, the pure pointer reducer                         |
+| web               | `apps/web/src/features/ink/ink-canvas.tsx`                  | `InkCanvas`, the one drawing surface                               |
 | web               | `apps/web/e2e/harness.ts`                                   | `startHarness` for the web journeys                                |
 | worker            | `apps/worker/src/index.ts`                                  | `main`, one pool per process, picked by `WORKER_POOL`              |
 | worker            | `apps/worker/src/env.ts`                                    | The worker's validated environment                                 |
@@ -189,6 +193,14 @@ Autosave is one pure reducer, `autosave` in `apps/web/src/lib/autosave.ts`. An e
 Stock fonts come from `apps/web/src/app/fonts/stock/[fontId]/route.ts`, which reads `packages/render/fonts` by `STOCK_FONTS` file name and answers as immutable; `apps/web/next.config.ts` traces that folder into the build.
 
 Web journeys live in `apps/web/e2e` and run with `pnpm test:e2e`, never inside `pnpm test`, against a running dev server at `WEB_BASE_URL`. `startHarness` in `apps/web/e2e/harness.ts` starts the browser container, seeds a fresh identity with `seedDevIdentity`, signs in through the `dev_user` cookie and creates a fresh letter per test. The browser reaches the host as `localhost`; the origin check treats loopback names on one port as one origin, so `NEXT_PUBLIC_PLATFORM_URL` may name either loopback address.
+
+## Ink
+
+Every drawing is `Stroke[]` from `packages/types/src/stroke.ts`: an input, pen, mouse or touch, and points of x, y, pressure and milliseconds since the stroke began, in the drawing surface's own units. `strokeOutline` in `packages/render/src/html/ink.ts` is the one place a stroke becomes a polygon, so the browser, the rasteriser and the worker draw the same ink. It calls perfect-freehand with `STROKE_OPTIONS`, whose size it multiplies by the caller's scale, and it is the one place the pressure rule lives: a pen's recorded pressure shapes its width, and any other input ignores its pressure and has it simulated from speed. `outlinePath` turns an outline into one closed SVG path.
+
+`InkCanvas` in `apps/web/src/features/ink/ink-canvas.tsx` is the one drawing surface, for doodles, signatures, font cells and the mask eraser. It is a canvas with `touch-action: none` that reads every coalesced pointer event, feeds `pointerSession`, and fills one `Path2D` per stroke on the next animation frame in its text colour. It calls `onStrokeEnd` with every stroke whenever the finished strokes change, and its ref offers undo and clear.
+
+`pointerSession` in `apps/web/src/features/ink/pointer-session.ts` holds the palm rules as a pure reducer. One stroke draws at a time. A pen keeps its pressure; a mouse or a finger stores `FLAT_PRESSURE`. A touch while a pen draws is ignored; once a pen has drawn in a session every touch is a palm, while a mouse still draws. A pen landing during a touch stroke drops that touch and draws. A second finger cancels the first finger's stroke, and a cancelled stroke is dropped. Undo removes the last stroke and clear removes all.
 
 ## Files
 

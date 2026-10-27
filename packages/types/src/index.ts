@@ -49,5 +49,6 @@ export type {
 } from "./page.ts";
 export { DEFAULT_FORMAT, PAGE_SPECS } from "./page.ts";
 export type { Member, Session } from "./session.ts";
+export type { Stroke, StrokeInput, StrokePoint } from "./stroke.ts";
 export type { NewUser, User } from "./user.ts";
 export type { UserOrganization } from "./user-organization.ts";
