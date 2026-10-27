@@ -1,0 +1,20 @@
+{
+	"name": "@repo/testing",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"typecheck": "tsc --noEmit"
+	},
+	"exports": {
+		"./browser": "./src/browser.ts"
+	},
+	"dependencies": {
+		"playwright-core": "catalog:",
+		"testcontainers": "catalog:"
+	},
+	"devDependencies": {
+		"@repo/typescript-config": "workspace:*",
+		"@types/node": "catalog:",
+		"typescript": "catalog:"
+	}
+}

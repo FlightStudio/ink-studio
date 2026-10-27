@@ -1,0 +1,202 @@
+@import "tailwindcss";
+
+@source "../components";
+@source "../../../../apps/web/src";
+
+:root {
+	--desk: oklch(0.93 0.012 75);
+	--desk-grain: oklch(0.88 0.014 70);
+	--ink: oklch(0.25 0.02 262);
+	--ink-muted: oklch(0.52 0.015 262);
+	--ink-accent: oklch(0.42 0.13 262);
+	--ink-accent-foreground: oklch(0.985 0.01 85);
+	--paper: oklch(0.985 0.008 85);
+	--rule: oklch(0.88 0.01 80);
+	--danger: oklch(0.55 0.17 28);
+	--shadow-float:
+		0 1px 2px oklch(0.3 0.03 60 / 0.1),
+		0 8px 20px -6px oklch(0.3 0.03 60 / 0.25);
+	--ease-settle: cubic-bezier(0.2, 0.7, 0.2, 1);
+	--duration-settle: 420ms;
+	--duration-quick: 160ms;
+}
+
+.studio {
+	--background: var(--desk);
+	--foreground: var(--ink);
+	--primary: var(--ink-accent);
+	--primary-foreground: var(--ink-accent-foreground);
+	--border: var(--rule);
+	--input: var(--rule);
+	--ring: oklch(0.42 0.13 262 / 0.4);
+	--destructive: var(--danger);
+	background: var(--background);
+	color: var(--foreground);
+	font-family: var(--font-sans), Outfit, sans-serif;
+}
+
+@theme inline {
+	--font-display: var(--font-display);
+	--font-sans: var(--font-sans);
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	--color-destructive: var(--destructive);
+	--text-display: 1.75rem;
+	--text-display--line-height: 2.125rem;
+	--text-title: 1.25rem;
+	--text-title--line-height: 1.625rem;
+	--text-ui: 0.875rem;
+	--text-ui--line-height: 1.25rem;
+	--text-label: 0.75rem;
+	--text-label--line-height: 1rem;
+	--animate-settle: ink-settle var(--duration-settle) var(--ease-settle) both;
+}
+
+@keyframes ink-settle {
+	from {
+		opacity: 0;
+		filter: blur(1.2px);
+		transform: scale(1.015);
+	}
+	to {
+		opacity: 1;
+		filter: blur(0);
+		transform: scale(1);
+	}
+}
+
+@keyframes ink-pulse {
+	50% {
+		opacity: 0.45;
+	}
+}
+
+.desk {
+	min-height: 100dvh;
+	background-color: var(--desk);
+	background-image: radial-gradient(
+		var(--desk-grain) 0.5px,
+		transparent 0.55px
+	);
+	background-size: 4px 4px;
+	color: var(--ink);
+}
+
+.studio-toolbar {
+	display: flex;
+	width: fit-content;
+	align-items: center;
+	gap: 0.25rem;
+	border-radius: 999px;
+	background: var(--paper);
+	padding: 0.25rem;
+	box-shadow: var(--shadow-float);
+	color: var(--ink);
+}
+
+.studio-toolbar :where(button, a) {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 32px;
+	min-height: 32px;
+	border-radius: 999px;
+	padding-inline: 0.7rem;
+	font-size: 0.875rem;
+	line-height: 1.25rem;
+}
+
+@media (pointer: coarse) {
+	.studio-toolbar :where(button, a) {
+		min-width: 44px;
+		min-height: 44px;
+	}
+}
+
+.studio-popup {
+	border: 1px solid var(--rule);
+	border-radius: 16px;
+	background: var(--paper);
+	color: var(--ink);
+	box-shadow: var(--shadow-float);
+	padding: 12px 14px;
+	font-size: 0.875rem;
+	line-height: 1.25rem;
+}
+
+.studio-swatch {
+	appearance: none;
+	width: 32px;
+	height: 32px;
+	border-radius: 999px;
+	border: 1px solid var(--rule);
+}
+
+.studio-swatch[data-selected="true"] {
+	box-shadow:
+		0 0 0 2px var(--paper),
+		0 0 0 4px var(--ink-accent);
+}
+
+.status-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	border: 1px solid var(--rule);
+	border-radius: 999px;
+	background: var(--paper);
+	padding: 0.2rem 0.7rem;
+	font-size: 0.75rem;
+	line-height: 1rem;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.status-pill::before {
+	content: "";
+	width: 0.45rem;
+	height: 0.45rem;
+	border-radius: 999px;
+	background: var(--ink-muted);
+}
+
+.status-pill[data-status="done"]::before {
+	background: oklch(0.48 0.08 150);
+}
+
+.status-pill[data-status="failed"]::before {
+	background: var(--danger);
+}
+
+.status-pill[data-status="pending"]::before,
+.status-pill[data-status="running"]::before {
+	background: var(--ink-accent);
+	animation: ink-pulse 1.6s var(--ease-settle) infinite;
+}
+
+.paper-sample {
+	height: 140px;
+	border: 1px solid var(--rule);
+	border-radius: 12px;
+	background-color: var(--paper);
+	background-image: var(--letter-paper-texture);
+	background-size: 220px;
+	box-shadow: var(--shadow-float);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	:root {
+		--duration-settle: 0ms;
+		--duration-quick: 0ms;
+	}
+
+	.status-pill[data-status="pending"]::before,
+	.status-pill[data-status="running"]::before {
+		animation: none;
+	}
+}

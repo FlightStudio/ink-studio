@@ -1,0 +1,32 @@
+{
+	"name": "@repo/ui",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts",
+		"./styles": "./src/styles/globals.css"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit"
+	},
+	"peerDependencies": {
+		"react": "^19.0.0",
+		"react-dom": "^19.0.0"
+	},
+	"devDependencies": {
+		"@repo/typescript-config": "workspace:*",
+		"@types/react": "catalog:",
+		"@types/react-dom": "catalog:",
+		"react": "catalog:",
+		"react-dom": "catalog:",
+		"typescript": "catalog:"
+	},
+	"dependencies": {
+		"@base-ui/react": "catalog:",
+		"class-variance-authority": "catalog:",
+		"clsx": "^2.1.1",
+		"lucide-react": "catalog:",
+		"tailwind-merge": "^3.7.0",
+		"tailwindcss": "catalog:"
+	}
+}
