@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave are ready on your own computer. Formatting from the toolbar is next.</p>
-  <div class="progress" aria-hidden="true"><span style="width:44%"></span></div>
-  <p class="log">16 of 36 steps in the repository. Step 16 draws with a pen, a mouse or a finger. Step 11 adds the floating toolbar.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave and a formatting toolbar are ready on your own computer. Tracing ink into outlines is next.</p>
+  <div class="progress" aria-hidden="true"><span style="width:47%"></span></div>
+  <p class="log">17 of 36 steps in the repository. Step 11 adds the floating toolbar. Step 27 traces ink into outlines.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -238,7 +238,24 @@ pnpm --filter web test:e2e</pre>
       <p>The journeys read like “typed text survives a reload”, “the older tab can keep its version”, and “a clean tab reloads a newer version when it comes back into view”. They add letters to your local database as they go.</p>
       <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, with all 6 save tests, and all 8 journeys against a dev server, twice.</p>
     </details>
-    <details id="step-11" open><summary><span class="tag now">Now</span> 11. Floating toolbar, format, undo</summary><p>One small toolbar for font, size, ink colour and alignment, with undo and redo. Formatting is its own undo step. Not in the repository yet.</p></details>
+    <details id="step-11">
+      <summary><span class="tag done">Done</span> 11. Floating toolbar, format, undo</summary>
+      <p>The editor now has one small toolbar floating over the letter. Select some words and change how they look; with nothing selected, the change applies to what you type next.</p>
+      <ul class="points">
+        <li>From left to right: Undo and Redo, a Font menu with Caveat, Patrick Hand and Homemade Apple, the sizes 16, 20, 24 and 30 pt, five ink colours (Midnight, Ink blue, Sepia, Forest and Oxblood), and align left, centre or right.</li>
+        <li>The toolbar shows the style of what is selected, so a word in Sepia at 24 pt lights up Sepia and 24.</li>
+        <li>Each change touches only what you changed. Picking a new colour keeps the font and the size.</li>
+        <li>Every formatting change is its own undo step. Undo takes it back without also taking back the words you typed before it.</li>
+        <li>Cmd-Z undoes and Shift-Cmd-Z redoes, as well as the buttons.</li>
+        <li>On an iPad the toolbar rides just above the on-screen keyboard, so it stays in reach while you write.</li>
+      </ul>
+      <p>The place above the keyboard still needs checking on a real iPad. Here the toolbar was only seen in an iPad-sized browser window, which has no on-screen keyboard.</p>
+      <p>To try it on your computer, after <code>git pull</code> and <code>pnpm install</code>, run <code>pnpm dev</code>, open <a href="http://127.0.0.1:3000">http://127.0.0.1:3000</a>, open a letter, select a word and pick Homemade Apple and Oxblood.</p>
+      <p>Four new journeys drive a real browser against your running <code>pnpm dev</code>, from a Playwright container, with Docker running:</p>
+      <pre>pnpm --filter web test:e2e</pre>
+      <p>They read “a font applied to a selection survives a reload”, “changing the colour keeps the font”, “undo takes back formatting before typing”, and “align centers the paragraph”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, and all 12 journeys, the 4 new ones and the 8 from step 10, against a dev server.</p>
+    </details>
     <details id="step-12"><summary><span class="tag later">Later</span> 12. Sides, overflow, seal, print preview</summary><p>The editor shows how many sides the letter uses, text that will not fit on a ghost sheet, Add a side, the Human Seal, and a print preview that is the print page itself.</p></details>
 
     <h3>M4. Files and jobs</h3>
