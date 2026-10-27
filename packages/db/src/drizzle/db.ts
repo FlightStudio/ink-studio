@@ -1,5 +1,6 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Db, Tx } from "../database.ts";
+import { createAssets } from "./assets.ts";
 import { createPool } from "./connection.ts";
 import { createLetters } from "./letters.ts";
 import { createOrganizationUsers } from "./organization-users.ts";
@@ -16,6 +17,7 @@ export function createDb(url: string): Db {
 		organizations: createOrganizations(query),
 		organizationUsers: createOrganizationUsers(query),
 		letters: createLetters(query),
+		assets: createAssets(query),
 	});
 	return {
 		...bound(orm),

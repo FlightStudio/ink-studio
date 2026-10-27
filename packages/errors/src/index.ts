@@ -10,6 +10,9 @@ export const apiErrorCodes = [
 	"invalid_letter",
 	"invalid_title",
 	"stale_revision",
+	"file_too_large",
+	"unsupported_file",
+	"heic_not_supported",
 ] as const;
 
 export type ApiErrorCode = (typeof apiErrorCodes)[number];
@@ -26,6 +29,10 @@ export const errorMessages = {
 	invalid_letter: "The letter could not be read.",
 	invalid_title: "A title needs 1 to 120 characters and no control characters.",
 	stale_revision: "This letter changed in another tab.",
+	file_too_large: "That file is too large.",
+	unsupported_file: "That kind of file cannot be used here.",
+	heic_not_supported:
+		"HEIC photos cannot be uploaded, so choose a JPEG, PNG or WebP.",
 } as const satisfies Record<ApiErrorCode, string>;
 
 export type ApiErrorBody = {

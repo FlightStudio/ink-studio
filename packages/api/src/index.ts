@@ -1,23 +1,33 @@
 export type {
 	ApiError,
+	AssetStatus,
 	CreatedLetter,
 	CreateLetterRequest,
 	LetterContentEnvelope,
 	LetterState,
 	SavedLetter,
 	SaveLetterRequest,
+	UploadedAsset,
+	UploadFileParams,
 } from "./gen/api.ts";
 export {
+	AssetProcessingStatus,
 	createLetter,
 	deleteLetter,
+	getAsset,
+	getAssetStatus,
 	getHealth,
 	getLetter,
 	PageFormatId,
 	saveLetter,
+	UploadPurpose,
+	uploadFile,
 } from "./gen/api.ts";
 export {
 	apiErrorCodeSchema,
 	apiErrorSchema,
+	assetProcessingStatusSchema,
+	assetStatusSchema,
 	createdLetterSchema,
 	createLetterRequestSchema,
 	healthSchema,
@@ -26,4 +36,6 @@ export {
 	pageFormatIdSchema,
 	savedLetterSchema,
 	saveLetterRequestSchema,
+	uploadedAssetSchema,
+	uploadPurposeSchema,
 } from "./zod.ts";

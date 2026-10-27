@@ -1,6 +1,8 @@
 import { apiErrorCodes } from "@repo/errors";
 import { z } from "zod";
 import {
+	AssetProcessingStatus,
+	type AssetStatus,
 	type CreatedLetter,
 	type CreateLetterRequest,
 	type LetterContentEnvelope,
@@ -8,6 +10,8 @@ import {
 	PageFormatId,
 	type SavedLetter,
 	type SaveLetterRequest,
+	type UploadedAsset,
+	UploadPurpose,
 } from "./gen/api.ts";
 
 export const apiErrorCodeSchema = z.enum(apiErrorCodes);
@@ -53,4 +57,17 @@ export const letterStateSchema: z.ZodType<LetterState> = z.strictObject({
 	title: z.string(),
 	revision: z.number().int(),
 	content: letterContentEnvelopeSchema,
+});
+
+export const uploadPurposeSchema = z.enum(UploadPurpose);
+
+export const uploadedAssetSchema: z.ZodType<UploadedAsset> = z.strictObject({
+	id: z.uuid(),
+});
+
+export const assetProcessingStatusSchema = z.enum(AssetProcessingStatus);
+
+export const assetStatusSchema: z.ZodType<AssetStatus> = z.strictObject({
+	status: assetProcessingStatusSchema,
+	error: apiErrorCodeSchema.nullable(),
 });

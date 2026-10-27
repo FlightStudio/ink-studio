@@ -12,3 +12,20 @@ services:
       interval: 2s
       timeout: 5s
       retries: 20
+  gcs:
+    image: fsouza/fake-gcs-server:1.56.1
+    command:
+      - -scheme
+      - http
+      - -port
+      - "4443"
+      - -public-host
+      - ${DEV_LAN_HOST:-localhost}:4443
+      - -cors-headers
+      - Content-Type
+      - -data
+      - /data
+    ports:
+      - "4443:4443"
+    volumes:
+      - ./tools/docker/gcs:/data

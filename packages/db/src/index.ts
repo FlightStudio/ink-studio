@@ -1,8 +1,10 @@
 export type {
+	Assets,
 	Db,
 	Letter,
 	LetterChange,
 	Letters,
+	NewAsset,
 	NewLetter,
 	Organizations,
 	OrganizationUsers,
