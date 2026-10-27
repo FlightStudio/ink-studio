@@ -42,6 +42,9 @@ type LetterPageContextValue = Pick<
 >;
 
 const EDIT_GAP_IN = 0.5;
+const VARIANT_SETS = ["ss01", "ss02", "ss03"] as const;
+const FNV_OFFSET_BASIS = 0x811c9dc5;
+const FNV_PRIME = 0x01000193;
 
 const LetterPageContext = createContext<LetterPageContextValue | null>(null);
 
@@ -50,6 +53,14 @@ export function useLetterPage(): LetterPageContextValue {
 	if (value === null)
 		throw new Error("useLetterPage is used outside LetterPage");
 	return value;
+}
+
+export function variantFeatureSettings(letterId: string): string {
+	let hash = FNV_OFFSET_BASIS;
+	for (const byte of new TextEncoder().encode(letterId)) {
+		hash = Math.imul(hash ^ byte, FNV_PRIME) >>> 0;
+	}
+	return `"${VARIANT_SETS[hash % VARIANT_SETS.length]}" 1`;
 }
 
 export function pageGapIn(mode: LetterPageProps["mode"]): number {
@@ -202,7 +213,12 @@ export function LetterPage(props: LetterPageProps): ReactElement {
 				className="letter-page"
 				data-mode={mode}
 				data-letter-id={props.letterId}
-				style={{ width: inches(spec.widthIn) }}
+				style={
+					{
+						width: inches(spec.widthIn),
+						"--letter-variant-set": variantFeatureSettings(props.letterId),
+					} as CSSProperties
+				}
 			>
 				<style>{LETTER_CSS}</style>
 				<style>{fontFaces(resources)}</style>

@@ -3,7 +3,8 @@
 	"private": true,
 	"type": "module",
 	"exports": {
-		"./shared/gcp": "./src/shared/gcp/index.ts"
+		"./shared/gcp": "./src/shared/gcp/index.ts",
+		"./worker/font": "./src/worker/font/index.ts"
 	},
 	"scripts": {
 		"test": "vitest run",
@@ -12,11 +13,15 @@
 	"dependencies": {
 		"@google-cloud/pubsub": "catalog:",
 		"@google-cloud/storage": "catalog:",
-		"@repo/services": "workspace:*"
+		"@repo/services": "workspace:*",
+		"@types/opentype.js": "^1.3.10",
+		"opentype.js": "catalog:"
 	},
 	"devDependencies": {
+		"@repo/testing": "workspace:*",
 		"@repo/typescript-config": "workspace:*",
 		"@types/node": "catalog:",
+		"playwright-core": "catalog:",
 		"testcontainers": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"

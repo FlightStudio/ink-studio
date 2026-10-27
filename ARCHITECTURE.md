@@ -43,6 +43,7 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | integrations      | `packages/integrations/src/shared/gcp/index.ts`             | `@repo/integrations/shared/gcp`, storage and Pub/Sub classes       |
 | integrations      | `packages/integrations/src/shared/gcp/pubsub/publisher.ts`  | `PubSubPublisher`, a message per call with its type attribute      |
 | integrations      | `packages/integrations/src/shared/gcp/pubsub/subscriber.ts` | `PubSubSubscriber`, streaming pull into a `MessageHandler`         |
+| integrations      | `packages/integrations/src/worker/font/index.ts`            | `@repo/integrations/worker/font`, `buildFont` and `UNITS_PER_EM`   |
 | ui                | `packages/ui/src/styles/globals.css`                        | Stationery tokens inside the studio class                          |
 | ui                | `packages/ui/components.json`                               | shadcn CLI config for the primitives                               |
 | ui                | `packages/ui/src/components/ui`                             | Generated shadcn primitives                                        |
@@ -141,6 +142,16 @@ Parity. `packages/render/src/html/letter-page.browser.test.tsx` runs every case 
 | postcard-back  | 2        | not checked    |
 
 WebKit's own ArrowDown does not follow a paragraph past a band: it lands below the band but at the paragraph's end or in the next paragraph, where Chromium lands on the next line. The editor has to move the caret across bands itself.
+
+## How handwriting varies
+
+`buildFont` in `packages/integrations/src/worker/font/opentype-font.ts` writes an OpenType font from glyph outlines at `UNITS_PER_EM`, with a notdef glyph and a space. A character with variants keeps its default glyph under the character's name and gets alternates suffixed alt1, alt2 and so on; only the default is in the cmap. Variants of one character run from 0 without gaps, and `buildFont` throws otherwise.
+
+Variation lives in GSUB, written through opentype.js's own table writer, which handles every lookup this layout needs. Each stylistic set, ss01, ss02 and ss03, owns one chained-context lookup (type 6, format 3). One single-substitution lookup per variant number maps each default to that alternate; these belong to no feature and run only from the chained lookups. Per letter, a set's subtables are ordered: the last variant behind and no substitution, so the cycle wraps to the default; then each alternate behind, stepping to the next; then the default behind, stepping to the first alternate. ss02 and ss03 end with a subtable with an empty backtrack that starts the letter one or two steps in, wrapped by that letter's own variant count. Within one lookup the backtrack sees the glyphs this lookup has already substituted, which is what makes a run cycle. The backtrack is the previous glyph only, so the cycle runs through repeated letters; after any other glyph a letter starts again where its set starts.
+
+`variantFeatureSettings` in `packages/render/src/html/letter-page.tsx` hashes the letter id with FNV-1a and picks one of the three sets. `LetterPage` puts it in the `--letter-variant-set` custom property, and the shared `letter-text` rule in `LETTER_CSS` applies it as `font-feature-settings`, so the editor root and the static root carry the same set. A letter always prints the same, and two letters differ.
+
+Parity. `packages/integrations/src/worker/font/opentype-font.browser.test.ts` measures advances at the print device scale factor in Chromium and WebKit, as differences of widths from the start of the run, because WebKit pads a lone character's range in the middle of a run. Both engines cycle every case. Playwright's WebKit on Linux shapes with HarfBuzz as Chromium does; Safari on the iPad shapes with Core Text, which this test does not reach.
 
 ## One letter, end to end
 

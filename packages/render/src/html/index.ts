@@ -33,6 +33,7 @@ export {
 	measureInputFor,
 	pageGapIn,
 	useLetterPage,
+	variantFeatureSettings,
 } from "./letter-page.tsx";
 export type { LetterPrintProps } from "./letter-print.tsx";
 export { LetterPrint, LetterText } from "./letter-print.tsx";
