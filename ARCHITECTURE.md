@@ -41,6 +41,7 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | services          | `packages/services/src/assets/assets.types.ts`              | `AssetStorage`, the provider integrations implements               |
 | services          | `packages/services/src/queue/index.ts`                      | `QueueManager`, `Publisher`, `MessageProcessor`, `Subscriber`      |
 | services          | `packages/services/src/drawings/drawings.types.ts`          | `ImageProcessor`, the lift provider integrations implements        |
+| services          | `packages/services/src/letters/letters.types.ts`            | `PrintRenderer`, the provider integrations implements              |
 | integrations      | `packages/integrations/src/shared/gcp/index.ts`             | `@repo/integrations/shared/gcp`, storage and Pub/Sub classes       |
 | integrations      | `packages/integrations/src/shared/gcp/pubsub/publisher.ts`  | `PubSubPublisher`, a message per call with its type attribute      |
 | integrations      | `packages/integrations/src/shared/gcp/pubsub/subscriber.ts` | `PubSubSubscriber`, streaming pull into a `MessageHandler`         |
@@ -48,6 +49,8 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | integrations      | `packages/integrations/src/worker/image/index.ts`           | `@repo/integrations/worker/image`, `SharpImageProcessor`           |
 | integrations      | `packages/integrations/src/worker/image/lift.ts`            | `liftInk`, `liftMask` and `LIFT_LIMITS`                            |
 | integrations      | `packages/integrations/src/worker/image/synthetic.ts`       | Test-only SVG pages with their ground-truth ink and ruling masks   |
+| integrations      | `packages/integrations/src/worker/chromium/index.ts`        | `@repo/integrations/worker/chromium`, `PlaywrightPrintRenderer`    |
+| integrations      | `packages/integrations/src/worker/chromium/fixtures`        | The test font, whose `a` is a solid square                         |
 | ui                | `packages/ui/src/styles/globals.css`                        | Stationery tokens inside the studio class                          |
 | ui                | `packages/ui/components.json`                               | shadcn CLI config for the primitives                               |
 | ui                | `packages/ui/src/components/ui`                             | Generated shadcn primitives                                        |
@@ -157,6 +160,19 @@ Variation lives in GSUB, written through opentype.js's own table writer, which h
 `variantFeatureSettings` in `packages/render/src/html/letter-page.tsx` hashes the letter id with FNV-1a and picks one of the three sets. `LetterPage` puts it in the `--letter-variant-set` custom property, and the shared `letter-text` rule in `LETTER_CSS` applies it as `font-feature-settings`, so the editor root and the static root carry the same set. A letter always prints the same, and two letters differ.
 
 Parity. `packages/integrations/src/worker/font/opentype-font.browser.test.ts` measures advances at the print device scale factor in Chromium and WebKit, as differences of widths from the start of the run, because WebKit pads a lone character's range in the middle of a run. Both engines cycle every case. Playwright's WebKit on Linux shapes with HarfBuzz as Chromium does; Safari on the iPad shapes with Core Text, which this test does not reach.
+
+## Print
+
+`PrintRenderer` in `packages/services/src/letters/letters.types.ts` is the provider the export calls, and `PlaywrightPrintRenderer` in `packages/integrations/src/worker/chromium/playwright-print-renderer.ts` implements it with Chromium. `connect` attaches to a browser server by its WebSocket endpoint and `launch` starts Chromium in the worker image. The renderer knows nothing about letters: it takes the page's HTML, the resource map, a measure function with its input, the `sheet` size, the output and a `sides` function. Services may not import `@repo/render/html`, so the letters types declare `MeasureInput` and `LetterMeasure` structurally; the compiler links them to `measureLetter` where the worker passes it in.
+
+- The measured root is the one `letter-column` element. `measure` runs on it in the page and `sides` runs in Node on the result; HTML without exactly one fails.
+- The outside network is blocked. Requests under `LETTER_ORIGIN` are fulfilled from the resource map, keyed by full URL, with their content type and an allow-any-origin header; every other request is aborted.
+- One scale factor. Each call gets its own context with JavaScript off and `DEVICE_SCALE_FACTOR`, so the measure and the pictures share one layout. The page waits for load and for its fonts before it measures or takes a picture.
+- The proof is raster. `render` measures in its own page load, then screenshots each side at its `sheet` clip in whole device pixels. Sides are stacked from the top of the document with no gap.
+- A PNG is one side, the one the output names.
+- A PDF is a second document of one full-page image per side `sides` returns, printed at the sheet's CSS page size. With `duplex` it is padded to an even page count with a blank page.
+
+`packages/integrations/src/worker/chromium/playwright-print-renderer.test.ts` proves these rules with hand-written HTML and the test font in `packages/integrations/src/worker/chromium/fixtures/square-a.ttf`, so integrations never imports `packages/render`.
 
 ## One letter, end to end
 
