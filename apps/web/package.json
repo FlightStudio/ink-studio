@@ -1,10 +1,13 @@
 {
 	"name": "web",
 	"private": true,
+	"type": "module",
 	"scripts": {
 		"dev": "next dev --hostname 0.0.0.0 --port 3000",
 		"build": "SKIP_ENV_VALIDATION=1 next build",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run",
+		"test:e2e": "vitest run --config vitest.e2e.config.ts"
 	},
 	"dependencies": {
 		"@repo/api": "workspace:*",
@@ -12,10 +15,14 @@
 		"@repo/errors": "workspace:*",
 		"@repo/integrations": "workspace:*",
 		"@repo/logger": "workspace:*",
+		"@repo/render": "workspace:*",
 		"@repo/services": "workspace:*",
 		"@repo/types": "workspace:*",
 		"@repo/ui": "workspace:*",
 		"@t3-oss/env-nextjs": "catalog:",
+		"@tiptap/core": "catalog:",
+		"@tiptap/pm": "catalog:",
+		"@tiptap/react": "catalog:",
 		"lucide-react": "catalog:",
 		"next": "^16.0.0",
 		"react": "catalog:",
@@ -23,12 +30,15 @@
 		"zod": "catalog:"
 	},
 	"devDependencies": {
+		"@repo/testing": "workspace:*",
 		"@repo/typescript-config": "workspace:*",
 		"@tailwindcss/postcss": "^4.3.3",
 		"@types/node": "catalog:",
 		"@types/react": "catalog:",
 		"@types/react-dom": "catalog:",
+		"playwright-core": "catalog:",
 		"tailwindcss": "catalog:",
-		"typescript": "catalog:"
+		"typescript": "catalog:",
+		"vitest": "catalog:"
 	}
 }
