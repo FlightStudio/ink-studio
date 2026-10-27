@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, and file uploads are ready on your own computer. The editor screen is next.</p>
-  <div class="progress" aria-hidden="true"><span style="width:28%"></span></div>
-  <p class="log">10 of 36 steps in the repository. Step 13 stores uploaded files. Step 10 puts the editor on the page, with autosave.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave are ready on your own computer. Formatting from the toolbar is next.</p>
+  <div class="progress" aria-hidden="true"><span style="width:31%"></span></div>
+  <p class="log">11 of 36 steps in the repository. Step 10 puts the editor on the page, with autosave. Step 11 adds the floating toolbar.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -106,11 +106,12 @@ pnpm db:migrate</pre>
       <pre>cp apps/web/.env.example apps/web/.env.local
 pnpm seed
 pnpm dev</pre>
-      <p>Open <a href="http://127.0.0.1:3000">http://127.0.0.1:3000</a>. The home page sits on the warm desk colour. It says Signed in, Ink Studio in the serif title face, then <code>dev@inkstudio.local · Ink Studio</code> and a button, Open the style guide. Health is <a href="http://127.0.0.1:3000/api/health">http://127.0.0.1:3000/api/health</a> and answers <code>{"ok":true}</code>.</p>
-      <p>The stationery style guide is <a href="http://127.0.0.1:3000/styleguide">http://127.0.0.1:3000/styleguide</a>. With the dev server already running, this writes <code>.local/screens/styleguide-1440x900.png</code> and <code>.local/screens/styleguide-ipad.png</code>:</p>
+      <p>Open <a href="http://localhost:3000">http://localhost:3000</a>. It goes straight to your letters on the warm desk colour, under the name of your organization, Ink Studio. Health is <a href="http://localhost:3000/api/health">http://localhost:3000/api/health</a> and answers <code>{"ok":true}</code>.</p>
+      <p>The stationery style guide is <a href="http://localhost:3000/styleguide">http://localhost:3000/styleguide</a>. With the dev server already running, this writes <code>.local/screens/styleguide-1440x900.png</code> and <code>.local/screens/styleguide-ipad.png</code>:</p>
       <pre>pnpm screens /styleguide</pre>
       <p>Docker has to be running for the screenshots. The first run downloads the Playwright browser image.</p>
       <p>Running <code>pnpm seed</code> again keeps that same user and organization. The password in the connection string is only for this local database.</p>
+      <p>Use <code>localhost</code>, not <code>127.0.0.1</code>. The website only accepts saves from the address in <code>NEXT_PUBLIC_PLATFORM_URL</code>, and that is now <code>http://localhost:3000</code>. If your <code>apps/web/.env.local</code> was made before step 10 and still says <code>http://127.0.0.1:3000</code>, change it to <code>http://localhost:3000</code> and restart <code>pnpm dev</code>.</p>
       <p>An iPad on the same network needs <code>DEV_LAN_HOST</code> set to this computer's LAN address in the root <code>.env</code> and in <code>apps/web/.env.local</code>, and <code>NEXT_PUBLIC_PLATFORM_URL=http://&lt;that-address&gt;:3000</code> in <code>apps/web/.env.local</code>. Restart <code>pnpm dev</code>, then open that address on the iPad. The dev server listens on port 3000 on every interface.</p>
     </div>
   </section>
@@ -140,7 +141,7 @@ pnpm dev</pre>
     <h3>M2. Design system and page model</h3>
     <details id="step-5">
       <summary><span class="tag done">Done</span> 5. Stationery design system and browser harness</summary>
-      <p>Open <a href="http://127.0.0.1:3000/styleguide">/styleguide</a> while <code>pnpm dev</code> is running. One sheet of letter paper lies on a warm desk, the way the editor will look:</p>
+      <p>Open <a href="http://localhost:3000/styleguide">/styleguide</a> while <code>pnpm dev</code> is running. One sheet of letter paper lies on a warm desk, the way the editor will look:</p>
       <ul class="points">
         <li>A small white bar floats over the top edge of the sheet: undo, redo, align left, centre and right, and Library. Hover a button for its name. Undo and redo follow the alignment you pick.</li>
         <li>The sheet says Start with a blank sheet. That line and the page title, Quiet stationery, are the only places the serif display face appears.</li>
@@ -164,7 +165,7 @@ pnpm dev</pre>
       <pre>pnpm --filter @repo/types test
 pnpm --filter @repo/render test</pre>
       <p>Each test is named for what it proves, for example “the band between side 1 and side 2 covers both margins and the gap” and “the postcard's address block shapes the back's text”. Add <code>--reporter=verbose</code> to see every name.</p>
-      <p>The five ink colours a creator writes with are in the catalogue now: Midnight, Ink blue, Sepia, Forest, and Oxblood. Open <a href="http://127.0.0.1:3000/styleguide">/styleguide</a> and the legend has an Ink section. Pick a colour and the sample line under it changes to that ink.</p>
+      <p>The five ink colours a creator writes with are in the catalogue now: Midnight, Ink blue, Sepia, Forest, and Oxblood. Open <a href="http://localhost:3000/styleguide">/styleguide</a> and the legend has an Ink section. Pick a colour and the sample line under it changes to that ink.</p>
     </details>
     <details id="step-7">
       <summary><span class="tag done">Done</span> 7. One letter document and validation</summary>
@@ -210,20 +211,34 @@ pnpm --filter @repo/render test --reporter=verbose</pre>
         <li>Another organization cannot read, save or delete your letters. To them a letter of yours does not exist.</li>
       </ul>
       <p>To try it on your computer, after <code>git pull</code>, <code>pnpm install</code>, and <code>pnpm db:migrate</code>, start <code>pnpm dev</code> and in a second terminal create a letter:</p>
-      <pre>curl -s -X POST http://127.0.0.1:3000/api/letters \
-  -H 'Origin: http://127.0.0.1:3000' -H 'Content-Type: application/json' -d '{}'</pre>
-      <p>It answers with the new letter's id, for example <code>{"id":"01a17f47-…"}</code>. Open <code>http://127.0.0.1:3000/api/letters/&lt;that id&gt;</code> in the browser to see its title, revision 1, and the empty Caveat letter. It also shows up in <code>pnpm db:studio</code> under <code>letters</code>. A request without the <code>Origin</code> header is refused, so another website cannot save into your letters.</p>
+      <pre>curl -s -X POST http://localhost:3000/api/letters \
+  -H 'Origin: http://localhost:3000' -H 'Content-Type: application/json' -d '{}'</pre>
+      <p>It answers with the new letter's id, for example <code>{"id":"01a17f47-…"}</code>. Open <code>http://localhost:3000/api/letters/&lt;that id&gt;</code> in the browser to see its title, revision 1, and the empty Caveat letter. It also shows up in <code>pnpm db:studio</code> under <code>letters</code>. A request without the <code>Origin</code> header is refused, so another website cannot save into your letters.</p>
       <p>The tests for this step run on their own throwaway Postgres in Docker:</p>
       <pre>pnpm --filter @repo/db test --reporter=verbose
 pnpm --filter @repo/services test --reporter=verbose</pre>
       <p>The names read like “a stale save is refused and changes nothing” and “another organization cannot read, save or delete the letter”.</p>
       <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including 12 database and 9 letter service tests, and every API answer above against the local database.</p>
     </details>
-    <details id="step-10" open>
-      <summary><span class="tag now">Now</span> 10. Write on the page with autosave</summary>
-      <p>The letters list, a new letter, typing on the page in Caveat, an editable title, and a save line that reads Saved, Saving…, or Offline, retrying. A stale tab can keep its version or load the newer one. Not in the repository yet.</p>
+    <details id="step-10">
+      <summary><span class="tag done">Done</span> 10. Write on the page with autosave</summary>
+      <p>The editor is on the page. <a href="http://localhost:3000">http://localhost:3000</a> opens your letters. With none yet it says Write your first letter, with a button, Start a letter. Afterwards each letter is a small sheet with its title and when it was last edited, and New letter sits top right.</p>
+      <ul class="points">
+        <li>A new letter opens on a blank sheet of paper reading Start writing…. Type straight onto the page in Caveat, Ink blue, 20 pt. When the text runs past the first side, a second sheet appears under it and the text carries on there.</li>
+        <li>The title and the save line sit in a small paper pill at the bottom of the screen. Click Untitled letter to rename it; Enter or Escape finishes, and an empty title goes back to the old one.</li>
+        <li>The save line reads Saving… while you type, then Saved a moment after you stop. Without a network it reads Offline, retrying and keeps trying, waiting longer each time, up to thirty seconds. Leaving the page with an unsaved change asks first.</li>
+        <li>Open the same letter in two tabs and write in both. The tab that saves second reads This letter changed in another tab, with Load the latest and Keep mine. Keep mine saves over the other tab's version. A tab with nothing unsaved quietly loads the newer version when you come back to it.</li>
+        <li>The three dots under a letter in the list open Delete, which asks before it removes the letter.</li>
+        <li>The fonts come from the website itself, at <code>/fonts/stock/caveat</code>, so the page never waits on Google Fonts.</li>
+      </ul>
+      <p>To try it on your computer, after <code>git pull</code> and <code>pnpm install</code>, check that <code>NEXT_PUBLIC_PLATFORM_URL=http://localhost:3000</code> is in <code>apps/web/.env.local</code>, then <code>pnpm dev</code> and open <a href="http://localhost:3000">http://localhost:3000</a>. Letters you made with curl in step 9 are in the list already.</p>
+      <p>The website now has tests of its own. The save logic runs in <code>pnpm test</code>. Eight journeys drive a real browser against your running <code>pnpm dev</code>, from a Playwright container, with Docker running:</p>
+      <pre>pnpm --filter web test --reporter=verbose
+pnpm --filter web test:e2e</pre>
+      <p>The journeys read like “typed text survives a reload”, “the older tab can keep its version”, and “a clean tab reloads a newer version when it comes back into view”. They add letters to your local database as they go.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, with all 6 save tests, and all 8 journeys against a dev server, twice.</p>
     </details>
-    <details id="step-11"><summary><span class="tag later">Later</span> 11. Floating toolbar, format, undo</summary><p>One small toolbar for font, size, ink colour and alignment, with undo and redo. Formatting is its own undo step.</p></details>
+    <details id="step-11" open><summary><span class="tag now">Now</span> 11. Floating toolbar, format, undo</summary><p>One small toolbar for font, size, ink colour and alignment, with undo and redo. Formatting is its own undo step. Not in the repository yet.</p></details>
     <details id="step-12"><summary><span class="tag later">Later</span> 12. Sides, overflow, seal, print preview</summary><p>The editor shows how many sides the letter uses, text that will not fit on a ghost sheet, Add a side, the Human Seal, and a print preview that is the print page itself.</p></details>
 
     <h3>M4. Files and jobs</h3>
@@ -247,10 +262,10 @@ STORAGE_EMULATOR_HOST=http://localhost:4443</pre>
 pnpm db:migrate
 pnpm dev</pre>
       <p><code>docker compose ps</code> now lists <code>gcs</code> next to <code>postgres</code>. The bucket and project lines are required: without them the terminal running <code>pnpm dev</code> reports Invalid environment variables and names the missing one. In a second terminal, upload any PNG as a mask and read it back:</p>
-      <pre>curl -s -X POST 'http://127.0.0.1:3000/api/uploads?purpose=mask' \
-  -H 'Origin: http://127.0.0.1:3000' -H 'x-file-name: paper.png' \
+      <pre>curl -s -X POST 'http://localhost:3000/api/uploads?purpose=mask' \
+  -H 'Origin: http://localhost:3000' -H 'x-file-name: paper.png' \
   --data-binary @apps/web/public/images/paper.png</pre>
-      <p>It answers with the new file's id, for example <code>{"id":"01a17f61-…"}</code>. Open <code>http://127.0.0.1:3000/api/assets/&lt;that id&gt;</code> in the browser and the paper texture appears. <code>/api/assets/&lt;that id&gt;/status</code> answers <code>{"status":"done","error":null}</code>. The row is in <code>pnpm db:studio</code> under <code>assets</code>, and the file itself is under <code>tools/docker/gcs/ink-studio-assets</code> on disk.</p>
+      <p>It answers with the new file's id, for example <code>{"id":"01a17f61-…"}</code>. Open <code>http://localhost:3000/api/assets/&lt;that id&gt;</code> in the browser and the paper texture appears. <code>/api/assets/&lt;that id&gt;/status</code> answers <code>{"status":"done","error":null}</code>. The row is in <code>pnpm db:studio</code> under <code>assets</code>, and the file itself is under <code>tools/docker/gcs/ink-studio-assets</code> on disk.</p>
       <p>The tests run on throwaway Postgres and Cloud Storage containers in Docker:</p>
       <pre>pnpm --filter @repo/services test --reporter=verbose
 pnpm --filter @repo/integrations test --reporter=verbose</pre>
