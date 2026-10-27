@@ -270,8 +270,8 @@ export default function StyleguidePage() {
 								onStrokeEnd={(strokes) => setStrokeCount(strokes.length)}
 							/>
 						</div>
-						<div className="mt-2 flex items-center justify-between gap-2">
-							<p className="text-ui text-ink-muted">
+						<div className="mt-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+							<p className="text-ui whitespace-nowrap text-ink-muted">
 								A pen, a mouse or a finger.
 							</p>
 							<div className="flex items-center">
