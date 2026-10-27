@@ -1,13 +1,16 @@
+import type { LetterChange, Letters } from "./drizzle/letters.ts";
 import type { OrganizationUsers } from "./drizzle/organization-users.ts";
 import type { Organizations } from "./drizzle/organizations.ts";
 import type { Users } from "./drizzle/users.ts";
 
-export type { Organizations, OrganizationUsers, Users };
+export type { Letter, NewLetter } from "./drizzle/letters.ts";
+export type { LetterChange, Letters, Organizations, OrganizationUsers, Users };
 
 export type Tx = {
 	users: Users;
 	organizations: Organizations;
 	organizationUsers: OrganizationUsers;
+	letters: Letters;
 };
 
 export type Db = Tx & {

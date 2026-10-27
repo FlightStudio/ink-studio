@@ -15,8 +15,159 @@ paths:
                 $ref: "#/components/schemas/Health"
         "500":
           $ref: "#/components/responses/InternalError"
+  /api/letters:
+    post:
+      operationId: createLetter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLetterRequest"
+      responses:
+        "201":
+          description: The letter was created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedLetter"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /api/letters/{letterId}:
+    parameters:
+      - name: letterId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getLetter
+      responses:
+        "200":
+          description: The letter's latest saved state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LetterState"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    put:
+      operationId: saveLetter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveLetterRequest"
+      responses:
+        "200":
+          description: The letter was saved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavedLetter"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      operationId: deleteLetter
+      responses:
+        "204":
+          description: The letter was deleted.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
 components:
   schemas:
+    PageFormatId:
+      type: string
+      enum:
+        - thanksio:letter-windowless
+        - thanksio:postcard-6x9
+    LetterContentEnvelope:
+      type: object
+      additionalProperties: true
+      required: [schemaVersion, format]
+      properties:
+        schemaVersion:
+          type: integer
+        format:
+          type: string
+    CreateLetterRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        format:
+          $ref: "#/components/schemas/PageFormatId"
+    CreatedLetter:
+      type: object
+      additionalProperties: false
+      required: [id]
+      properties:
+        id:
+          type: string
+          format: uuid
+    SaveLetterRequest:
+      type: object
+      additionalProperties: false
+      required: [title, content, expectedRevision]
+      properties:
+        title:
+          type: string
+        content:
+          $ref: "#/components/schemas/LetterContentEnvelope"
+        expectedRevision:
+          type: integer
+          minimum: 1
+    SavedLetter:
+      type: object
+      additionalProperties: false
+      required: [revision]
+      properties:
+        revision:
+          type: integer
+    LetterState:
+      type: object
+      additionalProperties: false
+      required: [title, revision, content]
+      properties:
+        title:
+          type: string
+        revision:
+          type: integer
+        content:
+          $ref: "#/components/schemas/LetterContentEnvelope"
     Health:
       type: object
       additionalProperties: false
@@ -35,6 +186,9 @@ components:
         - unsupported_media_type
         - internal_error
         - no_organization
+        - invalid_letter
+        - invalid_title
+        - stale_revision
     ApiError:
       type: object
       additionalProperties: false
@@ -77,6 +231,12 @@ components:
             $ref: "#/components/schemas/ApiError"
     UnsupportedMediaType:
       description: That file type is not supported.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Conflict:
+      description: This letter changed in another tab.
       content:
         application/json:
           schema:

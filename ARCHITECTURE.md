@@ -28,9 +28,12 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | render            | `packages/render/src/index.ts`                          | `@repo/render`, `renderLetterHtml` for the worker                  |
 | render            | `packages/render/src/render-letter-html.tsx`            | The print document around `LetterPrint`                            |
 | render            | `packages/render/fonts`                                 | Stock font files by `STOCK_FONTS` file name, with licences         |
-| errors            | `packages/errors/src/index.ts`                          | `errorMessages`                                                    |
+| errors            | `packages/errors/src/index.ts`                          | `errorMessages` and `ServiceError`                                 |
 | api               | `packages/api/openapi.yaml`                             | HTTP contract. Client is `packages/api/src/gen/api.ts`             |
-| db                | `packages/db/src/index.ts`                              | Identity repositories and migrations                               |
+| api               | `packages/api/src/zod.ts`                               | Request and response schemas typed against the generated types     |
+| db                | `packages/db/src/index.ts`                              | Identity and letter repositories and migrations                    |
+| db                | `packages/db/src/drizzle/letters.ts`                    | `Letters`, the revision-checked save and soft delete               |
+| services          | `packages/services/src/letters/index.ts`                | `LetterService`, `letterResources`, `letterOwnerIds`               |
 | ui                | `packages/ui/src/styles/globals.css`                    | Stationery tokens inside the studio class                          |
 | ui                | `packages/ui/components.json`                           | shadcn CLI config for the primitives                               |
 | ui                | `packages/ui/src/components/ui`                         | Generated shadcn primitives                                        |
@@ -44,6 +47,10 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | web               | `apps/web/src/app/(studio)/page.tsx`                    | Signed-in home on the desk                                         |
 | web               | `apps/web/src/app/(studio)/styleguide/page.tsx`         | Style guide as a letter on the desk                                |
 | web               | `apps/web/src/server/auth.ts`                           | `getSession`, the function the move replaces                       |
+| web               | `apps/web/src/server/handle-json.ts`                    | `handleJson`, the one wrapper around every API route               |
+| web               | `apps/web/src/server/letters.ts`                        | `getLetter` and `listLetters` for pages                            |
+| web               | `apps/web/src/app/api/letters/route.ts`                 | Create a letter                                                    |
+| web               | `apps/web/src/app/api/letters/[letterId]/route.ts`      | Read, save and delete one letter                                   |
 | tools             | `tools/check-comments.ts`                               | No-comment check                                                   |
 | tools             | `tools/check-architecture.ts`                           | This map stays honest                                              |
 | tools             | `tools/migrate.ts`                                      | Applies `packages/db/drizzle`                                      |
@@ -58,6 +65,7 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 8. Client components import `@repo/render/html` and `@repo/render/schema`. Services import `@repo/render/schema` to validate a letter against the real schema. `@repo/render/html` imports `perfect-freehand`.
 9. Only the worker imports `@repo/render`. The web never does, and integrations never import `packages/render`: the worker passes outlines and the measure function in.
 10. `packages/testing` is dev-only. Render, integrations and worker tests, the web's e2e files and `tools/dev` import it.
+11. Services take a `Member` and throw `ServiceError` with a kind and an `ApiErrorCode`. `handleJson` checks the origin, the content type and the body, finds the member, and turns each kind into one status; nothing else in a route touches errors.
 
 ## Pages
 
@@ -107,7 +115,11 @@ WebKit's own ArrowDown does not follow a paragraph past a band: it lands below t
 
 ## One letter, end to end
 
-Filled as the editor lands.
+A letter belongs to an organization and is one `letters` row. `LetterService` in `packages/services/src/letters/letters.service.ts` creates it with the default content for its format and the untitled title for its product kind.
+
+A save is parsed and refused when stale. `saveLetter` runs `parseLetterContent`, refuses an own font that does not exist, trims and checks the title, then saves with one conditional update that matches the expected revision and bumps it. No match is stale when the letter is still there and not found when it is not, so a stale tab never overwrites a newer save. Delete only sets `deleted_at`; a deleted letter is gone from every read.
+
+`getLetter` returns the letter with its `LetterResources` from `letterResources` and `editable` from `letterOwnerIds`; the export reads resources through the same function. The editor fills the rest of this section.
 
 ## Jobs
 
@@ -115,11 +127,12 @@ Filled as jobs land.
 
 ## Tables
 
-| Table              | Package       | Role                                     |
-| ------------------ | ------------- | ---------------------------------------- |
-| users              | `packages/db` | A person, keyed by external id and email |
-| organizations      | `packages/db` | A studio                                 |
-| organization_users | `packages/db` | Membership and role                      |
+| Table              | Package       | Role                                                                                    |
+| ------------------ | ------------- | --------------------------------------------------------------------------------------- |
+| users              | `packages/db` | A person, keyed by external id and email                                                |
+| organizations      | `packages/db` | A studio                                                                                |
+| organization_users | `packages/db` | Membership and role                                                                     |
+| letters            | `packages/db` | A letter's title, content and revision; stands in for project-post's `product_editions` |
 
 ## Where to change things
 

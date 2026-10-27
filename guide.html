@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, and the shared letter page are ready on your own computer. Milestone M2 is complete. The editor is next.</p>
-  <div class="progress" aria-hidden="true"><span style="width:22.2%"></span></div>
-  <p class="log">8 of 36 steps in the repository. Step 9 stores letters with titles, revisions, and soft delete.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, and letter storage are ready on your own computer. The editor screen is next.</p>
+  <div class="progress" aria-hidden="true"><span style="width:25%"></span></div>
+  <p class="log">9 of 36 steps in the repository. Step 10 puts the editor on the page, with autosave.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -91,10 +91,10 @@ cp tools/.env.example tools/.env
 docker compose up -d
 docker compose ps
 pnpm db:migrate</pre>
-      <p><code>docker compose ps</code> should show the postgres service as healthy before you migrate. <code>pnpm db:migrate</code> creates <code>users</code>, <code>organizations</code>, and <code>organization_users</code>.</p>
+      <p><code>docker compose ps</code> should show the postgres service as healthy before you migrate. <code>pnpm db:migrate</code> creates <code>users</code>, <code>organizations</code>, <code>organization_users</code>, and <code>letters</code>. After a <code>git pull</code> that brings a new table, run <code>pnpm db:migrate</code> again; it only applies what is new.</p>
       <p>Look at the tables in the browser with Drizzle Studio. It uses the database config already in the repo, so you do not install a second Postgres or a separate database app:</p>
       <pre>pnpm db:studio</pre>
-      <p>Leave that terminal open while you browse <code>users</code>, <code>organizations</code>, and <code>organization_users</code>. Stop it with Ctrl+C. The connection it uses is:</p>
+      <p>Leave that terminal open while you browse <code>users</code>, <code>organizations</code>, <code>organization_users</code>, and <code>letters</code>. Stop it with Ctrl+C. The connection it uses is:</p>
       <pre>postgresql://postgres:postgres@127.0.0.1:5434/ink_studio</pre>
       <p>That password is only for this local database. Do not reuse it anywhere else. Stop the database later with <code>docker compose stop</code>. The data stays in the Compose volume.</p>
       <p>The same tables from the terminal:</p>
@@ -115,8 +115,30 @@ pnpm dev</pre>
     </div>
   </section>
 
+  <section class="panel" id="step-9">
+    <p class="kicker">Just landed · M3 begins</p>
+    <h2>Step 9. Letters are stored, with titles and revisions</h2>
+    <p>A letter now lives in Postgres, in a <code>letters</code> table, so it survives a reload and follows you to another device. Each letter belongs to your organization. There is still no editor screen; step 10 adds it. For now the letter is reached through the website's API, which the editor will call.</p>
+    <ul class="points">
+      <li>A new letter is called Untitled letter and starts empty, in Caveat at 20 pt in Ink blue. A new postcard is called Untitled postcard.</li>
+      <li>Every save carries the revision it was based on. If another tab saved in between, the save is refused with “This letter changed in another tab.” and nothing is overwritten. Step 10 shows that message with two choices, Load the latest and Keep mine.</li>
+      <li>Every save is checked by the same parser as in step 7. A colour, size or font outside the catalogue is refused, and so is a title that is empty, over 120 characters, or holds a control character. Spaces around a title are trimmed.</li>
+      <li>Deleting a letter hides it everywhere but keeps the row, with the time it was deleted.</li>
+      <li>Another organization cannot read, save or delete your letters. To them a letter of yours does not exist.</li>
+    </ul>
+    <p>To try it on your computer, after <code>git pull</code>, <code>pnpm install</code>, and <code>pnpm db:migrate</code>, start <code>pnpm dev</code> and in a second terminal create a letter:</p>
+    <pre>curl -s -X POST http://127.0.0.1:3000/api/letters \
+  -H 'Origin: http://127.0.0.1:3000' -H 'Content-Type: application/json' -d '{}'</pre>
+    <p>It answers with the new letter's id, for example <code>{"id":"01a17f47-…"}</code>. Open <code>http://127.0.0.1:3000/api/letters/&lt;that id&gt;</code> in the browser to see its title, revision 1, and the empty Caveat letter. It also shows up in <code>pnpm db:studio</code> under <code>letters</code>. A request without the <code>Origin</code> header is refused, so another website cannot save into your letters.</p>
+    <p>The tests for this step run on their own throwaway Postgres in Docker:</p>
+    <pre>pnpm --filter @repo/db test --reporter=verbose
+pnpm --filter @repo/services test --reporter=verbose</pre>
+    <p>The names read like “a stale save is refused and changes nothing” and “another organization cannot read, save or delete the letter”.</p>
+    <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including 12 database and 9 letter service tests, and every API answer above against the local database.</p>
+  </section>
+
   <section class="panel" id="step-8">
-    <p class="kicker">Just landed · M2 complete</p>
+    <p class="kicker">Landed before · M2 complete</p>
     <h2>Step 8. One letter page, in Chromium and WebKit</h2>
     <p>There is now one page component, <code>LetterPage</code>. The editor will show it, the print preview will show it, and the worker will turn it into the proof PDF. Because they all draw the same page with the same CSS, the letter a creator sees is the letter that prints.</p>
     <ul class="points">
@@ -205,11 +227,14 @@ pnpm --filter @repo/render test --reporter=verbose</pre>
     </details>
 
     <h3>M3. Editor</h3>
-    <details open>
-      <summary><span class="tag now">Now</span> 9. Store letters, titles, revisions</summary>
-      <p>A <code>letters</code> table with titles, revisions, and soft delete, so letters persist. Not in the repository yet.</p>
+    <details>
+      <summary><span class="tag done">Done</span> 9. Store letters, titles, revisions</summary>
+      <p>A <code>letters</code> table, saves refused when another tab saved first, and delete that hides a letter. See <a href="#step-9">Just landed</a>.</p>
     </details>
-    <details><summary><span class="tag later">Later</span> 10. Write on the page with autosave</summary><p>The editor.</p></details>
+    <details open>
+      <summary><span class="tag now">Now</span> 10. Write on the page with autosave</summary>
+      <p>The letters list, a new letter, typing on the page in Caveat, an editable title, and a save line that reads Saved, Saving…, or Offline, retrying. A stale tab can keep its version or load the newer one. Not in the repository yet.</p>
+    </details>
     <details><summary><span class="tag later">Later</span> 11. Floating toolbar, format, undo</summary><p>Selection formatting.</p></details>
     <details><summary><span class="tag later">Later</span> 12. Sides, overflow, seal, print preview</summary><p>Fit is decided in Chromium.</p></details>
 

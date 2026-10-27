@@ -95,6 +95,9 @@ importers:
       '@repo/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@repo/services':
+        specifier: workspace:*
+        version: link:../../packages/services
       '@repo/types':
         specifier: workspace:*
         version: link:../../packages/types
@@ -264,6 +267,37 @@ importers:
       playwright-core:
         specifier: 'catalog:'
         version: 1.64.1
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@types/node@26.6.5)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/services:
+    dependencies:
+      '@repo/api':
+        specifier: workspace:*
+        version: link:../api
+      '@repo/db':
+        specifier: workspace:*
+        version: link:../db
+      '@repo/errors':
+        specifier: workspace:*
+        version: link:../errors
+      '@repo/render':
+        specifier: workspace:*
+        version: link:../render
+      '@repo/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.5
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
