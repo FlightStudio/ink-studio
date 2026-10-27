@@ -47,7 +47,8 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | integrations      | `packages/integrations/src/shared/gcp/index.ts`              | `@repo/integrations/shared/gcp`, storage and Pub/Sub classes       |
 | integrations      | `packages/integrations/src/shared/gcp/pubsub/publisher.ts`   | `PubSubPublisher`, a message per call with its type attribute      |
 | integrations      | `packages/integrations/src/shared/gcp/pubsub/subscriber.ts`  | `PubSubSubscriber`, streaming pull into a `MessageHandler`         |
-| integrations      | `packages/integrations/src/worker/font/index.ts`             | `@repo/integrations/worker/font`, `buildFont` and `UNITS_PER_EM`   |
+| integrations      | `packages/integrations/src/worker/font/index.ts`             | `@repo/integrations/worker/font`, `buildFont` and `vectorize`      |
+| integrations      | `packages/integrations/src/worker/font/vectorize.ts`         | `vectorize`, ink masks to closed glyph contours                    |
 | integrations      | `packages/integrations/src/worker/image/index.ts`            | `@repo/integrations/worker/image`, `SharpImageProcessor`           |
 | integrations      | `packages/integrations/src/worker/image/lift.ts`             | `liftInk`, `liftMask` and `LIFT_LIMITS`                            |
 | integrations      | `packages/integrations/src/worker/image/synthetic.ts`        | Test-only SVG pages with their ground-truth ink and ruling masks   |
@@ -165,6 +166,17 @@ Variation lives in GSUB, written through opentype.js's own table writer, which h
 `variantFeatureSettings` in `packages/render/src/html/letter-page.tsx` hashes the letter id with FNV-1a and picks one of the three sets. `LetterPage` puts it in the `--letter-variant-set` custom property, and the shared `letter-text` rule in `LETTER_CSS` applies it as `font-feature-settings`, so the editor root and the static root carry the same set. A letter always prints the same, and two letters differ.
 
 Parity. `packages/integrations/src/worker/font/opentype-font.browser.test.ts` measures advances at the print device scale factor in Chromium and WebKit, as differences of widths from the start of the run, because WebKit pads a lone character's range in the middle of a run. Both engines cycle every case. Playwright's WebKit on Linux shapes with HarfBuzz as Chromium does; Safari on the iPad shapes with Core Text, which this test does not reach.
+
+## Tracing glyphs
+
+`vectorize` in `packages/integrations/src/worker/font/vectorize.ts` turns a `Mask` from the lift into closed contours with no tracing dependency; potrace is GPL. Contours are in mask pixels with the origin at the mask's top-left corner and y pointing down, so pixel x, y covers the unit square from x, y and is sampled at its centre. Each contour is a list of points with an implied closing edge.
+
+1. Marching squares over the mask padded with one clear pixel on every side, so every contour closes. A pixel is ink when its alpha is at least `INK_ALPHA`. The contour runs where interpolated alpha crosses `ISO_ALPHA`, halfway between the last clear value and the first ink value, so a hard mask's edges fall on pixel boundaries. A saddle cell joins its two ink corners when the average of its four corners reaches `ISO_ALPHA`; in a hard mask that is exactly the tie, so pixels touching only at a corner are one shape.
+2. Each crossing sits on one grid edge shared by two cells, so it has exactly two neighbours, and the segments chain into loops by walking from neighbour to neighbour.
+3. Ramer-Douglas-Peucker on each closed loop at `tolerancePx`, `VECTORIZE_DEFAULTS` when the caller passes nothing. The loop is split at the point farthest from its first point and the point farthest from that one, and both halves are simplified with those two points kept. A loop that simplifies to fewer than three points is narrower than the tolerance and is dropped.
+4. Orientation by containment depth, counted on the unsimplified loops, which never cross: a loop inside an even number of others is clockwise and inside an odd number is counter-clockwise. Clockwise means clockwise as the mask is seen on screen with y down, which is a positive shoelace sum in these coordinates. Flipping y into font units turns outer contours counter-clockwise, the winding CFF expects, and holes the other way, so nonzero and even-odd fills agree.
+
+`packages/integrations/src/worker/font/vectorize.test.ts` fills the contours back with the nonzero rule at pixel centres and compares them with the mask at `INK_ALPHA`, on the handwritten g from `handwrittenG` in `packages/integrations/src/worker/image/synthetic.ts`.
 
 ## Print
 
