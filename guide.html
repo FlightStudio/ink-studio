@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave and a formatting toolbar are ready on your own computer. Tracing ink into outlines is next.</p>
-  <div class="progress" aria-hidden="true"><span style="width:47%"></span></div>
-  <p class="log">17 of 36 steps in the repository. Step 11 adds the floating toolbar. Step 27 traces ink into outlines.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave and a formatting toolbar are ready on your own computer. Jobs with retries and a sweep are next.</p>
+  <div class="progress" aria-hidden="true"><span style="width:50%"></span></div>
+  <p class="log">18 of 36 steps in the repository. Step 27 traces ink into outlines. Step 15 runs generated files as jobs with retries and a sweep.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -374,7 +374,21 @@ pnpm --filter @repo/render test --reporter=verbose</pre>
     <details id="step-24"><summary><span class="tag later">Later</span> 24. Store handwriting fonts</summary><p>Personal fonts, drawn cell by cell by their owner.</p></details>
     <details id="step-25"><summary><span class="tag later">Later</span> 25. Build a font in the worker</summary><p>A drawn font becomes a real font file; the last good build stays in use.</p></details>
     <details id="step-26"><summary><span class="tag later">Later</span> 26. Write with My handwriting</summary><p>Draw the template in the app and write with it.</p></details>
-    <details id="step-27"><summary><span class="tag later">Later</span> 27. Trace ink into outlines</summary><p>Masks become glyph outlines without a GPL tracer.</p></details>
+    <details id="step-27">
+      <summary><span class="tag done">Done</span> 27. Trace ink into outlines</summary>
+      <p>A font stores each letter as outlines, the edges of its shape, not as pixels. This step turns lifted ink, a picture of where the ink is, into those outlines. Step 28 uses it to make a font from a photo of the printed template, one traced letter per box. It is written for this project, because the usual tracer, potrace, is GPL-licensed and cannot ship here.</p>
+      <ul class="points">
+        <li>Each separate shape becomes its own outline, and the hole in an o or a g becomes an inner outline that runs the other way, so a font fills the letter and leaves the hole open.</li>
+        <li>Two pixels that touch only at a corner stay one shape, so a thin diagonal stroke does not break apart.</li>
+        <li>The outline is then simplified: points are dropped as long as the straight lines that replace them stay within 0.8 pixels of the traced edge. A handwritten g goes from 1,287 points to 88, and filled back in it covers 97% of the same pixels as the original ink.</li>
+        <li>A hairline about one pixel wide is narrower than that allowance and is dropped.</li>
+      </ul>
+      <p>Nothing on screen changes yet.</p>
+      <p>The tests run in <code>pnpm test</code>:</p>
+      <pre>pnpm --filter @repo/integrations test --reporter=verbose</pre>
+      <p>The names read like “a ring is an outer contour and a hole wound the other way”, “pixels touching only at a corner stay one shape”, and “the contours fill back to the mask”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including 5 new tracing tests, and a traced handwritten g drawn over its ink and looked at by eye.</p>
+    </details>
     <details id="step-28"><summary><span class="tag later">Later</span> 28. Font from a template photo</summary><p>Print the template, write, photograph, get a font.</p></details>
     <details id="step-29"><summary><span class="tag later">Later</span> 29. Font from an uploaded TTF or OTF</summary><p>Rebuilt from its outlines in a locked-down thread, never served as uploaded.</p></details>
 

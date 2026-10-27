@@ -286,3 +286,32 @@ export function headerOnlyPng(widthPx: number, heightPx: number): Uint8Array {
 		]),
 	);
 }
+
+export async function handwrittenG(): Promise<{
+	widthPx: number;
+	heightPx: number;
+	alpha: Uint8Array;
+}> {
+	const widthPx = 200;
+	const heightPx = 300;
+	const svg = [
+		`<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${heightPx}">`,
+		`<rect x="0" y="0" width="${widthPx}" height="${heightPx}" fill="#ffffff"/>`,
+		`<g fill="none" stroke="#000000" stroke-width="15" stroke-linecap="round" stroke-linejoin="round">`,
+		`<path d="M 137 96 C 124 66 70 60 54 100 C 40 136 64 170 98 162 C 126 156 140 128 137 96 Z"/>`,
+		`<path d="M 146 70 C 140 120 150 190 134 224 C 118 258 66 266 44 232 C 38 222 42 212 50 214"/>`,
+		"</g>",
+		"</svg>",
+	].join("");
+	const { data } = await sharp(Buffer.from(svg))
+		.removeAlpha()
+		.blur(0.8)
+		.extractChannel(0)
+		.raw()
+		.toBuffer({ resolveWithObject: true });
+	const alpha = new Uint8Array(widthPx * heightPx);
+	for (let index = 0; index < alpha.length; index += 1) {
+		alpha[index] = 255 - (data[index] ?? 255);
+	}
+	return { widthPx, heightPx, alpha };
+}
