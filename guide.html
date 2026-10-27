@@ -68,8 +68,8 @@ summary { cursor: pointer; }
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
   <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave are ready on your own computer. Formatting from the toolbar is next.</p>
-  <div class="progress" aria-hidden="true"><span style="width:33%"></span></div>
-  <p class="log">12 of 36 steps in the repository. Step 14 starts the worker in two pools. Step 11 adds the floating toolbar.</p>
+  <div class="progress" aria-hidden="true"><span style="width:36%"></span></div>
+  <p class="log">13 of 36 steps in the repository. Step 23 settles how handwriting varies its letters. Step 11 adds the floating toolbar.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -307,7 +307,23 @@ pnpm dev</pre>
     <details id="step-22"><summary><span class="tag later">Later</span> 22. Crop and erase a photo doodle</summary><p>Crop, erase leftovers, save to the library.</p></details>
 
     <h3>M7. Handwriting fonts (separable)</h3>
-    <details id="step-23"><summary><span class="tag later">Later</span> 23. Alternate letter shapes</summary><p>A handwriting font varies its letters the same way in Chromium and Safari.</p></details>
+    <details id="step-23">
+      <summary><span class="tag done">Done</span> 23. Alternate letter shapes</summary>
+      <p>This settles how a handwriting font will vary its letters, before any handwriting font exists. A letter drawn more than once, say three a's, becomes glyphs <code>a</code>, <code>a.alt1</code> and <code>a.alt2</code> in the font. The font has three stylistic sets, ss01, ss02 and ss03, and each one switches to the next shape when the same letter comes again. Each letter on the page picks one of the three sets from its id, so a letter prints the same every time and two letters look different.</p>
+      <ul class="points">
+        <li>Chromium and WebKit pick exactly the same shapes in every case tested, at print resolution.</li>
+        <li>The stock fonts have no alternates, so nothing on screen changes yet. Steps 24 to 26 build the first font in your own hand.</li>
+      </ul>
+      <p>Two things to know:</p>
+      <ul class="points">
+        <li>The shape only changes when the same letter repeats right after itself, as in “ll” or “ee”. Elsewhere each letter always starts from the same shape for that page. So one letter's a's mostly look alike, and the variety shows between letters and in double letters. That is what the plan describes; if you want every a on a page to vary, say so before step 25.</li>
+        <li>Playwright's WebKit on Linux shapes text the way Chromium does. Safari on the iPad uses Apple's own text engine, so the iPad still needs checking by hand once a font in your hand exists.</li>
+      </ul>
+      <p>The tests run in <code>pnpm test</code>, with Docker running for the two browsers:</p>
+      <pre>pnpm --filter @repo/integrations test --reporter=verbose</pre>
+      <p>The names read like “ss01 cycles from the default” and “ss02 starts one step later”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including 12 new font and page tests in both engines.</p>
+    </details>
     <details id="step-24"><summary><span class="tag later">Later</span> 24. Store handwriting fonts</summary><p>Personal fonts, drawn cell by cell by their owner.</p></details>
     <details id="step-25"><summary><span class="tag later">Later</span> 25. Build a font in the worker</summary><p>A drawn font becomes a real font file; the last good build stays in use.</p></details>
     <details id="step-26"><summary><span class="tag later">Later</span> 26. Write with My handwriting</summary><p>Draw the template in the app and write with it.</p></details>
