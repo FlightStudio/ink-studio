@@ -51,6 +51,28 @@ const pen = {
 	seed: 3,
 };
 
+const writingOnLines = {
+	color: "#141414",
+	widthUnits: 3,
+	lineSpacingUnits: 50,
+	area: { x: 120, y: 30, width: 800, height: 600 },
+	seed: 11,
+};
+
+const plainPaper: PageSpec = {
+	widthPx: 1600,
+	heightPx: 1200,
+	paper: "#fbfbf8",
+	ink: { ...writingOnLines, seed: 1 },
+	blurPx: 0.8,
+	noise: 3,
+};
+
+const graphPaper: PageSpec = {
+	...plainPaper,
+	grid: { color: "#777777", widthUnits: 1.4, spacingUnits: 25 },
+};
+
 function opaque(mask: Mask, level = 128): Uint8Array {
 	return mask.alpha.map((value) => (value >= level ? 1 : 0));
 }
@@ -107,6 +129,53 @@ function opaqueOutside(away: Uint8Array, found: Uint8Array): number {
 		if (found[index] === 1) wrong += 1;
 	}
 	return wrong / outside;
+}
+
+function shareBelow(
+	part: Uint8Array,
+	away: Uint8Array,
+	mask: Mask,
+	level: number,
+): number {
+	let seen = 0;
+	let below = 0;
+	for (let index = 0; index < part.length; index += 1) {
+		if (part[index] !== 1 || away[index] !== 1) continue;
+		seen += 1;
+		if ((mask.alpha[index] ?? 0) < level) below += 1;
+	}
+	expect(seen).toBeGreaterThan(0);
+	return below / seen;
+}
+
+function components(bits: Uint8Array, widthPx: number): number {
+	const heightPx = bits.length / widthPx;
+	const seen = new Uint8Array(bits.length);
+	const stack: number[] = [];
+	let found = 0;
+	for (let start = 0; start < bits.length; start += 1) {
+		if (bits[start] !== 1 || seen[start] === 1) continue;
+		found += 1;
+		seen[start] = 1;
+		stack.push(start);
+		while (stack.length > 0) {
+			const at = stack.pop() ?? 0;
+			const x = at % widthPx;
+			const y = Math.floor(at / widthPx);
+			for (let dy = -1; dy <= 1; dy += 1) {
+				for (let dx = -1; dx <= 1; dx += 1) {
+					const nx = x + dx;
+					const ny = y + dy;
+					if (nx < 0 || ny < 0 || nx >= widthPx || ny >= heightPx) continue;
+					const next = ny * widthPx + nx;
+					if (bits[next] !== 1 || seen[next] === 1) continue;
+					seen[next] = 1;
+					stack.push(next);
+				}
+			}
+		}
+	}
+	return found;
 }
 
 function inkIn(mask: Mask, box: Box): number {
@@ -338,5 +407,168 @@ describe("liftMask and liftInk", () => {
 		expect(
 			iou(opaque(small), resample(large, small.widthPx, small.heightPx)),
 		).toBeGreaterThanOrEqual(0.85);
+	});
+});
+
+describe("removing lines, specks and table edges", () => {
+	it("a grey graph-paper grid is removed and the writing kept", async () => {
+		const page = await syntheticPage(graphPaper);
+		const mask = await liftMask(page.photo, uncropped);
+		const found = opaque(mask);
+		expect(
+			shareBelow(page.grid, awayFromInk(page), mask, 30),
+		).toBeGreaterThanOrEqual(0.97);
+		expect(recall(page.ink, found)).toBeGreaterThanOrEqual(0.85);
+		const plain = await liftMask(
+			(await syntheticPage(plainPaper)).photo,
+			uncropped,
+		);
+		expect(
+			Math.abs(
+				components(found, mask.widthPx) -
+					components(opaque(plain), plain.widthPx),
+			),
+		).toBeLessThanOrEqual(1);
+	});
+
+	it("dark notebook rulings are removed", async () => {
+		const page = await syntheticPage({
+			widthPx: 1600,
+			heightPx: 1200,
+			paper: "#fbfaf6",
+			rulings: {
+				color: "#4e5a78",
+				widthUnits: 1.4,
+				spacingUnits: 40,
+				margin: "#7a2e38",
+			},
+			ink: {
+				...writingOnLines,
+				lineSpacingUnits: 40,
+				area: { x: 120, y: 10, width: 820, height: 700 },
+			},
+			blurPx: 0.8,
+			noise: 3,
+		});
+		const away = awayFromInk(page);
+		const kept = await liftMask(page.photo, {
+			removeLines: false,
+			cropToInk: false,
+		});
+		expect(shareBelow(page.rulings, away, kept, 128)).toBeLessThan(0.1);
+		const mask = await liftMask(page.photo, uncropped);
+		expect(shareBelow(page.rulings, away, mask, 30)).toBeGreaterThanOrEqual(
+			0.97,
+		);
+		expect(recall(page.ink, opaque(mask))).toBeGreaterThanOrEqual(0.85);
+	});
+
+	it("a wavy hand-drawn underline is kept", async () => {
+		const page = await syntheticPage({
+			widthPx: 1600,
+			heightPx: 1200,
+			paper: "#ffffff",
+			ink: {
+				...writingOnLines,
+				area: { x: 120, y: 60, width: 760, height: 260 },
+			},
+			underline: {
+				color: "#141414",
+				widthUnits: 1.8,
+				x: 140,
+				y: 380,
+				lengthUnits: 700,
+				riseUnits: 12,
+				amplitudeUnits: 3,
+				wavelengthUnits: 80,
+			},
+			blurPx: 0.8,
+			noise: 3,
+		});
+		const mask = await liftMask(page.photo, uncropped);
+		expect(recall(page.underline, opaque(mask))).toBeGreaterThanOrEqual(0.9);
+		expect(recall(page.ink, opaque(mask))).toBeGreaterThanOrEqual(0.9);
+	});
+
+	it("specks are dropped and the dot on an i is kept", async () => {
+		const page = await syntheticPage({
+			widthPx: 1600,
+			heightPx: 1200,
+			paper: "#fbfaf6",
+			ink: {
+				...writingOnLines,
+				area: { x: 120, y: 40, width: 760, height: 260 },
+			},
+			letterI: {
+				color: "#141414",
+				widthUnits: 3,
+				heightUnits: 14,
+				baselines: [200, 300, 400, 500, 600, 700, 800].map((x) => ({
+					x,
+					y: 420,
+				})),
+			},
+			specks: {
+				color: "#2a2a2a",
+				count: 200,
+				radiusUnits: 0.7,
+				area: { x: 40, y: 460, width: 920, height: 260 },
+				seed: 9,
+			},
+			blurPx: 0.8,
+			noise: 3,
+		});
+		const away = awayFromInk(page);
+		const kept = await liftMask(page.photo, {
+			removeLines: false,
+			cropToInk: false,
+		});
+		expect(shareBelow(page.specks, away, kept, 128)).toBeLessThan(0.2);
+		const mask = await liftMask(page.photo, uncropped);
+		expect(shareBelow(page.specks, away, mask, 30)).toBeGreaterThanOrEqual(
+			0.99,
+		);
+		expect(recall(page.dots, opaque(mask))).toBeGreaterThanOrEqual(0.9);
+		expect(recall(page.ink, opaque(mask))).toBeGreaterThanOrEqual(0.9);
+	});
+
+	it("a dark table edge around the paper is dropped", async () => {
+		const page = await syntheticPage({
+			widthPx: 1600,
+			heightPx: 1200,
+			paper: "#f8f6f0",
+			table: { color: "#3b2b20", insetUnits: 20, tiltDeg: 1.5 },
+			ink: {
+				...writingOnLines,
+				area: { x: 160, y: 120, width: 680, height: 460 },
+			},
+			blurPx: 0.8,
+			noise: 3,
+		});
+		const mask = await liftMask(page.photo, uncropped);
+		expect(
+			shareBelow(page.table, awayFromInk(page), mask, 30),
+		).toBeGreaterThanOrEqual(0.99);
+		expect(recall(page.ink, opaque(mask))).toBeGreaterThanOrEqual(0.9);
+		const cropped = await liftMask(page.photo, {
+			removeLines: true,
+			cropToInk: true,
+		});
+		const ink = inkBounds(page.ink, 1600);
+		const margin = 2 * 0.02 * 1600 + 8;
+		expect(cropped.widthPx).toBeLessThanOrEqual(ink.width + margin);
+		expect(cropped.heightPx).toBeLessThanOrEqual(ink.height + margin);
+	});
+
+	it("line removal can be turned off", async () => {
+		const page = await syntheticPage(graphPaper);
+		const mask = await liftMask(page.photo, {
+			removeLines: false,
+			cropToInk: false,
+		});
+		expect([mask.widthPx, mask.heightPx]).toEqual([1600, 1200]);
+		expect(
+			shareBelow(page.grid, awayFromInk(page), mask, 128),
+		).toBeLessThanOrEqual(0.1);
 	});
 });

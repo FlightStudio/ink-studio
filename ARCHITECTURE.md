@@ -241,11 +241,13 @@ The stages, in order:
 1. Decode. `sharp` reads the header and refuses a photo over the cap, then applies EXIF orientation, flattens transparency onto white, shrinks to `workingLongSidePx` in `LIFT_LIMITS` without enlarging, and hands over raw RGB. Only this stage and the final PNG encode use `sharp`; every other stage is plain TypeScript over the raw buffer.
 2. Lighting. A background estimate per channel (block mean, max filter, blur, bilinear upscale) divides each channel, so shadows and paper tint go to white.
 3. Colour separation. Brightness is the brightest channel, so light coloured rulings and margins read as paper and dark ink of any hue stays dark.
-4. Sauvola on brightness, from integral images of the value and its square, with a window that scales with the image's short side. A pixel darker than its threshold is hard ink; a page with none is `no_ink_found`.
-5. Soft matte. Alpha ramps with the distance below the threshold, inside a one-pixel dilation of the hard mask.
-6. Crop. `liftInk` crops to the ink plus a margin that scales with the image.
+4. Sauvola on brightness, from integral images of the value and its square, with a window that scales with the image's short side. A pixel darker than its threshold is hard ink.
+5. Line removal. Run-length filtering on the hard mask, an opening with a line element in linear time: horizontal runs at least the width over `LINE_LENGTH_DIVISOR` long, then vertical runs at least the height over it, lose the pixels where the mask's thickness across the run is at most `LINE_THICKNESS_BASE_PX` plus the short side over `LINE_THICKNESS_DIVISOR`. A stroke crossing a line is thick across it, so the crossing stays. The rows go first, so a grid's intersections are thin by the time the columns are filtered.
+6. Components. 8-connected components, from union-find over runs, drop when smaller than `SPECK_MIN_PX` or `SPECK_SHARE` of the image, whichever is larger, or when they touch the border and cover more than `BORDER_SHARE` of the image, which is a dark table edge around the paper. A page left with no hard ink is `no_ink_found`.
+7. Soft matte. Alpha ramps with the distance below the threshold, inside a one-pixel dilation of the cleaned hard mask. A pixel that line removal or the component filter took out stays clear even inside that dilation.
+8. Crop. `liftInk` crops to the ink plus a margin that scales with the image.
 
-The constants for each stage live at the top of the lift file. A stroke wider than the Sauvola window lifts hollow. `packages/integrations/src/worker/image/lift.test.ts` scores each stage against the ground truth from `packages/integrations/src/worker/image/synthetic.ts`.
+`liftMask` with `removeLines` off skips stages 5 and 6, so it returns Sauvola's mask with the matte; `liftInk` always removes them. The constants for each stage live at the top of the lift file. A stroke wider than the Sauvola window lifts hollow. Sauvola's threshold drops beside dark ink, so a mid-grey line breaks a few pixels either side of each stroke; a piece shorter than the run length then survives line removal. The border rule only sees a table edge whose dark band reaches the frame, because the lighting stage normalises a wide strip of table to paper. `packages/integrations/src/worker/image/lift.test.ts` scores each stage against the ground truth from `packages/integrations/src/worker/image/synthetic.ts`, which draws grids, rulings, a wavy underline, dotted i's, specks and a table around the paper, each with its own truth mask.
 
 ## Jobs
 

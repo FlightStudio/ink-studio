@@ -16,6 +16,12 @@ const BACKGROUND_BLUR_RADIUS = 1;
 const WINDOW_DIVISOR = 30;
 const SAUVOLA_K = 0.3;
 const SAUVOLA_R = 0.5;
+const LINE_LENGTH_DIVISOR = 12;
+const LINE_THICKNESS_BASE_PX = 2;
+const LINE_THICKNESS_DIVISOR = 800;
+const SPECK_MIN_PX = 12;
+const SPECK_SHARE = 0.000004;
+const BORDER_SHARE = 0.02;
 const MATTE_RAMP = 0.04;
 const CROP_MARGIN = 0.02;
 
@@ -256,6 +262,171 @@ function hardMask(plane: Plane, thresholds: Float32Array): Uint8Array {
 	return hard;
 }
 
+function runLengths(
+	bits: Uint8Array,
+	widthPx: number,
+	heightPx: number,
+	horizontal: boolean,
+): Uint32Array {
+	const lengths = new Uint32Array(bits.length);
+	const lines = horizontal ? heightPx : widthPx;
+	const along = horizontal ? widthPx : heightPx;
+	const step = horizontal ? 1 : widthPx;
+	for (let line = 0; line < lines; line += 1) {
+		const first = horizontal ? line * widthPx : line;
+		let position = 0;
+		while (position < along) {
+			if (bits[first + position * step] !== 1) {
+				position += 1;
+				continue;
+			}
+			let end = position;
+			while (end < along && bits[first + end * step] === 1) end += 1;
+			for (let at = position; at < end; at += 1) {
+				lengths[first + at * step] = end - position;
+			}
+			position = end;
+		}
+	}
+	return lengths;
+}
+
+function stripRuns(
+	bits: Uint8Array,
+	widthPx: number,
+	heightPx: number,
+	horizontal: boolean,
+): Uint8Array {
+	const minLength = Math.round(
+		(horizontal ? widthPx : heightPx) / LINE_LENGTH_DIVISOR,
+	);
+	const maxThickness =
+		LINE_THICKNESS_BASE_PX +
+		Math.round(Math.min(widthPx, heightPx) / LINE_THICKNESS_DIVISOR);
+	const along = runLengths(bits, widthPx, heightPx, horizontal);
+	const across = runLengths(bits, widthPx, heightPx, !horizontal);
+	const kept = bits.slice();
+	for (let index = 0; index < kept.length; index += 1) {
+		if (
+			kept[index] === 1 &&
+			(along[index] ?? 0) >= minLength &&
+			(across[index] ?? 0) <= maxThickness
+		) {
+			kept[index] = 0;
+		}
+	}
+	return kept;
+}
+
+function removeLines(
+	bits: Uint8Array,
+	widthPx: number,
+	heightPx: number,
+): Uint8Array {
+	const withoutRows = stripRuns(bits, widthPx, heightPx, true);
+	return stripRuns(withoutRows, widthPx, heightPx, false);
+}
+
+function root(parents: Int32Array, run: number): number {
+	let at = run;
+	while ((parents[at] ?? at) !== at) {
+		const parent = parents[at] ?? at;
+		const grandparent = parents[parent] ?? parent;
+		parents[at] = grandparent;
+		at = grandparent;
+	}
+	return at;
+}
+
+function dropComponents(
+	bits: Uint8Array,
+	widthPx: number,
+	heightPx: number,
+): Uint8Array {
+	let runCount = 0;
+	for (let y = 0; y < heightPx; y += 1) {
+		for (let x = 0; x < widthPx; x += 1) {
+			const index = y * widthPx + x;
+			if (bits[index] === 1 && (x === 0 || bits[index - 1] !== 1)) {
+				runCount += 1;
+			}
+		}
+	}
+	const rows = new Int32Array(runCount);
+	const starts = new Int32Array(runCount);
+	const ends = new Int32Array(runCount);
+	const parents = new Int32Array(runCount);
+	let next = 0;
+	let previousFrom = 0;
+	let previousTo = 0;
+	for (let y = 0; y < heightPx; y += 1) {
+		const from = next;
+		let x = 0;
+		while (x < widthPx) {
+			if (bits[y * widthPx + x] !== 1) {
+				x += 1;
+				continue;
+			}
+			let end = x;
+			while (end + 1 < widthPx && bits[y * widthPx + end + 1] === 1) end += 1;
+			rows[next] = y;
+			starts[next] = x;
+			ends[next] = end;
+			parents[next] = next;
+			next += 1;
+			x = end + 1;
+		}
+		let above = previousFrom;
+		for (let run = from; run < next; run += 1) {
+			const start = starts[run] ?? 0;
+			const end = ends[run] ?? 0;
+			while (above < previousTo && (ends[above] ?? 0) < start - 1) above += 1;
+			for (
+				let other = above;
+				other < previousTo && (starts[other] ?? 0) <= end + 1;
+				other += 1
+			) {
+				const a = root(parents, run);
+				const b = root(parents, other);
+				if (a !== b) parents[Math.max(a, b)] = Math.min(a, b);
+			}
+		}
+		previousFrom = from;
+		previousTo = next;
+	}
+	const sizes = new Uint32Array(runCount);
+	const touches = new Uint8Array(runCount);
+	for (let run = 0; run < runCount; run += 1) {
+		const top = root(parents, run);
+		const start = starts[run] ?? 0;
+		const end = ends[run] ?? 0;
+		const row = rows[run] ?? 0;
+		sizes[top] = (sizes[top] ?? 0) + end - start + 1;
+		if (
+			start === 0 ||
+			end === widthPx - 1 ||
+			row === 0 ||
+			row === heightPx - 1
+		) {
+			touches[top] = 1;
+		}
+	}
+	const pixels = widthPx * heightPx;
+	const minSize = Math.max(SPECK_MIN_PX, SPECK_SHARE * pixels);
+	const maxBorderSize = BORDER_SHARE * pixels;
+	const kept = bits.slice();
+	for (let run = 0; run < runCount; run += 1) {
+		const top = root(parents, run);
+		const size = sizes[top] ?? 0;
+		if (size >= minSize && !(touches[top] === 1 && size > maxBorderSize)) {
+			continue;
+		}
+		const offset = (rows[run] ?? 0) * widthPx;
+		kept.fill(0, offset + (starts[run] ?? 0), offset + (ends[run] ?? 0) + 1);
+	}
+	return kept;
+}
+
 function dilate(
 	bits: Uint8Array,
 	widthPx: number,
@@ -287,11 +458,13 @@ function matte(
 	plane: Plane,
 	thresholds: Float32Array,
 	hard: Uint8Array,
+	beforeRemoval: Uint8Array,
 ): Uint8Array {
 	const inside = dilate(hard, plane.widthPx, plane.heightPx);
 	const alpha = new Uint8Array(hard.length);
 	for (let index = 0; index < alpha.length; index += 1) {
 		if (inside[index] !== 1) continue;
+		if (beforeRemoval[index] === 1 && hard[index] !== 1) continue;
 		const below = (thresholds[index] ?? 0) - (plane.data[index] ?? 1);
 		const ramp = (below + MATTE_RAMP) / (2 * MATTE_RAMP);
 		alpha[index] = Math.round(255 * Math.min(1, Math.max(0, ramp)));
@@ -335,13 +508,20 @@ export async function liftMask(
 	const rgb = await decode(photo);
 	const plane = brightness(rgb);
 	const thresholds = sauvola(plane);
-	const hard = hardMask(plane, thresholds);
+	const sauvolaMask = hardMask(plane, thresholds);
+	const hard = options.removeLines
+		? dropComponents(
+				removeLines(sauvolaMask, rgb.widthPx, rgb.heightPx),
+				rgb.widthPx,
+				rgb.heightPx,
+			)
+		: sauvolaMask;
 	if (!hard.includes(1))
 		throw new ServiceError("invalid_input", "no_ink_found");
 	const mask: Mask = {
 		widthPx: rgb.widthPx,
 		heightPx: rgb.heightPx,
-		alpha: matte(plane, thresholds, hard),
+		alpha: matte(plane, thresholds, hard, sauvolaMask),
 	};
 	return options.cropToInk ? cropToInk(mask) : mask;
 }
