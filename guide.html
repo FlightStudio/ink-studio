@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. The app is not finished. Postgres is ready to run on your own computer.</p>
-  <div class="progress" aria-hidden="true"><span style="width:8.3%"></span></div>
-  <p class="log">3 of 36 steps in the repository. Step 4 serves the website against this database.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres and a small website are ready to run on your own computer. The editor is still ahead.</p>
+  <div class="progress" aria-hidden="true"><span style="width:11.1%"></span></div>
+  <p class="log">4 of 36 steps in the repository. Step 5 is the stationery design system.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -98,13 +98,23 @@ pnpm db:migrate</pre>
       <p>To look at the tables from the terminal:</p>
       <pre>docker compose exec postgres psql -U postgres -d ink_studio -c '\dt'</pre>
     </div>
+    <div id="website">
+      <h3>Open the website</h3>
+      <p>After migrate succeeds, seed one local user and start Next.js:</p>
+      <pre>cp apps/web/.env.example apps/web/.env.local
+pnpm seed
+pnpm dev</pre>
+      <p>Open <a href="http://127.0.0.1:3000">http://127.0.0.1:3000</a>. The page says Ink Studio, then <code>dev@inkstudio.local · Ink Studio</code>. Health is <a href="http://127.0.0.1:3000/api/health">http://127.0.0.1:3000/api/health</a> and answers <code>{"ok":true}</code>.</p>
+      <p>Running <code>pnpm seed</code> again keeps that same user and organization. The password in the connection string is only for this local database.</p>
+      <p>An iPad on the same network needs <code>DEV_LAN_HOST</code> set to this computer's LAN address in the root <code>.env</code> and in <code>apps/web/.env.local</code>, and <code>NEXT_PUBLIC_PLATFORM_URL=http://&lt;that-address&gt;:3000</code> in <code>apps/web/.env.local</code>. Restart <code>pnpm dev</code>, then open that address on the iPad. The dev server listens on port 3000 on every interface.</p>
+    </div>
   </section>
 
   <section class="panel">
     <p class="kicker">Just landed</p>
-    <h2>Step 3. Database package and Postgres</h2>
-    <p>Identity tables live in <code>packages/db</code>. Migrations are in <code>packages/db/drizzle</code>. <code>pnpm db:migrate</code> reads <code>DATABASE_URL</code> from <code>tools/.env</code>. Tests start their own Postgres 17 container, so they do not touch the database on port 5434.</p>
-    <p>There is still no website. Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, <code>pnpm test</code>, then <code>docker compose up -d</code> and <code>pnpm db:migrate</code>.</p>
+    <h2>Step 4. Dev identity and the web shell</h2>
+    <p><code>pnpm seed</code> writes one owner into Postgres. <code>getSession</code> in <code>apps/web/src/server/auth.ts</code> reads that user. Outside production, a <code>dev_user</code> cookie can name a different email the tests seeded. The home page renders Ink Studio. <code>/api/health</code> answers 200.</p>
+    <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, <code>pnpm test</code>, <code>pnpm seed</code>, <code>pnpm dev</code>, and the health request.</p>
   </section>
 
   <section>
@@ -124,13 +134,16 @@ pnpm db:migrate</pre>
       <summary><span class="tag done">Done</span> 3. Database package and Postgres</summary>
       <p>Postgres 17 on port 5434, three identity tables, and <code>pnpm db:migrate</code>. Follow the box at the top.</p>
     </details>
-    <details open>
-      <summary><span class="tag now">Now</span> 4. Dev identity and the web shell</summary>
-      <p><code>pnpm seed</code> then <code>pnpm dev</code>. The home page says Ink Studio. <code>/api/health</code> answers 200.</p>
+    <details>
+      <summary><span class="tag done">Done</span> 4. Dev identity and the web shell</summary>
+      <p><code>pnpm seed</code> then <code>pnpm dev</code>. The home page says Ink Studio. <code>/api/health</code> answers 200. Follow “Open the website” above.</p>
     </details>
 
     <h3>M2. Design system and page model</h3>
-    <details><summary><span class="tag later">Later</span> 5. Stationery design system and browser harness</summary><p>Tokens, components, screenshots.</p></details>
+    <details open>
+      <summary><span class="tag now">Now</span> 5. Stationery design system and browser harness</summary>
+      <p>Tokens, components, screenshots. Not in the repository yet.</p>
+    </details>
     <details><summary><span class="tag later">Later</span> 6. Page specs and exclusion floats</summary><p>Thanks.io letter and 6×9 postcard as data.</p></details>
     <details><summary><span class="tag later">Later</span> 7. One letter document and validation</summary><p>Tiptap JSON, validated on save.</p></details>
     <details><summary><span class="tag later">Later</span> 8. Shared letter page in Chromium and WebKit</summary><p>Text flows across sides.</p></details>

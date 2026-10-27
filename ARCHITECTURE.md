@@ -14,12 +14,17 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | errors            | `packages/errors/src/index.ts` | `errorMessages`                                        |
 | api               | `packages/api/openapi.yaml`    | HTTP contract. Client is `packages/api/src/gen/api.ts` |
 | db                | `packages/db/src/index.ts`     | Identity repositories and migrations                   |
+| ui                | `packages/ui/src/index.ts`     | Shared title and error presentation                    |
+| web               | `apps/web/src/app/page.tsx`    | Next.js shell                                          |
+| web               | `apps/web/src/server/auth.ts`  | `getSession`, the function the move replaces           |
 | tools             | `tools/check-comments.ts`      | No-comment check                                       |
 | tools             | `tools/check-architecture.ts`  | This map stays honest                                  |
 | tools             | `tools/migrate.ts`             | Applies `packages/db/drizzle`                          |
 1. An app may import packages. A package never imports an app.
 2. Dependencies point toward `packages/types`. `packages/errors` stands alone. `packages/api` may import `packages/errors`.
 3. Drizzle and `pg` live only in `packages/db`.
+4. Pages read through `apps/web/src/server`. Mutations go through `apps/web/src/app/api`.
+5. `getSession` in `apps/web/src/server/auth.ts` is the one function the move replaces.
 
 ## One letter, end to end
 

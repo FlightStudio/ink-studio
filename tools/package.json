@@ -5,6 +5,7 @@
 	"scripts": {
 		"check": "tsx check.ts",
 		"migrate": "tsx migrate.ts",
+		"seed": "tsx dev/seed.ts",
 		"test": "vitest run",
 		"typecheck": "tsc --noEmit"
 	},

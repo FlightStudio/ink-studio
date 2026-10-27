@@ -1,11 +1,14 @@
 node_modules
 .turbo
 .next
+apps/web/next-env.d.ts
 dist
+*.tsbuildinfo
 coverage
 .env
 .env.local
 **/.env
+**/.env.local
 !**/.env.example
 *.log
 .pnpm-store

@@ -1,0 +1,49 @@
+:root {
+	color-scheme: light;
+	--desk: oklch(0.94 0.012 75);
+	--paper: oklch(0.98 0.008 85);
+	--ink: oklch(0.25 0.02 262);
+	--muted: oklch(0.48 0.02 262);
+	--rule: oklch(0.86 0.012 80);
+}
+
+body {
+	margin: 0;
+	min-height: 100vh;
+	background: var(--desk);
+	color: var(--ink);
+	font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+}
+
+main,
+section {
+	width: min(640px, calc(100% - 32px));
+	margin: 48px auto;
+	background: var(--paper);
+	border: 1px solid var(--rule);
+	padding: 48px 40px;
+}
+
+h1,
+h2 {
+	font-weight: 400;
+	margin: 0 0 12px;
+}
+
+h1 {
+	font-size: 2.4rem;
+}
+
+p {
+	margin: 0;
+	color: var(--muted);
+}
+
+button {
+	margin-top: 16px;
+	font: inherit;
+	color: var(--ink);
+	background: transparent;
+	border: 1px solid var(--rule);
+	padding: 8px 14px;
+}
