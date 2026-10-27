@@ -13,10 +13,13 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | types             | `packages/types/src/index.ts`  | Identity shapes, including `Member`                    |
 | errors            | `packages/errors/src/index.ts` | `errorMessages`                                        |
 | api               | `packages/api/openapi.yaml`    | HTTP contract. Client is `packages/api/src/gen/api.ts` |
+| db                | `packages/db/src/index.ts`     | Identity repositories and migrations                   |
 | tools             | `tools/check-comments.ts`      | No-comment check                                       |
 | tools             | `tools/check-architecture.ts`  | This map stays honest                                  |
+| tools             | `tools/migrate.ts`             | Applies `packages/db/drizzle`                          |
 1. An app may import packages. A package never imports an app.
 2. Dependencies point toward `packages/types`. `packages/errors` stands alone. `packages/api` may import `packages/errors`.
+3. Drizzle and `pg` live only in `packages/db`.
 
 ## One letter, end to end
 
@@ -28,7 +31,11 @@ Filled as jobs land.
 
 ## Tables
 
-Filled as tables land.
+| Table              | Package       | Role                                     |
+| ------------------ | ------------- | ---------------------------------------- |
+| users              | `packages/db` | A person, keyed by external id and email |
+| organizations      | `packages/db` | A studio                                 |
+| organization_users | `packages/db` | Membership and role                      |
 
 ## Where to change things
 

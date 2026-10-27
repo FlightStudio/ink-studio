@@ -4,8 +4,12 @@
 	"type": "module",
 	"scripts": {
 		"check": "tsx check.ts",
+		"migrate": "tsx migrate.ts",
 		"test": "vitest run",
 		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@repo/db": "workspace:*"
 	},
 	"devDependencies": {
 		"@babel/parser": "^8.0.0",

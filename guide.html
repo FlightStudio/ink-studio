@@ -67,36 +67,44 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. The app is not finished. Postgres is the part you can run on your own computer once step 3 is in the repository.</p>
-  <div class="progress" aria-hidden="true"><span style="width:5.6%"></span></div>
-  <p class="log">2 of 36 steps in the repository. Step 3 brings Postgres.</p>
+  <p class="lede">This page is the map. It updates after each plan step. The app is not finished. Postgres is ready to run on your own computer.</p>
+  <div class="progress" aria-hidden="true"><span style="width:8.3%"></span></div>
+  <p class="log">3 of 36 steps in the repository. Step 4 serves the website against this database.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
     <p class="kicker">On your computer</p>
     <h2>Prepare the machine, then the database</h2>
-    <p>Do this now. The database commands stay locked until <code>docker-compose.yml</code> exists.</p>
+    <p>Do the machine setup once. Then start Postgres and apply the identity tables.</p>
     <ol class="steps">
-      <li>Install <a href="https://www.docker.com/products/docker-desktop/">Docker Desktop</a> and leave it running. On Linux, Docker Engine plus the Compose plugin is enough.</li>
+      <li>Install <a href="https://www.docker.com/products/docker-desktop/">Docker Desktop</a> and leave it running. On Linux, Docker Engine plus the Compose plugin is enough. If <code>docker compose</code> says permission denied, open a new terminal after your user is in the <code>docker</code> group, or run the compose commands with <code>sg docker -c '…'</code>.</li>
       <li>Install Node.js 22 from <a href="https://nodejs.org/">nodejs.org</a>.</li>
       <li>In a terminal: <code>corepack enable</code> then <code>corepack prepare pnpm@10.33.4 --activate</code>.</li>
       <li>Clone this repository and check out the branch <code>cursor/ink-studio-guide-8700</code>.</li>
       <li><code>pnpm install</code></li>
-      <li><code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code> should pass. There is no website yet.</li>
     </ol>
-    <div class="locked" id="postgres">
+    <div id="postgres">
       <h3>Postgres 17 on port 5434</h3>
-      <p>Not in the repository yet. Step 3 adds Compose, the identity tables, and <code>pnpm db:migrate</code>. When that lands, this box becomes the thing you run, and the connection is:</p>
+      <p>From the repository root, with Docker running:</p>
+      <pre>cp .env.example .env
+cp tools/.env.example tools/.env
+docker compose up -d
+docker compose ps
+pnpm db:migrate</pre>
+      <p><code>docker compose ps</code> should show the postgres service as healthy before you migrate. <code>pnpm db:migrate</code> creates <code>users</code>, <code>organizations</code>, and <code>organization_users</code>.</p>
+      <p>Connect with TablePlus, psql, or any client:</p>
       <pre>postgresql://postgres:postgres@127.0.0.1:5434/ink_studio</pre>
-      <p>That password is only for this local database. Do not reuse it anywhere else.</p>
+      <p>That password is only for this local database. Do not reuse it anywhere else. Stop the database later with <code>docker compose stop</code>. The data stays in the Compose volume.</p>
+      <p>To look at the tables from the terminal:</p>
+      <pre>docker compose exec postgres psql -U postgres -d ink_studio -c '\dt'</pre>
     </div>
   </section>
 
   <section class="panel">
     <p class="kicker">Just landed</p>
-    <h2>Step 2. Types, API contract, errors</h2>
-    <p>Identity shapes live in <code>packages/types</code>. Error sentences live in <code>packages/errors</code>. <code>pnpm api:generate</code> writes the health client from <code>packages/api/openapi.yaml</code>.</p>
-    <p>Still no database and no website. Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, <code>pnpm test</code>.</p>
+    <h2>Step 3. Database package and Postgres</h2>
+    <p>Identity tables live in <code>packages/db</code>. Migrations are in <code>packages/db/drizzle</code>. <code>pnpm db:migrate</code> reads <code>DATABASE_URL</code> from <code>tools/.env</code>. Tests start their own Postgres 17 container, so they do not touch the database on port 5434.</p>
+    <p>There is still no website. Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, <code>pnpm test</code>, then <code>docker compose up -d</code> and <code>pnpm db:migrate</code>.</p>
   </section>
 
   <section>
@@ -113,11 +121,11 @@ summary { cursor: pointer; }
       <p>Shared identity shapes and a health endpoint contract.</p>
     </details>
     <details>
-      <summary><span class="tag now">Now</span> 3. Database package and Postgres</summary>
-      <p>This is the step that unlocks the database box. Real Postgres 17, migrations, and tests against a container.</p>
+      <summary><span class="tag done">Done</span> 3. Database package and Postgres</summary>
+      <p>Postgres 17 on port 5434, three identity tables, and <code>pnpm db:migrate</code>. Follow the box at the top.</p>
     </details>
-    <details>
-      <summary><span class="tag later">Later</span> 4. Dev identity and the web shell</summary>
+    <details open>
+      <summary><span class="tag now">Now</span> 4. Dev identity and the web shell</summary>
       <p><code>pnpm seed</code> then <code>pnpm dev</code>. The home page says Ink Studio. <code>/api/health</code> answers 200.</p>
     </details>
 
