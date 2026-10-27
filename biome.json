@@ -7,7 +7,7 @@
 	},
 	"files": {
 		"ignoreUnknown": true,
-		"includes": ["**", "!PLAN.md", "!pnpm-lock.yaml"]
+		"includes": ["**", "!PLAN.md", "!pnpm-lock.yaml", "!packages/api/src/gen"]
 	},
 	"formatter": {
 		"enabled": true,

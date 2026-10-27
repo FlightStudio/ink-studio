@@ -68,8 +68,8 @@ summary { cursor: pointer; }
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
   <p class="lede">This page is the map. It updates after each plan step. The app is not finished. Postgres is the part you can run on your own computer once step 3 is in the repository.</p>
-  <div class="progress" aria-hidden="true"><span></span></div>
-  <p class="log">1 of 36 steps in the repository. Step 2 is next.</p>
+  <div class="progress" aria-hidden="true"><span style="width:5.6%"></span></div>
+  <p class="log">2 of 36 steps in the repository. Step 3 brings Postgres.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -94,9 +94,9 @@ summary { cursor: pointer; }
 
   <section class="panel">
     <p class="kicker">Just landed</p>
-    <h2>Step 1. Monorepo and the two repo checks</h2>
-    <p>An empty workspace with pnpm, Turborepo, Biome, and two checks: no comments in code, and <code>ARCHITECTURE.md</code> only names files that exist. Shared packages were rebuilt from the plan because project-post is not in this workspace.</p>
-    <p>Checked here: <code>pnpm lint</code>, <code>pnpm typecheck</code>, <code>pnpm test</code> (9 tests).</p>
+    <h2>Step 2. Types, API contract, errors</h2>
+    <p>Identity shapes live in <code>packages/types</code>. Error sentences live in <code>packages/errors</code>. <code>pnpm api:generate</code> writes the health client from <code>packages/api/openapi.yaml</code>.</p>
+    <p>Still no database and no website. Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, <code>pnpm test</code>.</p>
   </section>
 
   <section>
@@ -109,11 +109,11 @@ summary { cursor: pointer; }
       <p>Goal: a green empty monorepo. You can install and run the three checks above.</p>
     </details>
     <details open>
-      <summary><span class="tag now">Now</span> 2. Types, API contract, errors</summary>
+      <summary><span class="tag done">Done</span> 2. Types, API contract, errors</summary>
       <p>Shared identity shapes and a health endpoint contract.</p>
     </details>
     <details>
-      <summary><span class="tag later">Later</span> 3. Database package and Postgres</summary>
+      <summary><span class="tag now">Now</span> 3. Database package and Postgres</summary>
       <p>This is the step that unlocks the database box. Real Postgres 17, migrations, and tests against a container.</p>
     </details>
     <details>

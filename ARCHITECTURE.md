@@ -6,12 +6,17 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 
 ## Packages and the dependency rule
 
-| Package           | Path                          | Role                      |
-| ----------------- | ----------------------------- | ------------------------- |
-| typescript-config | `packages/typescript-config`  | Shared TypeScript presets |
-| logger            | `packages/logger`             | Structured log helper     |
-| tools             | `tools/check-comments.ts`     | No-comment check          |
-| tools             | `tools/check-architecture.ts` | This map stays honest     |
+| Package           | Path                           | Role                                                   |
+| ----------------- | ------------------------------ | ------------------------------------------------------ |
+| typescript-config | `packages/typescript-config`   | Shared TypeScript presets                              |
+| logger            | `packages/logger`              | Structured log helper                                  |
+| types             | `packages/types/src/index.ts`  | Identity shapes, including `Member`                    |
+| errors            | `packages/errors/src/index.ts` | `errorMessages`                                        |
+| api               | `packages/api/openapi.yaml`    | HTTP contract. Client is `packages/api/src/gen/api.ts` |
+| tools             | `tools/check-comments.ts`      | No-comment check                                       |
+| tools             | `tools/check-architecture.ts`  | This map stays honest                                  |
+1. An app may import packages. A package never imports an app.
+2. Dependencies point toward `packages/types`. `packages/errors` stands alone. `packages/api` may import `packages/errors`.
 
 ## One letter, end to end
 

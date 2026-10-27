@@ -1,0 +1,15 @@
+{
+	"name": "@repo/errors",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@repo/typescript-config": "workspace:*",
+		"typescript": "catalog:"
+	}
+}

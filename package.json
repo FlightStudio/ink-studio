@@ -8,6 +8,7 @@
 		"typecheck": "turbo run typecheck",
 		"test": "turbo run test",
 		"build": "turbo run build",
+		"api:generate": "pnpm --filter @repo/api generate",
 		"seed": "pnpm --filter tools seed",
 		"test:e2e": "pnpm --filter web test:e2e",
 		"screens": "pnpm --filter tools screens",
