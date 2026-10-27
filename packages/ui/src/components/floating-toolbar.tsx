@@ -1,8 +1,8 @@
 "use client";
 
 import { Toolbar } from "@base-ui/react/toolbar";
+import { cn } from "cn";
 import type { ComponentProps } from "react";
-import { cn } from "../lib/cn.ts";
 
 export type FloatingToolbarProps = ComponentProps<typeof Toolbar.Root> & {
 	placement: "top" | "bottom";
@@ -15,8 +15,9 @@ export function FloatingToolbar({
 }: FloatingToolbarProps) {
 	return (
 		<Toolbar.Root
+			data-slot="floating-toolbar"
 			data-placement={placement}
-			className={cn("studio-toolbar animate-settle", className)}
+			className={cn("floating-toolbar animate-settle", className)}
 			{...props}
 		/>
 	);

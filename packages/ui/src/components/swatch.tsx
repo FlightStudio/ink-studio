@@ -9,14 +9,14 @@ export type SwatchProps = {
 
 export function Swatch({ color, label, selected, onSelect }: SwatchProps) {
 	return (
-		<input
-			type="radio"
-			checked={selected}
-			aria-label={label}
-			data-selected={selected}
-			className="studio-swatch"
-			style={{ background: color }}
-			onChange={onSelect}
-		/>
+		<label data-slot="swatch" data-selected={selected} className="swatch">
+			<input type="radio" checked={selected} onChange={onSelect} />
+			<span
+				aria-hidden="true"
+				className="swatch-dot"
+				style={{ background: color }}
+			/>
+			<span>{label}</span>
+		</label>
 	);
 }

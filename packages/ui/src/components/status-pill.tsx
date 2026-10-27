@@ -5,7 +5,12 @@ export type StatusPillProps = {
 
 export function StatusPill({ status, label }: StatusPillProps) {
 	return (
-		<span className="status-pill" data-status={status}>
+		<span
+			data-slot="status-pill"
+			data-status={status}
+			role="status"
+			className="status-pill"
+		>
 			{label}
 		</span>
 	);

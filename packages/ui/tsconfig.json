@@ -2,7 +2,10 @@
 	"extends": "@repo/typescript-config/base.json",
 	"compilerOptions": {
 		"lib": ["es2023", "dom"],
-		"jsx": "react-jsx"
+		"jsx": "react-jsx",
+		"paths": {
+			"@repo/ui/*": ["./src/*"]
+		}
 	},
 	"include": ["src/**/*.ts", "src/**/*.tsx"]
 }

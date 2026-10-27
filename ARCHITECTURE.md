@@ -15,13 +15,16 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | api               | `packages/api/openapi.yaml`                       | HTTP contract. Client is `packages/api/src/gen/api.ts` |
 | db                | `packages/db/src/index.ts`                        | Identity repositories and migrations                   |
 | ui                | `packages/ui/src/styles/globals.css`              | Stationery tokens inside the studio class              |
+| ui                | `packages/ui/components.json`                     | shadcn CLI config for the primitives                   |
+| ui                | `packages/ui/src/components/ui`                   | Generated shadcn primitives                            |
 | ui                | `packages/ui/src/components/desk.tsx`             | Full-viewport desk surface                             |
 | ui                | `packages/ui/src/components/floating-toolbar.tsx` | Paper toolbar                                          |
 | ui                | `packages/ui/src/components/swatch.tsx`           | Ink colour radio                                       |
 | ui                | `packages/ui/src/components/status-pill.tsx`      | Pending, running, done, failed                         |
 | testing           | `packages/testing/src/browser.ts`                 | Dev-only Chromium and WebKit harness                   |
-| web               | `apps/web/src/app/(studio)/styleguide/page.tsx`   | Style guide                                            |
-| web               | `apps/web/src/app/page.tsx`                       | Next.js shell                                          |
+| web               | `apps/web/src/app/(studio)/layout.tsx`            | Studio class, fonts, paper texture                     |
+| web               | `apps/web/src/app/(studio)/page.tsx`              | Signed-in home on the desk                             |
+| web               | `apps/web/src/app/(studio)/styleguide/page.tsx`   | Style guide as a letter on the desk                    |
 | web               | `apps/web/src/server/auth.ts`                     | `getSession`, the function the move replaces           |
 | tools             | `tools/check-comments.ts`                         | No-comment check                                       |
 | tools             | `tools/check-architecture.ts`                     | This map stays honest                                  |
@@ -32,7 +35,7 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 3. Drizzle and `pg` live only in `packages/db`.
 4. Pages read through `apps/web/src/server`. Mutations go through `apps/web/src/app/api`.
 5. `getSession` in `apps/web/src/server/auth.ts` is the one function the move replaces.
-6. Stationery tokens in `packages/ui/src/styles/globals.css` apply on the studio class set by `apps/web/src/app/(studio)/layout.tsx`. The browser harness in `packages/testing/src/browser.ts` is dev-only.
+6. Stationery tokens in `packages/ui/src/styles/globals.css` apply on the studio class set by `apps/web/src/app/(studio)/layout.tsx`, so every page in that group sits on the desk. Primitives in `packages/ui/src/components/ui` are regenerated with the shadcn CLI, never edited by hand. The browser harness in `packages/testing/src/browser.ts` is dev-only.
 
 ## One letter, end to end
 
