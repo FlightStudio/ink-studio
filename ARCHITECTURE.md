@@ -11,6 +11,10 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | typescript-config | `packages/typescript-config`                      | Shared TypeScript presets                              |
 | logger            | `packages/logger`                                 | Structured log helper                                  |
 | types             | `packages/types/src/index.ts`                     | Identity shapes, including `Member`                    |
+| types             | `packages/types/src/page.ts`                      | `PAGE_SPECS`, one entry per provider and product       |
+| types             | `packages/types/src/ink.ts`                       | `INK_COLORS` and `TEXT_SIZES`                          |
+| types             | `packages/types/src/font.ts`                      | `STOCK_FONTS`                                          |
+| render            | `packages/render/src/html/index.ts`               | `@repo/render/html`, client-safe page layout           |
 | errors            | `packages/errors/src/index.ts`                    | `errorMessages`                                        |
 | api               | `packages/api/openapi.yaml`                       | HTTP contract. Client is `packages/api/src/gen/api.ts` |
 | db                | `packages/db/src/index.ts`                        | Identity repositories and migrations                   |

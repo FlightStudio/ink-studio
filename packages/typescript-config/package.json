@@ -2,6 +2,7 @@
 	"name": "@repo/typescript-config",
 	"private": true,
 	"files": [
-		"base.json"
+		"base.json",
+		"react-library.json"
 	]
 }

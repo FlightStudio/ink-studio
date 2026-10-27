@@ -1,0 +1,19 @@
+{
+	"name": "@repo/render",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./html": "./src/html/index.ts"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@repo/types": "workspace:*"
+	},
+	"devDependencies": {
+		"@repo/typescript-config": "workspace:*",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	}
+}

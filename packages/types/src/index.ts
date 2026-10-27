@@ -1,3 +1,7 @@
+export type { StockFontId } from "./font.ts";
+export { STOCK_FONTS } from "./font.ts";
+export type { InkColorId, TextSizePt } from "./ink.ts";
+export { INK_COLORS, TEXT_SIZES } from "./ink.ts";
 export type { NewOrganization, Organization } from "./organization.ts";
 export type {
 	NewOrganizationUser,
@@ -6,6 +10,14 @@ export type {
 } from "./organization-user.ts";
 export type { OtherString } from "./other-string.ts";
 export { asOtherString } from "./other-string.ts";
+export type {
+	Corner,
+	KeepClearZone,
+	PageFormatId,
+	PageSpec,
+	ProductKind,
+} from "./page.ts";
+export { DEFAULT_FORMAT, PAGE_SPECS } from "./page.ts";
 export type { Member, Session } from "./session.ts";
 export type { NewUser, User } from "./user.ts";
 export type { UserOrganization } from "./user-organization.ts";
