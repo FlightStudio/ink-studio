@@ -310,8 +310,7 @@ pnpm dev</pre>
         <li>Edges are soft rather than jagged, and the result is cropped to the ink with a small margin.</li>
         <li>A phone photo taken sideways is turned upright. A photo over 40 million pixels is refused with “That photo has too many pixels, so try a smaller one.”, before it is opened. A file that is not a picture reads “That photo could not be opened, so try another one.”, and a blank page reads “No ink was found in that photo.”</li>
       </ul>
-      <p>There is no button for it yet; step 21 runs it in the worker and step 22 adds the screen. Dark rulings, graph paper and specks are step 20. Here is a test photo and what came out, tinted blue on a checkerboard so the clear parts show:</p>
-      <p><code>/opt/cursor/artifacts/step-19/lift-input.png</code> and <code>lift-output-on-checkerboard.png</code> in the pull request.</p>
+      <p>There is no button for it yet; step 21 runs it in the worker and step 22 adds the screen. Dark rulings, graph paper and specks are step 20. The pull request for this step shows a test photo and what came out, on a checkerboard so the clear parts show.</p>
       <p>The tests build pages with known ink and score the result against them:</p>
       <pre>pnpm --filter @repo/integrations test --reporter=verbose</pre>
       <p>The names read like “a shadow across the page does not become ink” and “blue ballpoint on blue rulings is kept”.</p>
