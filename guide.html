@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres and a small website are ready to run on your own computer. The editor is still ahead.</p>
-  <div class="progress" aria-hidden="true"><span style="width:11.1%"></span></div>
-  <p class="log">4 of 36 steps in the repository. Step 5 is the stationery design system.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, and the stationery style guide are ready on your own computer. The editor is still ahead.</p>
+  <div class="progress" aria-hidden="true"><span style="width:13.9%"></span></div>
+  <p class="log">5 of 36 steps in the repository. Step 6 is the letter and postcard page geometry.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -92,10 +92,12 @@ docker compose up -d
 docker compose ps
 pnpm db:migrate</pre>
       <p><code>docker compose ps</code> should show the postgres service as healthy before you migrate. <code>pnpm db:migrate</code> creates <code>users</code>, <code>organizations</code>, and <code>organization_users</code>.</p>
-      <p>Connect with TablePlus, psql, or any client:</p>
+      <p>Look at the tables in the browser with Drizzle Studio. It uses the database config already in the repo, so you do not install a second Postgres or a separate database app:</p>
+      <pre>pnpm db:studio</pre>
+      <p>Leave that terminal open while you browse <code>users</code>, <code>organizations</code>, and <code>organization_users</code>. Stop it with Ctrl+C. The connection it uses is:</p>
       <pre>postgresql://postgres:postgres@127.0.0.1:5434/ink_studio</pre>
       <p>That password is only for this local database. Do not reuse it anywhere else. Stop the database later with <code>docker compose stop</code>. The data stays in the Compose volume.</p>
-      <p>To look at the tables from the terminal:</p>
+      <p>The same tables from the terminal:</p>
       <pre>docker compose exec postgres psql -U postgres -d ink_studio -c '\dt'</pre>
     </div>
     <div id="website">
@@ -105,6 +107,8 @@ pnpm db:migrate</pre>
 pnpm seed
 pnpm dev</pre>
       <p>Open <a href="http://127.0.0.1:3000">http://127.0.0.1:3000</a>. The page says Ink Studio, then <code>dev@inkstudio.local · Ink Studio</code>. Health is <a href="http://127.0.0.1:3000/api/health">http://127.0.0.1:3000/api/health</a> and answers <code>{"ok":true}</code>.</p>
+      <p>The stationery style guide is <a href="http://127.0.0.1:3000/styleguide">http://127.0.0.1:3000/styleguide</a>. With the dev server already running, this writes a desktop screenshot and an iPad screenshot under <code>.local/screens</code>:</p>
+      <pre>pnpm screens /styleguide</pre>
       <p>Running <code>pnpm seed</code> again keeps that same user and organization. The password in the connection string is only for this local database.</p>
       <p>An iPad on the same network needs <code>DEV_LAN_HOST</code> set to this computer's LAN address in the root <code>.env</code> and in <code>apps/web/.env.local</code>, and <code>NEXT_PUBLIC_PLATFORM_URL=http://&lt;that-address&gt;:3000</code> in <code>apps/web/.env.local</code>. Restart <code>pnpm dev</code>, then open that address on the iPad. The dev server listens on port 3000 on every interface.</p>
     </div>
@@ -112,9 +116,9 @@ pnpm dev</pre>
 
   <section class="panel">
     <p class="kicker">Just landed</p>
-    <h2>Step 4. Dev identity and the web shell</h2>
-    <p><code>pnpm seed</code> writes one owner into Postgres. <code>getSession</code> in <code>apps/web/src/server/auth.ts</code> reads that user. Outside production, a <code>dev_user</code> cookie can name a different email the tests seeded. The home page renders Ink Studio. <code>/api/health</code> answers 200.</p>
-    <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, <code>pnpm test</code>, <code>pnpm seed</code>, <code>pnpm dev</code>, and the health request.</p>
+    <h2>Step 5. Stationery design system</h2>
+    <p>Tokens and components live in <code>packages/ui</code> and apply on the studio class. Open <a href="http://127.0.0.1:3000/styleguide">/styleguide</a> while <code>pnpm dev</code> is running. <code>pnpm screens /styleguide</code> saves a 1440×900 screenshot and an iPad screenshot.</p>
+    <p>The home page is unchanged: Ink Studio and the seeded email. Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, <code>pnpm test</code>, the style guide in the browser, and the two screenshots.</p>
   </section>
 
   <section>
@@ -140,11 +144,14 @@ pnpm dev</pre>
     </details>
 
     <h3>M2. Design system and page model</h3>
-    <details open>
-      <summary><span class="tag now">Now</span> 5. Stationery design system and browser harness</summary>
-      <p>Tokens, components, screenshots. Not in the repository yet.</p>
+    <details>
+      <summary><span class="tag done">Done</span> 5. Stationery design system and browser harness</summary>
+      <p>Tokens, the desk, the toolbar, swatches, and status pills. Open /styleguide. Screenshots land in <code>.local/screens</code>.</p>
     </details>
-    <details><summary><span class="tag later">Later</span> 6. Page specs and exclusion floats</summary><p>Thanks.io letter and 6×9 postcard as data.</p></details>
+    <details open>
+      <summary><span class="tag now">Now</span> 6. Page specs and exclusion floats</summary>
+      <p>Thanks.io letter and 6×9 postcard as data. Not in the repository yet.</p>
+    </details>
     <details><summary><span class="tag later">Later</span> 7. One letter document and validation</summary><p>Tiptap JSON, validated on save.</p></details>
     <details><summary><span class="tag later">Later</span> 8. Shared letter page in Chromium and WebKit</summary><p>Text flows across sides.</p></details>
 

@@ -9,6 +9,11 @@
 		"ignoreUnknown": true,
 		"includes": ["**", "!PLAN.md", "!pnpm-lock.yaml", "!packages/api/src/gen"]
 	},
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
+		}
+	},
 	"formatter": {
 		"enabled": true,
 		"indentStyle": "tab"

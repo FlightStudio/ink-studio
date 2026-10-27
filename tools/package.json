@@ -6,11 +6,14 @@
 		"check": "tsx check.ts",
 		"migrate": "tsx migrate.ts",
 		"seed": "tsx dev/seed.ts",
+		"screens": "tsx dev/screens.ts",
 		"test": "vitest run",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@repo/db": "workspace:*"
+		"@repo/db": "workspace:*",
+		"@repo/testing": "workspace:*",
+		"playwright-core": "catalog:"
 	},
 	"devDependencies": {
 		"@babel/parser": "^8.0.0",

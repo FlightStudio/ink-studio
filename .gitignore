@@ -12,3 +12,4 @@ coverage
 !**/.env.example
 *.log
 .pnpm-store
+.local
