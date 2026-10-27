@@ -8,6 +8,9 @@ const nextConfig: NextConfig = {
 		"host.docker.internal",
 		...(lanHost ? [lanHost] : []),
 	],
+	outputFileTracingIncludes: {
+		"/fonts/stock/[fontId]": ["../../packages/render/fonts/*.ttf"],
+	},
 };
 
 export default nextConfig;
