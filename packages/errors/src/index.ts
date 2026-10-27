@@ -7,6 +7,9 @@ export const apiErrorCodes = [
 	"unsupported_media_type",
 	"internal_error",
 	"no_organization",
+	"invalid_letter",
+	"invalid_title",
+	"stale_revision",
 ] as const;
 
 export type ApiErrorCode = (typeof apiErrorCodes)[number];
@@ -20,6 +23,9 @@ export const errorMessages = {
 	unsupported_media_type: "That file type is not supported.",
 	internal_error: "Something went wrong.",
 	no_organization: "You are not in an organization.",
+	invalid_letter: "The letter could not be read.",
+	invalid_title: "A title needs 1 to 120 characters and no control characters.",
+	stale_revision: "This letter changed in another tab.",
 } as const satisfies Record<ApiErrorCode, string>;
 
 export type ApiErrorBody = {
@@ -29,4 +35,25 @@ export type ApiErrorBody = {
 
 export function apiError(code: ApiErrorCode): ApiErrorBody {
 	return { code, message: errorMessages[code] };
+}
+
+export const serviceErrorKinds = [
+	"invalid_input",
+	"not_found",
+	"forbidden",
+	"conflict",
+] as const;
+
+export type ServiceErrorKind = (typeof serviceErrorKinds)[number];
+
+export class ServiceError extends Error {
+	readonly kind: ServiceErrorKind;
+	readonly code: ApiErrorCode;
+
+	constructor(kind: ServiceErrorKind, code: ApiErrorCode) {
+		super(errorMessages[code]);
+		this.name = "ServiceError";
+		this.kind = kind;
+		this.code = code;
+	}
 }

@@ -1,0 +1,25 @@
+{
+	"name": "@repo/services",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./letters": "./src/letters/index.ts"
+	},
+	"scripts": {
+		"test": "vitest run",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@repo/api": "workspace:*",
+		"@repo/db": "workspace:*",
+		"@repo/errors": "workspace:*",
+		"@repo/render": "workspace:*",
+		"@repo/types": "workspace:*"
+	},
+	"devDependencies": {
+		"@repo/typescript-config": "workspace:*",
+		"@types/node": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	}
+}

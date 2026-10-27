@@ -1,5 +1,9 @@
 export type {
 	Db,
+	Letter,
+	LetterChange,
+	Letters,
+	NewLetter,
 	Organizations,
 	OrganizationUsers,
 	TestDb,

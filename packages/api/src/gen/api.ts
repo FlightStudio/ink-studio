@@ -4,6 +4,45 @@
  * Ink Studio
  * OpenAPI spec version: 0.0.0
  */
+export type PageFormatId = typeof PageFormatId[keyof typeof PageFormatId];
+
+
+export const PageFormatId = {
+  'thanksio:letter-windowless': 'thanksio:letter-windowless',
+  'thanksio:postcard-6x9': 'thanksio:postcard-6x9',
+} as const;
+
+export interface LetterContentEnvelope {
+  schemaVersion: number;
+  format: string;
+  [key: string]: unknown;
+ }
+
+export interface CreateLetterRequest {
+  format?: PageFormatId;
+}
+
+export interface CreatedLetter {
+  id: string;
+}
+
+export interface SaveLetterRequest {
+  title: string;
+  content: LetterContentEnvelope;
+  /** @minimum 1 */
+  expectedRevision: number;
+}
+
+export interface SavedLetter {
+  revision: number;
+}
+
+export interface LetterState {
+  title: string;
+  revision: number;
+  content: LetterContentEnvelope;
+}
+
 export interface Health {
   ok: boolean;
 }
@@ -20,6 +59,9 @@ export const ApiErrorCode = {
   unsupported_media_type: 'unsupported_media_type',
   internal_error: 'internal_error',
   no_organization: 'no_organization',
+  invalid_letter: 'invalid_letter',
+  invalid_title: 'invalid_title',
+  stale_revision: 'stale_revision',
 } as const;
 
 export interface ApiError {
@@ -56,6 +98,11 @@ export type InvalidOriginResponse = ApiError;
  * That file type is not supported.
  */
 export type UnsupportedMediaTypeResponse = ApiError;
+
+/**
+ * This letter changed in another tab.
+ */
+export type ConflictResponse = ApiError;
 
 /**
  * Something went wrong.
@@ -110,4 +157,301 @@ export const getHealth = async ( options?: RequestInit): Promise<getHealthRespon
 
   const data: getHealthResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getHealthResponse
+}
+
+
+
+export type createLetterResponse201 = {
+  data: CreatedLetter
+  status: 201
+}
+
+export type createLetterResponse400 = {
+  data: InvalidRequestResponse
+  status: 400
+}
+
+export type createLetterResponse401 = {
+  data: UnauthenticatedResponse
+  status: 401
+}
+
+export type createLetterResponse403 = {
+  data: ForbiddenResponse
+  status: 403
+}
+
+export type createLetterResponse415 = {
+  data: UnsupportedMediaTypeResponse
+  status: 415
+}
+
+export type createLetterResponse500 = {
+  data: InternalErrorResponse
+  status: 500
+}
+
+export type createLetterResponseSuccess = (createLetterResponse201) & {
+  headers: Headers;
+};
+export type createLetterResponseError = (createLetterResponse400 | createLetterResponse401 | createLetterResponse403 | createLetterResponse415 | createLetterResponse500) & {
+  headers: Headers;
+};
+
+export type createLetterResponse = (createLetterResponseSuccess | createLetterResponseError)
+
+export const getCreateLetterUrl = () => {
+
+
+
+
+  return `/api/letters`
+}
+
+export const createLetter = async (createLetterRequest: CreateLetterRequest, options?: RequestInit): Promise<createLetterResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCreateLetterUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createLetterRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createLetterResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createLetterResponse
+}
+
+
+
+export type getLetterResponse200 = {
+  data: LetterState
+  status: 200
+}
+
+export type getLetterResponse401 = {
+  data: UnauthenticatedResponse
+  status: 401
+}
+
+export type getLetterResponse403 = {
+  data: ForbiddenResponse
+  status: 403
+}
+
+export type getLetterResponse404 = {
+  data: NotFoundResponse
+  status: 404
+}
+
+export type getLetterResponse500 = {
+  data: InternalErrorResponse
+  status: 500
+}
+
+export type getLetterResponseSuccess = (getLetterResponse200) & {
+  headers: Headers;
+};
+export type getLetterResponseError = (getLetterResponse401 | getLetterResponse403 | getLetterResponse404 | getLetterResponse500) & {
+  headers: Headers;
+};
+
+export type getLetterResponse = (getLetterResponseSuccess | getLetterResponseError)
+
+export const getGetLetterUrl = (letterId: string,) => {
+
+
+
+
+  return `/api/letters/${letterId}`
+}
+
+export const getLetter = async (letterId: string, options?: RequestInit): Promise<getLetterResponse> => {
+
+  const res = await fetch(getGetLetterUrl(letterId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getLetterResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as getLetterResponse
+}
+
+
+
+export type saveLetterResponse200 = {
+  data: SavedLetter
+  status: 200
+}
+
+export type saveLetterResponse400 = {
+  data: InvalidRequestResponse
+  status: 400
+}
+
+export type saveLetterResponse401 = {
+  data: UnauthenticatedResponse
+  status: 401
+}
+
+export type saveLetterResponse403 = {
+  data: ForbiddenResponse
+  status: 403
+}
+
+export type saveLetterResponse404 = {
+  data: NotFoundResponse
+  status: 404
+}
+
+export type saveLetterResponse409 = {
+  data: ConflictResponse
+  status: 409
+}
+
+export type saveLetterResponse415 = {
+  data: UnsupportedMediaTypeResponse
+  status: 415
+}
+
+export type saveLetterResponse500 = {
+  data: InternalErrorResponse
+  status: 500
+}
+
+export type saveLetterResponseSuccess = (saveLetterResponse200) & {
+  headers: Headers;
+};
+export type saveLetterResponseError = (saveLetterResponse400 | saveLetterResponse401 | saveLetterResponse403 | saveLetterResponse404 | saveLetterResponse409 | saveLetterResponse415 | saveLetterResponse500) & {
+  headers: Headers;
+};
+
+export type saveLetterResponse = (saveLetterResponseSuccess | saveLetterResponseError)
+
+export const getSaveLetterUrl = (letterId: string,) => {
+
+
+
+
+  return `/api/letters/${letterId}`
+}
+
+export const saveLetter = async (letterId: string,
+    saveLetterRequest: SaveLetterRequest, options?: RequestInit): Promise<saveLetterResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getSaveLetterUrl(letterId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(saveLetterRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: saveLetterResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as saveLetterResponse
+}
+
+
+
+export type deleteLetterResponse204 = {
+  data: void
+  status: 204
+}
+
+export type deleteLetterResponse401 = {
+  data: UnauthenticatedResponse
+  status: 401
+}
+
+export type deleteLetterResponse403 = {
+  data: ForbiddenResponse
+  status: 403
+}
+
+export type deleteLetterResponse404 = {
+  data: NotFoundResponse
+  status: 404
+}
+
+export type deleteLetterResponse500 = {
+  data: InternalErrorResponse
+  status: 500
+}
+
+export type deleteLetterResponseSuccess = (deleteLetterResponse204) & {
+  headers: Headers;
+};
+export type deleteLetterResponseError = (deleteLetterResponse401 | deleteLetterResponse403 | deleteLetterResponse404 | deleteLetterResponse500) & {
+  headers: Headers;
+};
+
+export type deleteLetterResponse = (deleteLetterResponseSuccess | deleteLetterResponseError)
+
+export const getDeleteLetterUrl = (letterId: string,) => {
+
+
+
+
+  return `/api/letters/${letterId}`
+}
+
+export const deleteLetter = async (letterId: string, options?: RequestInit): Promise<deleteLetterResponse> => {
+
+  const res = await fetch(getDeleteLetterUrl(letterId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: deleteLetterResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as deleteLetterResponse
 }
