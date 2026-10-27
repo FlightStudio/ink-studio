@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the letter and postcard page geometry, and the letter document format are ready on your own computer. The editor is still ahead.</p>
-  <div class="progress" aria-hidden="true"><span style="width:19.4%"></span></div>
-  <p class="log">7 of 36 steps in the repository. Step 8 is the shared letter page, tested in Chromium and WebKit.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, and the shared letter page are ready on your own computer. Milestone M2 is complete. The editor is next.</p>
+  <div class="progress" aria-hidden="true"><span style="width:22.2%"></span></div>
+  <p class="log">8 of 36 steps in the repository. Step 9 stores letters with titles, revisions, and soft delete.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -115,22 +115,22 @@ pnpm dev</pre>
     </div>
   </section>
 
-  <section class="panel" id="step-7">
-    <p class="kicker">Just landed</p>
-    <h2>Step 7. One letter document, checked on every save</h2>
-    <p>A letter is now one defined shape: Tiptap JSON with paragraphs, line breaks, and one ink style per run of text (font, size, and colour). Doodles placed on the page live in the same document, so one undo will cover typing and moving a doodle alike. The document also records how many sides the creator added and, for a postcard, the front image.</p>
+  <section class="panel" id="step-8">
+    <p class="kicker">Just landed · M2 complete</p>
+    <h2>Step 8. One letter page, in Chromium and WebKit</h2>
+    <p>There is now one page component, <code>LetterPage</code>. The editor will show it, the print preview will show it, and the worker will turn it into the proof PDF. Because they all draw the same page with the same CSS, the letter a creator sees is the letter that prints.</p>
     <ul class="points">
-      <li>One parser checks every letter against the catalogues. An ink colour, size, font, or alignment that is not in the catalogue is refused, so a saved letter can never carry made-up CSS such as <code>red;background:url(x)</code>.</li>
-      <li>Every id must be a UUID. Unknown fields, unknown node types, bold, HTML strings, and future schema versions are refused.</li>
-      <li>A letter is held to 20,000 characters and 200 placed doodles. It may not ask for more sides than its product allows, and only a postcard may have a front image.</li>
-      <li>The Human Seal is worked out from the document. All in Karla's handwriting reads “Written in Karla's own handwriting”. Some of it reads “Partly written in Karla's own handwriting”. Doodles add “doodles hand-drawn”. A letter with nothing human in it has no seal.</li>
-      <li>The merge fields first name and last name are in the catalogue, with sample values for the preview. The <code>@</code> menu that inserts them comes in step 33.</li>
+      <li>A letter is drawn as sheets of paper on the desk with a gap between them while editing, and as plain white sheets with no gap when printed. The text column runs down through every side the letter may use.</li>
+      <li>Text skips the gap between sides, so no line is ever cut in half across a page break. On a postcard the text flows around the address and postage block on the back.</li>
+      <li>While editing, the corners the printer keeps clear are hatched, so a creator can see them. They disappear in print.</li>
+      <li>Caveat, Patrick Hand, and Homemade Apple are in the repository with their licences, under <code>packages/render/fonts</code>. The page loads them by id, so the editor and the print use the same font files.</li>
+      <li>A measure reads where every line sits, in inches, even when the page is zoomed. That count decides how many sides a letter uses and how far it runs over.</li>
     </ul>
-    <p>The page that draws a letter comes in step 8. To check this step on your computer:</p>
-    <pre>pnpm --filter @repo/types test --reporter=verbose
-pnpm --filter @repo/render test --reporter=verbose</pre>
-    <p>The seal cases are under <code>humanSeal</code>, and the parser cases read like “an ink colour outside the catalogue is refused”.</p>
-    <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>.</p>
+    <p>The tests open seven sample letters in real Chromium and real WebKit, the engine behind Safari on the iPad. Each runs at screen resolution and at print resolution, in both edit and print mode. The two engines agree on the number of sides for every sample. One gap remains: in WebKit, the down arrow from the last line of a side jumps further than the next line when a paragraph carries on past the gap. The editor in steps 10 and 11 will move the caret across that gap itself.</p>
+    <p>There is no page in the app that shows a letter yet. The editor in step 10 is the first. To run the browser tests yourself, with Docker running:</p>
+    <pre>pnpm --filter @repo/render test --silent=false</pre>
+    <p>The first run downloads the Playwright browser image. The output lists each sample with its line and side counts in both engines, for example <code>nearly-full edit @1.000: chromium 61 lines 3 sides, webkit 61 lines 3 sides</code>.</p>
+    <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including all 86 render tests.</p>
   </section>
 
   <section>
@@ -186,15 +186,29 @@ pnpm --filter @repo/render test</pre>
     </details>
     <details>
       <summary><span class="tag done">Done</span> 7. One letter document and validation</summary>
-      <p>Tiptap JSON checked against the catalogues on every save, and the Human Seal. See <a href="#step-7">Just landed</a>.</p>
+      <p>A letter is now one defined shape: Tiptap JSON with paragraphs, line breaks, and one ink style per run of text (font, size, and colour). Doodles placed on the page live in the same document, so one undo will cover typing and moving a doodle alike. The document also records how many sides the creator added and, for a postcard, the front image.</p>
+      <ul class="points">
+        <li>One parser checks every letter against the catalogues. An ink colour, size, font, or alignment that is not in the catalogue is refused, so a saved letter can never carry made-up CSS such as <code>red;background:url(x)</code>.</li>
+        <li>Every id must be a UUID. Unknown fields, unknown node types, bold, HTML strings, and future schema versions are refused.</li>
+        <li>A letter is held to 20,000 characters and 200 placed doodles. It may not ask for more sides than its product allows, and only a postcard may have a front image.</li>
+        <li>The Human Seal is worked out from the document. All in Karla's handwriting reads “Written in Karla's own handwriting”. Some of it reads “Partly written in Karla's own handwriting”. Doodles add “doodles hand-drawn”. A letter with nothing human in it has no seal.</li>
+        <li>The merge fields first name and last name are in the catalogue, with sample values for the preview. The <code>@</code> menu that inserts them comes in step 33.</li>
+      </ul>
+      <p>To check this step on your computer:</p>
+      <pre>pnpm --filter @repo/types test --reporter=verbose
+pnpm --filter @repo/render test --reporter=verbose</pre>
+      <p>The seal cases are under <code>humanSeal</code>, and the parser cases read like “an ink colour outside the catalogue is refused”.</p>
     </details>
-    <details open>
-      <summary><span class="tag now">Now</span> 8. Shared letter page in Chromium and WebKit</summary>
-      <p>One page component for the editor and the print. Text flows across sides and around the postcard's address block in both browser engines. Not in the repository yet.</p>
+    <details>
+      <summary><span class="tag done">Done</span> 8. Shared letter page in Chromium and WebKit</summary>
+      <p>One page component for the editor and the print. Text flows across sides and around the postcard's address block in both engines. See <a href="#step-8">Just landed</a>.</p>
     </details>
 
     <h3>M3. Editor</h3>
-    <details><summary><span class="tag later">Later</span> 9. Store letters, titles, revisions</summary><p>Letters persist.</p></details>
+    <details open>
+      <summary><span class="tag now">Now</span> 9. Store letters, titles, revisions</summary>
+      <p>A <code>letters</code> table with titles, revisions, and soft delete, so letters persist. Not in the repository yet.</p>
+    </details>
     <details><summary><span class="tag later">Later</span> 10. Write on the page with autosave</summary><p>The editor.</p></details>
     <details><summary><span class="tag later">Later</span> 11. Floating toolbar, format, undo</summary><p>Selection formatting.</p></details>
     <details><summary><span class="tag later">Later</span> 12. Sides, overflow, seal, print preview</summary><p>Fit is decided in Chromium.</p></details>
