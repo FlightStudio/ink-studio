@@ -70,6 +70,7 @@ export const LETTER_CSS = `
 	word-break: normal;
 	font-kerning: normal;
 	font-variant-ligatures: normal;
+	font-feature-settings: var(--letter-variant-set, normal);
 	-webkit-hyphens: none;
 	hyphens: none;
 	outline: none;

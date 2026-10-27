@@ -24,7 +24,12 @@ import {
 	type Rect,
 	sidesUsed,
 } from "./geometry.ts";
-import { LetterPage, measureInputFor, pageGapIn } from "./letter-page.tsx";
+import {
+	LetterPage,
+	measureInputFor,
+	pageGapIn,
+	variantFeatureSettings,
+} from "./letter-page.tsx";
 import { LetterText } from "./letter-print.tsx";
 import { type LetterMeasure, measureLetter } from "./measure.ts";
 
@@ -530,6 +535,56 @@ describe.each(ENGINES)("%s", (engine) => {
 			expect(
 				Math.abs((result.caret ?? Number.NaN) - result.firstTop),
 			).toBeLessThan(0.05);
+		});
+
+		test("the variant set reaches the text in the editable root and the static root", async () => {
+			const note = fixtureContent(letterFixture("note"));
+			const content: LetterContent = {
+				...note,
+				doc: {
+					...note.doc,
+					content: [
+						{
+							type: "paragraph",
+							attrs: { align: "left" },
+							content: [
+								{
+									type: "text",
+									text: "Dear Alex,",
+									marks: [
+										{
+											type: "ink",
+											attrs: { font: null, sizePt: 24, color: "sepia" },
+										},
+									],
+								},
+							],
+						},
+					],
+				},
+			};
+			const tag = variantFeatureSettings(LETTER_ID).split(" ")[0] ?? "";
+			const settingsOf = (page: Page) =>
+				page
+					.locator(".letter-text span")
+					.first()
+					.evaluate((span) => getComputedStyle(span).fontFeatureSettings);
+			const editable = await withPage(
+				context(),
+				{ content, mode: "edit" },
+				async (page) => {
+					await makeEditable(page);
+					return settingsOf(page);
+				},
+			);
+			const fixed = await withPage(
+				context(),
+				{ content, mode: "print" },
+				settingsOf,
+			);
+			expect(tag).toMatch(/^"ss0[123]"$/u);
+			expect(editable).toContain(tag);
+			expect(fixed).toContain(tag);
 		});
 
 		test("the caret crosses a band", async () => {
