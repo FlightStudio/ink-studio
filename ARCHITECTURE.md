@@ -23,6 +23,7 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | ui                | `packages/ui/src/components/status-pill.tsx`      | Pending, running, done, failed                         |
 | testing           | `packages/testing/src/browser.ts`                 | Dev-only Chromium and WebKit harness                   |
 | web               | `apps/web/src/app/(studio)/layout.tsx`            | Studio class, fonts, paper texture                     |
+| web               | `apps/web/public/images/paper.png`                | Paper scan from project-post, tiled on the sheet       |
 | web               | `apps/web/src/app/(studio)/page.tsx`              | Signed-in home on the desk                             |
 | web               | `apps/web/src/app/(studio)/styleguide/page.tsx`   | Style guide as a letter on the desk                    |
 | web               | `apps/web/src/server/auth.ts`                     | `getSession`, the function the move replaces           |

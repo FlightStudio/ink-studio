@@ -410,7 +410,7 @@ export default function StyleguidePage() {
 					<article
 						aria-label="A blank letter"
 						data-view={view}
-						className="relative aspect-[8.5/11] w-full max-w-[40rem] rounded-[3px] bg-paper bg-(image:--letter-paper-texture) bg-cover shadow-sheet transition-[background-color,box-shadow] duration-(--duration-settle) ease-settle data-[view=print]:bg-white data-[view=print]:bg-none data-[view=print]:shadow-[0_0_0_1px_var(--rule)] xl:w-[min(100%,calc((100dvh-11rem)*8.5/11))] xl:max-w-none"
+						className="relative aspect-[8.5/11] w-full max-w-[40rem] rounded-[3px] bg-paper bg-(image:--letter-paper-texture) bg-size-[125px] bg-repeat shadow-sheet transition-[background-color,box-shadow] duration-(--duration-settle) ease-settle data-[view=print]:bg-white data-[view=print]:bg-none data-[view=print]:shadow-[0_0_0_1px_var(--rule)] xl:w-[min(100%,calc((100dvh-11rem)*8.5/11))] xl:max-w-none"
 					>
 						<div
 							className="absolute inset-x-[8.8%] top-[10%]"
