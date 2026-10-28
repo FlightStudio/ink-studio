@@ -6,109 +6,114 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 
 ## Packages and the dependency rule
 
-| Package           | Path                                                         | Role                                                               |
-| ----------------- | ------------------------------------------------------------ | ------------------------------------------------------------------ |
-| typescript-config | `packages/typescript-config`                                 | Shared TypeScript presets                                          |
-| logger            | `packages/logger`                                            | Structured log helper                                              |
-| types             | `packages/types/src/index.ts`                                | Identity shapes, including `Member`                                |
-| types             | `packages/types/src/asset.ts`                                | `Asset`, its origin and processing, `assetMessageType`             |
-| types             | `packages/types/src/page.ts`                                 | `PAGE_SPECS`, one entry per provider and product                   |
-| types             | `packages/types/src/ink.ts`                                  | `INK_COLORS` and `TEXT_SIZES`                                      |
-| types             | `packages/types/src/font.ts`                                 | `STOCK_FONTS`, and a personal `Font`                               |
-| types             | `packages/types/src/handwriting.ts`                          | `HANDWRITING_GLYPHS`, `CELL`, `GLYPH_LIMITS` and `missingChars`    |
-| types             | `packages/types/src/letter.ts`                               | `LetterContent`, the element union, `LetterResources`, `humanSeal` |
-| types             | `packages/types/src/merge-field.ts`                          | `MERGE_FIELDS` and the sample and longest values                   |
-| types             | `packages/types/src/stroke.ts`                               | `Stroke`, its input and its timed points                           |
-| render            | `packages/render/src/html/index.ts`                          | `@repo/render/html`, client-safe page layout                       |
-| render            | `packages/render/src/html/geometry.ts`                       | Column, bands, keep-clear exclusions, spacer floats                |
-| render            | `packages/render/src/html/letter-page.tsx`                   | `LetterPage`, the one page, and `useLetterPage`                    |
-| render            | `packages/render/src/html/letter-css.ts`                     | `LETTER_CSS`, the letter's whole look                              |
-| render            | `packages/render/src/html/letter-print.tsx`                  | `LetterPrint`, the page in print with a static flow                |
-| render            | `packages/render/src/html/measure.ts`                        | `measureLetter`, the scale-aware line measure                      |
-| render            | `packages/render/src/html/ink.ts`                            | `STROKE_OPTIONS`, `strokeOutline` and `outlinePath`                |
-| render            | `packages/render/src/html/fixtures/index.ts`                 | `LETTER_FIXTURES`, letters written against `maxPages`              |
-| render            | `packages/render/src/html/letter-page.browser.test.tsx`      | The page laid out in Chromium and WebKit                           |
-| render            | `packages/render/src/schema/index.ts`                        | `@repo/render/schema`, `letterExtensions` and parser               |
-| render            | `packages/render/src/index.ts`                               | `@repo/render`, `renderLetterHtml` for the worker                  |
-| render            | `packages/render/src/render-letter-html.tsx`                 | The print document around `LetterPrint`                            |
-| render            | `packages/render/fonts`                                      | Stock font files by `STOCK_FONTS` file name, with licences         |
-| errors            | `packages/errors/src/index.ts`                               | `errorMessages` and `ServiceError`                                 |
-| api               | `packages/api/openapi.yaml`                                  | HTTP contract. Client is `packages/api/src/gen/api.ts`             |
-| api               | `packages/api/src/zod.ts`                                    | Request and response schemas typed against the generated types     |
-| db                | `packages/db/src/index.ts`                                   | Identity, letter and font repositories and migrations              |
-| db                | `packages/db/src/drizzle/letters.ts`                         | `Letters`, the revision-checked save and soft delete               |
-| db                | `packages/db/src/drizzle/fonts.ts`                           | `Fonts`, one cell replaced under a row lock                        |
-| db                | `packages/db/src/drizzle/assets.ts`                          | `Assets`, the claim, the job's moves and the stale read            |
-| services          | `packages/services/src/letters/index.ts`                     | `LetterService`, `letterResources`, `letterOwnerIds`               |
-| services          | `packages/services/src/fonts/index.ts`                       | `FontService` and `isOwnFont`                                      |
-| services          | `packages/services/src/assets/index.ts`                      | `AssetService`, `isServable`, `assetReadUrl`                       |
-| services          | `packages/services/src/assets/assets.service.ts`             | `UPLOADS`, the sniff and `READ_URL_EXPIRES_IN_SECONDS`             |
-| services          | `packages/services/src/assets/assets.service.ts`             | `runJob`, `sweep`, `MAX_ATTEMPTS`, `LEASE_MS`, `STALE_PENDING_MS`  |
-| services          | `packages/services/src/assets/assets.types.ts`               | `AssetStorage`, the provider integrations implements               |
-| services          | `packages/services/src/assets/assets.types.ts`               | `RunJobParams`, `ProducedFile`, `AssetJobMessage`                  |
-| services          | `packages/services/src/assets/assets.schemas.ts`             | `assetJobMessageSchema`, the one job message                       |
-| services          | `packages/services/src/queue/index.ts`                       | `QueueManager`, `Publisher`, `MessageProcessor`, `Subscriber`      |
-| services          | `packages/services/src/drawings/drawings.types.ts`           | `ImageProcessor`, the lift provider integrations implements        |
-| services          | `packages/services/src/letters/letters.types.ts`             | `PrintRenderer`, the provider integrations implements              |
-| integrations      | `packages/integrations/src/shared/gcp/index.ts`              | `@repo/integrations/shared/gcp`, storage and Pub/Sub classes       |
-| integrations      | `packages/integrations/src/shared/gcp/pubsub/publisher.ts`   | `PubSubPublisher`, a message per call with its type attribute      |
-| integrations      | `packages/integrations/src/shared/gcp/pubsub/subscriber.ts`  | `PubSubSubscriber`, streaming pull into a `MessageHandler`         |
-| integrations      | `packages/integrations/src/worker/font/index.ts`             | `@repo/integrations/worker/font`, `buildFont` and `vectorize`      |
-| integrations      | `packages/integrations/src/worker/font/vectorize.ts`         | `vectorize`, ink masks to closed glyph contours                    |
-| integrations      | `packages/integrations/src/worker/image/index.ts`            | `@repo/integrations/worker/image`, `SharpImageProcessor`           |
-| integrations      | `packages/integrations/src/worker/image/lift.ts`             | `liftInk`, `liftMask` and `LIFT_LIMITS`                            |
-| integrations      | `packages/integrations/src/worker/image/synthetic.ts`        | Test-only SVG pages with their ground-truth ink and ruling masks   |
-| integrations      | `packages/integrations/src/worker/chromium/index.ts`         | `@repo/integrations/worker/chromium`, `PlaywrightPrintRenderer`    |
-| integrations      | `packages/integrations/src/worker/chromium/fixtures`         | The test font, whose `a` is a solid square                         |
-| ui                | `packages/ui/src/styles/globals.css`                         | Stationery tokens inside the studio class                          |
-| ui                | `packages/ui/components.json`                                | shadcn CLI config for the primitives                               |
-| ui                | `packages/ui/src/components/ui`                              | Generated shadcn primitives                                        |
-| ui                | `packages/ui/src/components/desk.tsx`                        | Full-viewport desk surface                                         |
-| ui                | `packages/ui/src/components/floating-toolbar.tsx`            | Paper toolbar                                                      |
-| ui                | `packages/ui/src/components/swatch.tsx`                      | Ink colour radio                                                   |
-| ui                | `packages/ui/src/components/status-pill.tsx`                 | Pending, running, done, failed                                     |
-| testing           | `packages/testing/src/browser.ts`                            | Dev-only Chromium and WebKit harness                               |
-| web               | `apps/web/src/app/(studio)/layout.tsx`                       | Studio class, fonts, paper texture                                 |
-| web               | `apps/web/public/images/paper.png`                           | Paper scan from project-post, tiled on the sheet                   |
-| web               | `apps/web/src/app/page.tsx`                                  | Sends `/` to the letters list                                      |
-| web               | `apps/web/src/app/(studio)/letters/page.tsx`                 | Letters list with its empty state                                  |
-| web               | `apps/web/src/app/(studio)/letters/[letterId]/page.tsx`      | The editor page and its missing-letter view                        |
-| web               | `apps/web/src/app/(studio)/styleguide/page.tsx`              | Style guide as a letter on the desk                                |
-| web               | `apps/web/src/server/auth.ts`                                | `getSession`, the function the move replaces                       |
-| web               | `apps/web/src/server/handle-json.ts`                         | `handleJson`, the one wrapper around every API route               |
-| web               | `apps/web/src/server/origin.ts`                              | `isPlatformOrigin`, loopback names count as one origin             |
-| web               | `apps/web/src/server/letters.ts`                             | `getLetter` and `listLetters` for pages                            |
-| web               | `apps/web/src/server/fonts.ts`                               | `getFont` and `listFonts` for pages                                |
-| web               | `apps/web/src/app/api/letters/route.ts`                      | Create a letter                                                    |
-| web               | `apps/web/src/app/api/letters/[letterId]/route.ts`           | Read, save and delete one letter                                   |
-| web               | `apps/web/src/app/api/fonts/route.ts`                        | Create a handwriting font                                          |
-| web               | `apps/web/src/app/api/fonts/[fontId]/route.ts`               | Delete one font                                                    |
-| web               | `apps/web/src/app/api/fonts/[fontId]/glyphs/route.ts`        | Save one glyph cell                                                |
-| web               | `apps/web/src/server/services.ts`                            | Builds the db, the storage, the publisher and each service lazily  |
-| web               | `apps/web/src/app/api/uploads/route.ts`                      | Upload one file                                                    |
-| web               | `apps/web/src/app/api/assets/[assetId]/route.ts`             | Redirect to a fresh signed URL                                     |
-| web               | `apps/web/src/app/api/assets/[assetId]/status/route.ts`      | An asset's processing status                                       |
-| web               | `apps/web/src/app/fonts/stock/[fontId]/route.ts`             | Stock font bytes, cached as immutable                              |
-| web               | `apps/web/src/features/editor/components/letter-editor.tsx`  | `LetterEditor`, Tiptap writing on `LetterPage`                     |
-| web               | `apps/web/src/features/editor/components/save-line.tsx`      | `SaveLine`, the save state and the conflict choices                |
-| web               | `apps/web/src/features/editor/components/letter-card.tsx`    | A letter in the list, with Delete in its menu                      |
-| web               | `apps/web/src/lib/autosave.ts`                               | `autosave`, the pure save reducer, and `SAVE_DELAY_MS`             |
-| web               | `apps/web/src/lib/use-autosave.ts`                           | `useAutosave`, timers, unload and visibility                       |
-| web               | `apps/web/src/features/ink/pointer-session.ts`               | `pointerSession`, the pure pointer reducer                         |
-| web               | `apps/web/src/features/ink/ink-canvas.tsx`                   | `InkCanvas`, the one drawing surface                               |
-| web               | `apps/web/e2e/harness.ts`                                    | `startHarness` for the web journeys                                |
-| web               | `apps/web/src/features/editor/components/editor-toolbar.tsx` | `EditorToolbar`, font, size, ink, align, undo and redo             |
-| worker            | `apps/worker/src/index.ts`                                   | `main`, one pool per process, picked by `WORKER_POOL`              |
-| worker            | `apps/worker/src/env.ts`                                     | The worker's validated environment                                 |
-| worker            | `apps/worker/src/processors/sweep.ts`                        | `sweepProcessor`, the `sweep` message                              |
-| worker            | `apps/worker/package.json`                                   | `dev` runs the standard pool, `dev:render` the render pool         |
-| tools             | `tools/check-comments.ts`                                    | No-comment check                                                   |
-| tools             | `tools/check-architecture.ts`                                | This map stays honest                                              |
-| tools             | `tools/migrate.ts`                                           | Applies `packages/db/drizzle`                                      |
-| tools             | `tools/dev/screens.ts`                                       | `pnpm screens` writes both viewports of `WEB_BASE_URL`             |
-| tools             | `tools/dev/sweep.ts`                                         | `pnpm jobs:sweep` publishes one `sweep`                            |
-| tools             | `tools/docker/gcs/ink-studio-assets`                         | The local bucket, loaded by the `gcs` compose service              |
-| tools             | `tools/docker/pubsub-entrypoint.sh`                          | The emulator's jobs topic and one filtered subscription per pool   |
+| Package           | Path                                                          | Role                                                               |
+| ----------------- | ------------------------------------------------------------- | ------------------------------------------------------------------ |
+| typescript-config | `packages/typescript-config`                                  | Shared TypeScript presets                                          |
+| logger            | `packages/logger`                                             | Structured log helper                                              |
+| types             | `packages/types/src/index.ts`                                 | Identity shapes, including `Member`                                |
+| types             | `packages/types/src/asset.ts`                                 | `Asset`, its origin and processing, `assetMessageType`             |
+| types             | `packages/types/src/page.ts`                                  | `PAGE_SPECS`, one entry per provider and product                   |
+| types             | `packages/types/src/ink.ts`                                   | `INK_COLORS` and `TEXT_SIZES`                                      |
+| types             | `packages/types/src/font.ts`                                  | `STOCK_FONTS`, and a personal `Font`                               |
+| types             | `packages/types/src/handwriting.ts`                           | `HANDWRITING_GLYPHS`, `CELL`, `GLYPH_LIMITS` and `missingChars`    |
+| types             | `packages/types/src/letter.ts`                                | `LetterContent`, the element union, `LetterResources`, `humanSeal` |
+| types             | `packages/types/src/merge-field.ts`                           | `MERGE_FIELDS` and the sample and longest values                   |
+| types             | `packages/types/src/stroke.ts`                                | `Stroke`, its input and its timed points                           |
+| render            | `packages/render/src/html/index.ts`                           | `@repo/render/html`, client-safe page layout                       |
+| render            | `packages/render/src/html/geometry.ts`                        | Column, bands, keep-clear exclusions, spacer floats                |
+| render            | `packages/render/src/html/letter-page.tsx`                    | `LetterPage`, the one page, and `useLetterPage`                    |
+| render            | `packages/render/src/html/letter-css.ts`                      | `LETTER_CSS`, the letter's whole look                              |
+| render            | `packages/render/src/html/letter-print.tsx`                   | `LetterPrint`, the page in print with a static flow                |
+| render            | `packages/render/src/html/measure.ts`                         | `measureLetter`, the scale-aware line measure                      |
+| render            | `packages/render/src/html/ink.ts`                             | `STROKE_OPTIONS`, `strokeOutline` and `outlinePath`                |
+| render            | `packages/render/src/html/fixtures/index.ts`                  | `LETTER_FIXTURES`, letters written against `maxPages`              |
+| render            | `packages/render/src/html/letter-page.browser.test.tsx`       | The page laid out in Chromium and WebKit                           |
+| render            | `packages/render/src/schema/index.ts`                         | `@repo/render/schema`, `letterExtensions` and parser               |
+| render            | `packages/render/src/index.ts`                                | `@repo/render`, `renderLetterHtml` for the worker                  |
+| render            | `packages/render/src/render-letter-html.tsx`                  | The print document around `LetterPrint`                            |
+| render            | `packages/render/fonts`                                       | Stock font files by `STOCK_FONTS` file name, with licences         |
+| errors            | `packages/errors/src/index.ts`                                | `errorMessages` and `ServiceError`                                 |
+| api               | `packages/api/openapi.yaml`                                   | HTTP contract. Client is `packages/api/src/gen/api.ts`             |
+| api               | `packages/api/src/zod.ts`                                     | Request and response schemas typed against the generated types     |
+| db                | `packages/db/src/index.ts`                                    | Identity, letter and font repositories and migrations              |
+| db                | `packages/db/src/drizzle/fonts.ts`                            | `Fonts`, one cell replaced under a row lock                        |
+| db                | `packages/db/src/drizzle/letters.ts`                          | `Letters`, the revision-checked save and soft delete               |
+| db                | `packages/db/src/drizzle/assets.ts`                           | `Assets`, the claim, the job's moves and the stale read            |
+| services          | `packages/services/src/letters/index.ts`                      | `LetterService`, `letterResources`, `letterOwnerIds`               |
+| services          | `packages/services/src/fonts/index.ts`                        | `FontService` and `isOwnFont`                                      |
+| services          | `packages/services/src/assets/index.ts`                       | `AssetService`, `isServable`, `assetReadUrl`                       |
+| services          | `packages/services/src/assets/assets.service.ts`              | `UPLOADS`, the sniff and `READ_URL_EXPIRES_IN_SECONDS`             |
+| services          | `packages/services/src/assets/assets.service.ts`              | `runJob`, `sweep`, `MAX_ATTEMPTS`, `LEASE_MS`, `STALE_PENDING_MS`  |
+| services          | `packages/services/src/assets/assets.types.ts`                | `AssetStorage`, the provider integrations implements               |
+| services          | `packages/services/src/assets/assets.types.ts`                | `RunJobParams`, `ProducedFile`, `AssetJobMessage`                  |
+| services          | `packages/services/src/assets/assets.schemas.ts`              | `assetJobMessageSchema`, the one job message                       |
+| services          | `packages/services/src/queue/index.ts`                        | `QueueManager`, `Publisher`, `MessageProcessor`, `Subscriber`      |
+| services          | `packages/services/src/drawings/drawings.types.ts`            | `ImageProcessor`, the lift provider integrations implements        |
+| services          | `packages/services/src/letters/letters.types.ts`              | `PrintRenderer`, the provider integrations implements              |
+| integrations      | `packages/integrations/src/shared/gcp/index.ts`               | `@repo/integrations/shared/gcp`, storage and Pub/Sub classes       |
+| integrations      | `packages/integrations/src/shared/gcp/pubsub/publisher.ts`    | `PubSubPublisher`, a message per call with its type attribute      |
+| integrations      | `packages/integrations/src/shared/gcp/pubsub/subscriber.ts`   | `PubSubSubscriber`, streaming pull into a `MessageHandler`         |
+| integrations      | `packages/integrations/src/worker/font/index.ts`              | `@repo/integrations/worker/font`, `buildFont` and `vectorize`      |
+| integrations      | `packages/integrations/src/worker/font/vectorize.ts`          | `vectorize`, ink masks to closed glyph contours                    |
+| integrations      | `packages/integrations/src/worker/image/index.ts`             | `@repo/integrations/worker/image`, `SharpImageProcessor`           |
+| integrations      | `packages/integrations/src/worker/image/lift.ts`              | `liftInk`, `liftMask` and `LIFT_LIMITS`                            |
+| integrations      | `packages/integrations/src/worker/image/synthetic.ts`         | Test-only SVG pages with their ground-truth ink and ruling masks   |
+| integrations      | `packages/integrations/src/worker/chromium/index.ts`          | `@repo/integrations/worker/chromium`, `PlaywrightPrintRenderer`    |
+| integrations      | `packages/integrations/src/worker/chromium/fixtures`          | The test font, whose `a` is a solid square                         |
+| ui                | `packages/ui/src/styles/globals.css`                          | Stationery tokens inside the studio class                          |
+| ui                | `packages/ui/components.json`                                 | shadcn CLI config for the primitives                               |
+| ui                | `packages/ui/src/components/ui`                               | Generated shadcn primitives                                        |
+| ui                | `packages/ui/src/components/desk.tsx`                         | Full-viewport desk surface                                         |
+| ui                | `packages/ui/src/components/floating-toolbar.tsx`             | Paper toolbar                                                      |
+| ui                | `packages/ui/src/components/swatch.tsx`                       | Ink colour radio                                                   |
+| ui                | `packages/ui/src/components/status-pill.tsx`                  | Pending, running, done, failed                                     |
+| testing           | `packages/testing/src/browser.ts`                             | Dev-only Chromium and WebKit harness                               |
+| web               | `apps/web/src/app/(studio)/layout.tsx`                        | Studio class, fonts, paper texture                                 |
+| web               | `apps/web/public/images/paper.png`                            | Paper scan from project-post, tiled on the sheet                   |
+| web               | `apps/web/src/app/page.tsx`                                   | Sends `/` to the letters list                                      |
+| web               | `apps/web/src/app/(studio)/letters/page.tsx`                  | Letters list with its empty state                                  |
+| web               | `apps/web/src/app/(studio)/letters/[letterId]/page.tsx`       | The editor page and its missing-letter view                        |
+| web               | `apps/web/src/app/(studio)/styleguide/page.tsx`               | Style guide as a letter on the desk                                |
+| web               | `apps/web/src/server/auth.ts`                                 | `getSession`, the function the move replaces                       |
+| web               | `apps/web/src/server/handle-json.ts`                          | `handleJson`, the one wrapper around every API route               |
+| web               | `apps/web/src/server/origin.ts`                               | `isPlatformOrigin`, loopback names count as one origin             |
+| web               | `apps/web/src/server/letters.ts`                              | `getLetter` and `listLetters` for pages                            |
+| web               | `apps/web/src/server/fonts.ts`                                | `getFont` and `listFonts` for pages                                |
+| web               | `apps/web/src/app/api/letters/route.ts`                       | Create a letter                                                    |
+| web               | `apps/web/src/app/api/letters/[letterId]/route.ts`            | Read, save and delete one letter                                   |
+| web               | `apps/web/src/app/api/fonts/route.ts`                         | Create a handwriting font                                          |
+| web               | `apps/web/src/app/api/fonts/[fontId]/route.ts`                | Delete one font                                                    |
+| web               | `apps/web/src/app/api/fonts/[fontId]/glyphs/route.ts`         | Save one glyph cell                                                |
+| web               | `apps/web/src/server/services.ts`                             | Builds the db, the storage, the publisher and each service lazily  |
+| web               | `apps/web/src/app/api/uploads/route.ts`                       | Upload one file                                                    |
+| web               | `apps/web/src/app/api/assets/[assetId]/route.ts`              | Redirect to a fresh signed URL                                     |
+| web               | `apps/web/src/app/api/assets/[assetId]/status/route.ts`       | An asset's processing status                                       |
+| web               | `apps/web/src/app/fonts/stock/[fontId]/route.ts`              | Stock font bytes, cached as immutable                              |
+| web               | `apps/web/src/features/editor/components/letter-editor.tsx`   | `LetterEditor`, Tiptap writing on `LetterPage`                     |
+| web               | `apps/web/src/features/editor/components/save-line.tsx`       | `SaveLine`, the save state and the conflict choices                |
+| web               | `apps/web/src/features/editor/components/letter-card.tsx`     | A letter in the list, with Delete in its menu                      |
+| web               | `apps/web/src/lib/autosave.ts`                                | `autosave`, the pure save reducer, and `SAVE_DELAY_MS`             |
+| web               | `apps/web/src/lib/use-autosave.ts`                            | `useAutosave`, timers, unload and visibility                       |
+| web               | `apps/web/src/features/ink/pointer-session.ts`                | `pointerSession`, the pure pointer reducer                         |
+| web               | `apps/web/src/features/ink/ink-canvas.tsx`                    | `InkCanvas`, the one drawing surface                               |
+| web               | `apps/web/e2e/harness.ts`                                     | `startHarness` for the web journeys                                |
+| web               | `apps/web/src/features/editor/components/editor-toolbar.tsx`  | `EditorToolbar`, font, size, ink, align, undo and redo             |
+| web               | `apps/web/src/features/editor/components/sides-indicator.tsx` | `SidesIndicator`, how many allowed sides the letter uses           |
+| web               | `apps/web/src/features/editor/components/overflow-notice.tsx` | `OverflowNotice`, words that will not fit                          |
+| web               | `apps/web/src/features/editor/components/add-side.tsx`        | `AddSide`, one step that raises `minSides`                         |
+| web               | `apps/web/src/features/editor/components/human-seal.tsx`      | `HumanSeal`, the seal from `humanSeal` with no own fonts yet       |
+| web               | `apps/web/src/features/editor/components/print-preview.tsx`   | `PrintPreview`, the print page in a same-origin frame              |
+| worker            | `apps/worker/src/index.ts`                                    | `main`, one pool per process, picked by `WORKER_POOL`              |
+| worker            | `apps/worker/src/env.ts`                                      | The worker's validated environment                                 |
+| worker            | `apps/worker/src/processors/sweep.ts`                         | `sweepProcessor`, the `sweep` message                              |
+| worker            | `apps/worker/package.json`                                    | `dev` runs the standard pool, `dev:render` the render pool         |
+| tools             | `tools/check-comments.ts`                                     | No-comment check                                                   |
+| tools             | `tools/check-architecture.ts`                                 | This map stays honest                                              |
+| tools             | `tools/migrate.ts`                                            | Applies `packages/db/drizzle`                                      |
+| tools             | `tools/dev/screens.ts`                                        | `pnpm screens` writes both viewports of `WEB_BASE_URL`             |
+| tools             | `tools/dev/sweep.ts`                                          | `pnpm jobs:sweep` publishes one `sweep`                            |
+| tools             | `tools/docker/gcs/ink-studio-assets`                          | The local bucket, loaded by the `gcs` compose service              |
+| tools             | `tools/docker/pubsub-entrypoint.sh`                           | The emulator's jobs topic and one filtered subscription per pool   |
 1. An app may import packages. A package never imports an app.
 2. Dependencies point toward `packages/types`. `packages/errors` stands alone. `packages/api` may import `packages/errors`.
 3. Drizzle and `pg` live only in `packages/db`.
@@ -155,17 +160,23 @@ The spacer floats from `exclusionFloats` are the first children of the `letter-c
 
 The measure is scale-aware. `measureLetter` in `packages/render/src/html/measure.ts` is self-contained so Playwright can send it into a page, and it runs on the `letter-column` element. It divides line rectangles by the column's own scale, so `transform: scale()` and the device scale factor change nothing, and it returns gap-free column inches, so the editor and the print give the same numbers to `sidesUsed` and `overflowIn`. `measureInputFor` builds its input from a spec and a mode.
 
+Text that does not fit is shown, never cut. `LetterEditor` keeps the whole flow and, when `overflowIn` is above zero, draws one sheet past the last allowed side behind that text. `OverflowNotice` says how many words will not fit. The extra sheet is paper only; nothing slices the text to the page limit.
+
+`PrintPreview` in `apps/web/src/features/editor/components/print-preview.tsx` is the preview frame. It renders `LetterPrint` with `SAMPLE_MERGE_VALUES` through a React portal into a same-origin iframe, so the studio's desk, paper texture and keep-clear guides cannot reach the print page, and no server route renders the letter. The preview is this browser's print layout. Chromium in the worker remains the authority on whether a proof fits.
+
 Parity. `packages/render/src/html/letter-page.browser.test.tsx` runs every case in Chromium and WebKit at device scale factor 1 and at the print factor, in edit and print mode. WebKit agrees with Chromium on sides used for every fixture. Sides used per fixture in `packages/render/src/html/fixtures/index.ts`:
 
-| Fixture        | Chromium | iPad (step 12) |
-| -------------- | -------- | -------------- |
-| note           | 1        | pending        |
-| one-side       | 1        | pending        |
-| blank-lines    | 1        | pending        |
-| one-and-a-half | 2        | pending        |
-| nearly-full    | 3        | pending        |
-| overflow       | 3        | pending        |
-| postcard-back  | 2        | not checked    |
+| Fixture        | Chromium | iPad      |
+| -------------- | -------- | --------- |
+| note           | 1        | unchecked |
+| one-side       | 1        | unchecked |
+| blank-lines    | 1        | unchecked |
+| one-and-a-half | 2        | unchecked |
+| nearly-full    | 3        | unchecked |
+| overflow       | 3        | unchecked |
+| postcard-back  | 2        | unchecked |
+
+iPad side counts are still unchecked. Step 12 compared the editor with the print preview in desktop Chromium only. This environment has no iPad, so the table does not record an iPad side count.
 
 WebKit's own ArrowDown does not follow a paragraph past a band: it lands below the band but at the paragraph's end or in the next paragraph, where Chromium lands on the next line. The editor has to move the caret across bands itself.
 
@@ -218,6 +229,8 @@ A save is parsed and refused when stale. `saveLetter` runs `parseLetterContent`,
 `getLetter` returns the letter with its `LetterResources` from `letterResources` and `editable` from `letterOwnerIds`; the export reads resources through the same function.
 
 The list in `apps/web/src/app/(studio)/letters/page.tsx` reads `listLetters`; a new letter is created through the API and opened. The editor page reads `getLetter` and renders `LetterEditor` keyed by the letter's id and revision, so a refresh that brings a newer revision starts the editor afresh. `LetterEditor` runs Tiptap over `letterExtensions` and hands it to `LetterPage` as the flow, in edit mode. The page scales to the desk width up to `MAX_SCALE` with one transform, and that one scale converts pointer pixels to inches. Until the letter's fonts have loaded, for at most `INK_READY_TIMEOUT_MS`, the paper shows without text and then the ink settles in, so a fallback font never flashes. A letter whose `editable` is false opens read-only.
+
+`LetterEditor` measures after each edit and again when the document's fonts are ready. `PageState` holds that `LetterMeasure`, the `sidesUsed` count given `minSides`, `overflowIn`, and `placementIssues`. The inches passed in are the measure's gap-free inches. `sheets` is the sides in use, plus one ghost sheet when text overflows. `AddSide` is one document-attribute transaction on `minSides`, offered while that is below the spec's `maxPages`. `HumanSeal` renders `humanSeal` under the page; own fonts are an empty map until a later step. `SidesIndicator` reads both counts from the spec's `maxPages`.
 
 Formatting sets one ink attribute. `EditorToolbar` in `apps/web/src/features/editor/components/editor-toolbar.tsx` offers `STOCK_FONTS`, `TEXT_SIZES`, `INK_COLORS` and the paragraph aligns, and each choice is one `setMark("ink", …)` or one paragraph attribute with only the changed value, so a colour change keeps the font and an unset attribute still falls back to the letter's defaults. Every formatting command closes the history first, so it is its own undo step even right after typing. Undo and redo are the history commands, on the toolbar and on Meta+Z and Shift+Meta+Z as well as Mod, in `packages/render/src/schema/letter-schema.ts`. The toolbar shows the selection's resolved style, mark over default, and shows nothing for an attribute the selection mixes. With a fine pointer it sticks to the top of the desk; with a coarse pointer it follows the browser's `visualViewport` to sit above the on-screen keyboard, and the title and save line move up to clear it. The formatted letter saves through the same parser as everything else.
 
@@ -272,7 +285,7 @@ The worker runs as two pools from one codebase, `apps/worker`. Each process read
 
 `main` in `apps/worker/src/index.ts` builds the db, `GcsAssetStorage`, `PubSubPublisher`, `AssetService` and the pool's processors, starts `PubSubSubscriber`, which checks its subscription exists first, logs `worker listening` with its pool, and runs until `SIGINT` or `SIGTERM`, then stops its timer and closes the subscription, the publisher and the db.
 
-Locally the `pubsub` service in `docker-compose.yml` runs the emulator from `tools/docker/Dockerfile.pubsub`, and its healthcheck passes once the subscriptions exist. `pnpm dev` runs `turbo run dev dev:render`, so the web, the standard pool (`dev`) and the render pool (`dev:render`, which sets `WORKER_POOL` and `PUBSUB_JOBS_SUBSCRIPTION` for the render pool) start together. Both pools read the worker env file copied from `apps/worker/.env.example`.
+Locally the `pubsub` service in `docker-compose.yml` runs the emulator from `tools/docker/Dockerfile.pubsub`, and its healthcheck passes once the subscriptions exist. `pnpm dev` runs `turbo run dev dev:render`, so the web, the standard pool (`dev`) and the render pool (`dev:render`, which sets `WORKER_POOL` and `PUBSUB_JOBS_SUBSCRIPTION` for the render pool) start together. Both pools read the worker's env file, copied from `apps/worker/.env.example`.
 
 | Message type | Pool     | Processor                             | Data |
 | ------------ | -------- | ------------------------------------- | ---- |

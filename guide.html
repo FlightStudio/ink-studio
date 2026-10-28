@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave and a formatting toolbar are ready on your own computer.</p>
-  <div class="progress" aria-hidden="true"><span style="width:58%"></span></div>
-  <p class="log">21 of 36 steps in the repository. Step 24 stores a creator's handwriting, one cell at a time.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal and a print preview are ready on your own computer.</p>
+  <div class="progress" aria-hidden="true"><span style="width:61%"></span></div>
+  <p class="log">22 of 36 steps in the repository. Step 24 stores a creator's handwriting, one cell at a time.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -256,7 +256,24 @@ pnpm --filter web test:e2e</pre>
       <p>They read “a font applied to a selection survives a reload”, “changing the colour keeps the font”, “undo takes back formatting before typing”, and “align centers the paragraph”.</p>
       <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, and all 12 journeys, the 4 new ones and the 8 from step 10, against a dev server.</p>
     </details>
-    <details id="step-12"><summary><span class="tag later">Later</span> 12. Sides, overflow, seal, print preview</summary><p>The editor shows how many sides the letter uses, text that will not fit on a ghost sheet, Add a side, the Human Seal, and a print preview that is the print page itself.</p></details>
+    <details id="step-12">
+      <summary><span class="tag done">Done</span> 12. Sides, overflow, seal, print preview</summary>
+      <p>Under the page, the editor now says how many sides the letter uses, out of the number that product allows. A letter is three sides. When the writing runs past the last of them, the extra words stay on the page, on a pale extra sheet, with a sentence such as “About 40 words won't fit on 3 sides.” Nothing is cut off.</p>
+      <ul class="points">
+        <li>The count sits under the page, for example 2 of 3 sides. It is the same at a wide window and a narrower one.</li>
+        <li>Add a side gives you a blank sheet for a doodle. Each press is its own undo. It stops when the letter already has every side it is allowed, and the button goes away.</li>
+        <li>An added side is saved with the letter, so it is still there after a reload. Undo takes that side away again.</li>
+        <li>Delete the words that spilled over and the sentence goes away. Undo brings the words and the sentence back.</li>
+        <li>The Human Seal sits under the page, in the quiet ink colour. A letter in a stock font with no doodles has nothing human in it, so no seal is shown. Own handwriting is a later step.</li>
+        <li>Print preview opens the print page itself, in its own frame, on white, with no desk and no hatched keep-clear guides. The lines break where they do in the editor. The PDF's fit is still decided later, by the worker.</li>
+      </ul>
+      <p>Side counts on a real iPad are still unchecked. There is no iPad in this setup, so nothing here records one.</p>
+      <p>To try it on your computer, after <code>git pull</code> and <code>pnpm install</code>, run <code>pnpm dev</code> and open <a href="http://127.0.0.1:3000">http://127.0.0.1:3000</a>. Open a letter, write until a second side appears, and read the count under the page. Keep writing past the last side and the pale sheet and the sentence appear. Press Add a side, then Print preview.</p>
+      <p>New journeys drive a real browser against your running <code>pnpm dev</code>, from a Playwright container, with Docker running:</p>
+      <pre>pnpm --filter web test:e2e</pre>
+      <p>They read “a long letter reports its sides”, “text past the last allowed side shows on a ghost sheet with a count”, “Add a side stops at the limit”, “deleting the extra text clears the notice”, “undo brings it back”, “an added side stays after reload and undo removes it”, “the seal reads the letter”, “the preview breaks lines where the editor does”, and “the preview has no desk and no guides”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, and all 21 journeys, the 9 new ones and the 12 from steps 10 and 11, against a dev server.</p>
+    </details>
 
     <h3>M4. Files and jobs</h3>
     <details id="step-13">
