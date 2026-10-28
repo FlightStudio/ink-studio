@@ -132,7 +132,8 @@ describe("placed doodles", () => {
 		await page.getByRole("button", { name: "Move doodle" }).click();
 		await page
 			.getByRole("group", { name: "Doodle" })
-			.getByRole("radio", { name: "Oxblood" })
+			.locator('[data-slot="swatch"]')
+			.filter({ hasText: "Oxblood" })
 			.click();
 		const oxblood = rgbOf(INK_COLORS.oxblood.css);
 		const inkBlue = rgbOf(INK_COLORS["ink-blue"].css);
@@ -148,7 +149,8 @@ describe("placed doodles", () => {
 		const saved = nextSave(page, letterId);
 		await page
 			.getByRole("group", { name: "Doodle" })
-			.getByRole("radio", { name: "Oxblood" })
+			.locator('[data-slot="swatch"]')
+			.filter({ hasText: "Oxblood" })
 			.click();
 		await saved;
 		await waitForSaved(page);
