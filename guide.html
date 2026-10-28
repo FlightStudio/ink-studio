@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, a doodle library, moving a placed doodle, lifting ink from a photo in the worker, photographing a doodle, and building a drawn handwriting font are ready on your own computer.</p>
-  <div class="progress" aria-hidden="true"><span style="width:75%"></span></div>
-  <p class="log">27 of 36 steps in the repository. Step 25 builds a drawn handwriting font in the worker.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, a doodle library, moving a placed doodle, lifting ink from a photo in the worker, photographing a doodle, building a drawn handwriting font, and writing a letter in that hand are ready on your own computer.</p>
+  <div class="progress" aria-hidden="true"><span style="width:78%"></span></div>
+  <p class="log">28 of 36 steps in the repository. Step 26 draws a handwriting font and writes with it.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -570,7 +570,25 @@ pnpm --filter worker test --reporter=verbose</pre>
       <p>The names read like “a polygon from the ascender line to the baseline makes a glyph that tall”, “a build needs every required character”, “a finished build becomes the font in use and records its characters”, and “a teammate opens a letter in Karla's hand read-only”.</p>
       <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, 296 tests, including 5 new font-builder tests, 2 new font service tests, 1 new asset test, 5 new letter tests, and 3 worker build tests. Building a font on an iPad is still unchecked, because this step has no drawing screen. There is no iPad in this setup.</p>
     </details>
-    <details id="step-26"><summary><span class="tag later">Later</span> 26. Write with My handwriting</summary><p>Draw the template in the app and write with it.</p></details>
+    <details id="step-26">
+      <summary><span class="tag done">Done</span> 26. Write with My handwriting</summary>
+      <p>You can draw each letter of a handwriting font in a grid of cells, build it, and then write a letter in that hand. The Font menu's My handwriting group lists fonts that have finished a build. If you have none yet, that group offers to make one.</p>
+      <ul class="points">
+        <li>Open a letter and open Font. Under My handwriting, choose Make a handwriting font. The page asks “What name should the seal use?”. Type a name, such as Karla, and choose Draw it here.</li>
+        <li>Each cell is one character, with faint guide lines and the character itself in the background. Draw in the cell. The page lists what is still missing, and Build stays off until every required letter and mark is drawn. Capitals, digits and the extra punctuation can wait.</li>
+        <li>Build asks the worker for a font file. The line above the cells stays “Nothing built yet.” until that file is ready, then it shows “hello, world.” in the new hand.</li>
+        <li>Back on a letter, select the writing and choose Karla's handwriting. The words use that font at once. When every visible character is one you drew, the seal reads “Written in Karla's own handwriting”.</li>
+        <li>The fonts page lists each hand you have made, and Delete removes it from that list.</li>
+      </ul>
+      <p>The worker has to be running, because the website only asks for the build. Photograph the template and Upload a font file are named on the new-font page, and they become links in later steps. After <code>git pull</code> and <code>pnpm install</code>:</p>
+      <pre>docker compose up -d
+pnpm dev</pre>
+      <p>Open <a href="http://127.0.0.1:3000">http://127.0.0.1:3000</a>, open a letter, then Font, then Make a handwriting font. Draw the lowercase letters and <code>. , ! ? '</code>, then Build.</p>
+      <p>The browser journeys are:</p>
+      <pre>pnpm --filter web test:e2e</pre>
+      <p>The names read like “the toolbar offers to make a handwriting font when there is none”, “the draw page lists what is still missing”, “a drawn font becomes a choice in the toolbar and in the seal”, “variants show while editing”, and “a deleted font leaves the fonts page”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, 297 tests, including the cell-units test, and <code>pnpm test:e2e</code>, 37 browser journeys including the five new handwriting journeys. Drawing the cells with a pencil on an iPad is still unchecked. There is no iPad in this setup.</p>
+    </details>
     <details id="step-27">
       <summary><span class="tag done">Done</span> 27. Trace ink into outlines</summary>
       <p>A font stores each letter as outlines, the edges of its shape, not as pixels. This step turns lifted ink, a picture of where the ink is, into those outlines. Step 28 uses it to make a font from a photo of the printed template, one traced letter per box. It is written for this project, because the usual tracer, potrace, is GPL-licensed and cannot ship here.</p>

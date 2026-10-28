@@ -2,6 +2,7 @@
 
 import type {
 	Align,
+	FontOption,
 	FontRef,
 	InkColorId,
 	InkMark,
@@ -16,7 +17,9 @@ import { Button } from "@repo/ui/components/ui/button";
 import {
 	Select,
 	SelectContent,
+	SelectGroup,
 	SelectItem,
+	SelectLabel,
 	SelectTrigger,
 	SelectValue,
 } from "@repo/ui/components/ui/select";
@@ -49,6 +52,7 @@ import {
 	Redo2,
 	Undo2,
 } from "lucide-react";
+import Link from "next/link";
 import {
 	type CSSProperties,
 	type ReactNode,
@@ -249,17 +253,33 @@ function HistoryButton({
 export type EditorToolbarProps = {
 	editor: Editor;
 	defaults: InkStyle;
+	fonts?: FontOption[];
 	coarsePointer: boolean;
 	onKeyboardClearance: (heightPx: number) => void;
 	onLibrary: () => void;
+	onOwnFont?: (fontId: string) => void;
 };
+
+function fontFromKey(key: string): FontRef | null {
+	if (key.startsWith("stock:")) {
+		const id = key.slice("stock:".length);
+		if (id in STOCK_FONTS) return { kind: "stock", id: id as StockFontId };
+		return null;
+	}
+	if (key.startsWith("own:")) {
+		return { kind: "own", fontId: key.slice("own:".length) };
+	}
+	return null;
+}
 
 export function EditorToolbar({
 	editor,
 	defaults,
+	fonts = [],
 	coarsePointer,
 	onKeyboardClearance,
 	onLibrary,
+	onOwnFont,
 }: EditorToolbarProps) {
 	const ref = useRef<HTMLDivElement>(null);
 	const style = useEditorState({
@@ -267,7 +287,18 @@ export function EditorToolbar({
 		selector: ({ editor: current }) => resolvedStyle(current.state, defaults),
 	});
 	useFollowKeyboard(ref, coarsePointer, onKeyboardClearance);
-	const font = style.font?.kind === "stock" ? style.font.id : null;
+	const built = fonts.filter((font) => font.assetId !== null);
+	const items = [
+		...FONT_ITEMS.map((item) => ({
+			value: `stock:${item.value}`,
+			label: item.label,
+		})),
+		...built.map((font) => ({
+			value: `own:${font.id}`,
+			label: `${font.ownerName}'s handwriting`,
+		})),
+	];
+	const font = style.font ? fontKey(style.font) : null;
 
 	return (
 		<TooltipProvider delay={400}>
@@ -296,10 +327,14 @@ export function EditorToolbar({
 				</Toolbar.Group>
 				<Toolbar.Separator />
 				<Select
-					items={FONT_ITEMS}
+					items={items}
 					value={font}
 					onValueChange={(next) => {
-						if (next) formatInk(editor, { font: { kind: "stock", id: next } });
+						if (!next) return;
+						const chosen = fontFromKey(next);
+						if (!chosen) return;
+						formatInk(editor, { font: chosen });
+						if (chosen.kind === "own") onOwnFont?.(chosen.fontId);
 					}}
 					onOpenChange={(open) => {
 						if (!open) editor.commands.focus();
@@ -322,16 +357,48 @@ export function EditorToolbar({
 						sideOffset={8}
 						className="w-auto min-w-(--anchor-width) p-1"
 					>
-						{FONT_ITEMS.map((item) => (
-							<SelectItem
-								key={item.value}
-								value={item.value}
-								className="overflow-hidden py-1.5 pl-2.5 text-title"
-								style={{ fontFamily: `"stock-${item.value}"` }}
-							>
-								{item.label}
-							</SelectItem>
-						))}
+						{built.map((item) =>
+							item.assetId ? (
+								<style
+									key={item.id}
+								>{`@font-face { font-family: "own-${item.id}"; src: url("/api/assets/${item.assetId}"); font-display: block; }`}</style>
+							) : null,
+						)}
+						<SelectGroup>
+							<SelectLabel>Stock</SelectLabel>
+							{FONT_ITEMS.map((item) => (
+								<SelectItem
+									key={item.value}
+									value={`stock:${item.value}`}
+									className="overflow-hidden py-1.5 pl-2.5 text-title"
+									style={{ fontFamily: `"stock-${item.value}"` }}
+								>
+									{item.label}
+								</SelectItem>
+							))}
+						</SelectGroup>
+						<SelectGroup>
+							<SelectLabel>My handwriting</SelectLabel>
+							{built.length === 0 ? (
+								<Link
+									href="/fonts/new"
+									className="block rounded-md px-2.5 py-1.5 text-ui text-ink hover:bg-muted"
+								>
+									Make a handwriting font
+								</Link>
+							) : (
+								built.map((item) => (
+									<SelectItem
+										key={item.id}
+										value={`own:${item.id}`}
+										className="overflow-hidden py-1.5 pl-2.5 text-title"
+										style={{ fontFamily: `"own-${item.id}", "stock-caveat"` }}
+									>
+										{item.ownerName}'s handwriting
+									</SelectItem>
+								))
+							)}
+						</SelectGroup>
 					</SelectContent>
 				</Select>
 				<Toolbar.Separator />

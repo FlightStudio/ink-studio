@@ -431,9 +431,22 @@ export function LetterEditor({
 					<EditorToolbar
 						editor={editor}
 						defaults={letter.content.defaults}
+						fonts={fonts}
 						coarsePointer={coarsePointer}
 						onKeyboardClearance={setKeyboardClearancePx}
 						onLibrary={() => setLibraryOpen(true)}
+						onOwnFont={(fontId) => {
+							const assetId = fonts.find((font) => font.id === fontId)?.assetId;
+							if (!assetId) return;
+							setResources((current) =>
+								current.fonts[fontId] === assetId
+									? current
+									: {
+											...current,
+											fonts: { ...current.fonts, [fontId]: assetId },
+										},
+							);
+						}}
 					/>
 				) : null}
 				<div ref={desk.ref} className="flex w-full justify-center">
