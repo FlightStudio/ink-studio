@@ -16,7 +16,13 @@ RUN pnpm --filter worker build
 FROM mcr.microsoft.com/playwright:v1.64.1-noble
 WORKDIR /app
 COPY --from=build /app/apps/worker/dist ./dist
-RUN npm install --omit=dev sharp@0.35.5 playwright-core@1.64.1
+RUN npm install --omit=dev \
+	sharp@0.35.5 \
+	playwright-core@1.64.1 \
+	@google-cloud/pubsub@6 \
+	@google-cloud/storage@8 \
+	@t3-oss/env-core@0.13.11 \
+	zod@4
 ENV STOCK_FONTS_DIR=/app/dist/fonts
 ENV WORKER_POOL=render
 ENV NODE_ENV=production
