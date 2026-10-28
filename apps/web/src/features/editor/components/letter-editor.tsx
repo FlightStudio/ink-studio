@@ -10,6 +10,7 @@ import {
 	type PlacementIssue,
 	pageGapIn,
 	placementIssues,
+	SignatureMark,
 	sidesUsed,
 } from "@repo/render/html";
 import { letterExtensions } from "@repo/render/schema";
@@ -17,6 +18,7 @@ import type { EditableLetter } from "@repo/services/letters";
 import type {
 	FontOption,
 	FontRef,
+	InkColorId,
 	LetterContent,
 	LetterDoc,
 	LetterResources,
@@ -25,7 +27,12 @@ import type {
 	PageSpec,
 	PlacedElement,
 } from "@repo/types";
-import { MERGE_FIELDS, PAGE_SPECS } from "@repo/types";
+import {
+	INK_COLORS,
+	MERGE_FIELDS,
+	PAGE_SPECS,
+	SIGNATURE_WIDTHS,
+} from "@repo/types";
 import { Desk } from "@repo/ui/components/desk";
 import type { Extensions } from "@tiptap/core";
 import {
@@ -48,7 +55,12 @@ import {
 } from "react";
 import { LibrarySheet } from "@/features/library/components/library-sheet";
 import { useAutosave } from "@/lib/use-autosave";
-import { placeElement, removeElement, updateElement } from "../elements.ts";
+import {
+	placeElement,
+	removeElement,
+	signLetter,
+	updateElement,
+} from "../elements.ts";
 import { mergeFieldSuggestion } from "../merge-field-suggestion.ts";
 import { AddSide } from "./add-side.tsx";
 import { EditorToolbar, useCoarsePointer } from "./editor-toolbar.tsx";
@@ -61,6 +73,31 @@ import { OverflowNotice } from "./overflow-notice.tsx";
 import { PrintPreview } from "./print-preview.tsx";
 import { SaveLine } from "./save-line.tsx";
 import { SidesIndicator } from "./sides-indicator.tsx";
+import { SignButton } from "./sign-button.tsx";
+
+function SignatureView({ node }: ReactNodeViewProps) {
+	const { drawingId, widthIn, align, color } = node.attrs;
+	const width = SIGNATURE_WIDTHS.find((value) => value === widthIn);
+	if (
+		typeof drawingId !== "string" ||
+		width === undefined ||
+		(align !== "left" && align !== "center" && align !== "right") ||
+		typeof color !== "string" ||
+		!Object.hasOwn(INK_COLORS, color)
+	) {
+		return <NodeViewWrapper />;
+	}
+	return (
+		<NodeViewWrapper>
+			<SignatureMark
+				drawingId={drawingId}
+				widthIn={width}
+				align={align}
+				color={color as InkColorId}
+			/>
+		</NodeViewWrapper>
+	);
+}
 
 function MergeFieldView({ node }: ReactNodeViewProps) {
 	const field = node.attrs.field;
@@ -76,15 +113,23 @@ function MergeFieldView({ node }: ReactNodeViewProps) {
 
 function editorExtensions(): Extensions {
 	return [
-		...letterExtensions.map((extension) =>
-			extension.name === "mergeField"
-				? extension.extend({
-						addNodeView() {
-							return ReactNodeViewRenderer(MergeFieldView);
-						},
-					})
-				: extension,
-		),
+		...letterExtensions.map((extension) => {
+			if (extension.name === "mergeField") {
+				return extension.extend({
+					addNodeView() {
+						return ReactNodeViewRenderer(MergeFieldView);
+					},
+				});
+			}
+			if (extension.name === "signature") {
+				return extension.extend({
+					addNodeView() {
+						return ReactNodeViewRenderer(SignatureView);
+					},
+				});
+			}
+			return extension;
+		}),
 		mergeFieldSuggestion,
 	];
 }
@@ -100,8 +145,9 @@ function familyOf(font: FontRef): string {
 
 function fontQueries(content: LetterContent): string[] {
 	const families = new Set([familyOf(content.defaults.font)]);
-	for (const paragraph of content.doc.content) {
-		for (const node of paragraph.content ?? []) {
+	for (const block of content.doc.content) {
+		if (block.type !== "paragraph") continue;
+		for (const node of block.content ?? []) {
 			for (const mark of node.marks ?? []) {
 				if (mark.attrs.font) families.add(familyOf(mark.attrs.font));
 			}
@@ -113,7 +159,9 @@ function fontQueries(content: LetterContent): string[] {
 }
 
 function isBlank(doc: LetterDoc): boolean {
-	const [first, ...rest] = doc.content;
+	if (doc.content.some((block) => block.type === "signature")) return false;
+	const paragraphs = doc.content.filter((block) => block.type === "paragraph");
+	const [first, ...rest] = paragraphs;
 	return rest.length === 0 && (first?.content ?? []).length === 0;
 }
 
@@ -267,12 +315,14 @@ function visibleSideCentre(): {
 export type LetterEditorProps = {
 	letter: EditableLetter;
 	doodles: LibraryDrawing[];
+	signatures?: LibraryDrawing[];
 	fonts?: FontOption[];
 };
 
 export function LetterEditor({
 	letter,
 	doodles,
+	signatures = [],
 	fonts = [],
 }: LetterEditorProps) {
 	const router = useRouter();
@@ -285,6 +335,9 @@ export function LetterEditor({
 	const [flowHeightIn, setFlowHeightIn] = useState(0);
 	const [resources, setResources] = useState<LetterResources>(letter.resources);
 	const [libraryOpen, setLibraryOpen] = useState(false);
+	const [libraryTab, setLibraryTab] = useState<"doodle" | "signature">(
+		"doodle",
+	);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [preview, setPreview] = useState<PlacedElement | null>(null);
 	const pageRef = useRef<HTMLDivElement>(null);
@@ -449,6 +502,35 @@ export function LetterEditor({
 		setLibraryOpen(false);
 	}
 
+	function signDrawing(
+		drawing: LibraryDrawing,
+		choice: {
+			widthIn: (typeof SIGNATURE_WIDTHS)[number];
+			color: InkColorId;
+		},
+	) {
+		if (!editor) return;
+		setResources((current) => ({
+			...current,
+			drawings: {
+				...current.drawings,
+				[drawing.id]: {
+					maskAssetId: drawing.maskAssetId,
+					aspect: drawing.aspect,
+				},
+			},
+		}));
+		editor.view.dispatch(
+			signLetter(editor.state, {
+				drawingId: drawing.id,
+				widthIn: choice.widthIn,
+				align: "right",
+				color: choice.color,
+			}),
+		);
+		setLibraryOpen(false);
+	}
+
 	return (
 		<Desk className="flex flex-col">
 			<header className="flex items-center px-4 pt-4 sm:px-6">
@@ -483,7 +565,10 @@ export function LetterEditor({
 						fonts={fonts}
 						coarsePointer={coarsePointer}
 						onKeyboardClearance={setKeyboardClearancePx}
-						onLibrary={() => setLibraryOpen(true)}
+						onLibrary={() => {
+							setLibraryTab("doodle");
+							setLibraryOpen(true);
+						}}
 						onOwnFont={(fontId) => {
 							const assetId = fonts.find((font) => font.id === fontId)?.assetId;
 							if (!assetId) return;
@@ -602,6 +687,14 @@ export function LetterEditor({
 						{editor && letter.editable ? (
 							<AddSide editor={editor} maxPages={spec.maxPages} />
 						) : null}
+						{editor && letter.editable ? (
+							<SignButton
+								onClick={() => {
+									setLibraryTab("signature");
+									setLibraryOpen(true);
+								}}
+							/>
+						) : null}
 						<PrintPreview
 							letterId={letter.id}
 							content={live}
@@ -648,8 +741,12 @@ export function LetterEditor({
 				<LibrarySheet
 					open={libraryOpen}
 					onOpenChange={setLibraryOpen}
-					drawings={doodles}
+					doodles={doodles}
+					signatures={signatures}
+					tab={libraryTab}
+					onTab={setLibraryTab}
 					onPlace={placeDrawing}
+					onSign={signDrawing}
 				/>
 			) : null}
 		</Desk>

@@ -1,10 +1,11 @@
 import { letterExtensions } from "@repo/render/schema";
-import type { PlacedElement } from "@repo/types";
+import type { PlacedElement, SignatureNode } from "@repo/types";
 import { getSchema } from "@tiptap/core";
+import { splitBlock } from "@tiptap/pm/commands";
 import { history, undo } from "@tiptap/pm/history";
-import { EditorState, type Transaction } from "@tiptap/pm/state";
+import { EditorState, TextSelection, type Transaction } from "@tiptap/pm/state";
 import { expect, it } from "vitest";
-import { placeElement, updateElement } from "./elements.ts";
+import { placeElement, signLetter, updateElement } from "./elements.ts";
 
 const schema = getSchema(letterExtensions);
 
@@ -62,6 +63,60 @@ it("one undo stack covers text and placement, newest first", () => {
 	expect(elementsOf(state)[0]?.xIn).toBe(3);
 	state = stepBack(state);
 	expect(elementsOf(state)[0]?.xIn).toBe(1);
+});
+
+const firstSignature: SignatureNode["attrs"] = {
+	drawingId: "0192e4a0-7b1c-7cc3-9a5e-3f1d2b4c5a30",
+	widthIn: 1.5,
+	align: "left",
+	color: "sepia",
+};
+
+const secondSignature: SignatureNode["attrs"] = {
+	drawingId: "0192e4a0-7b1c-7cc3-9a5e-3f1d2b4c5a31",
+	widthIn: 3,
+	align: "right",
+	color: "oxblood",
+};
+
+function signaturesOf(state: EditorState): SignatureNode["attrs"][] {
+	const found: SignatureNode["attrs"][] = [];
+	state.doc.forEach((node) => {
+		if (node.type.name === "signature") {
+			found.push(node.attrs as SignatureNode["attrs"]);
+		}
+	});
+	return found;
+}
+
+it("signing twice keeps one signature, the newer one", () => {
+	const start = fresh();
+	const once = apply(start, signLetter(start, firstSignature));
+	const twice = apply(once, signLetter(once, secondSignature));
+	expect(signaturesOf(twice)).toEqual([secondSignature]);
+	expect(twice.doc.childCount).toBe(2);
+});
+
+it("Enter at the end of the last paragraph adds a paragraph above the signature", () => {
+	let state = apply(fresh(), signLetter(fresh(), firstSignature));
+	state = apply(state, state.tr.insertText("Hi"));
+	const paragraph = state.doc.firstChild;
+	if (paragraph?.type.name !== "paragraph") {
+		throw new Error("the letter has no paragraph");
+	}
+	state = state.apply(
+		state.tr.setSelection(
+			TextSelection.create(state.doc, 1 + paragraph.content.size),
+		),
+	);
+	const split = splitBlock(state, (transaction) => {
+		state = state.apply(transaction);
+	});
+	expect(split).toBe(true);
+	expect(state.doc.child(0).textContent).toBe("Hi");
+	expect(state.doc.child(1).type.name).toBe("paragraph");
+	expect(state.doc.child(2).type.name).toBe("signature");
+	expect(signaturesOf(state)).toEqual([firstSignature]);
 });
 
 it("updating an element that does not exist throws", () => {

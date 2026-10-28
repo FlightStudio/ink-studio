@@ -140,6 +140,42 @@ describe("humanSeal", () => {
 		);
 	});
 
+	it("a signature adds signed by hand", () => {
+		const content = letter([run("dear sam", karla)], { elements: [doodle] });
+		content.doc.content = [
+			...content.doc.content,
+			{
+				type: "signature",
+				attrs: {
+					drawingId: "0192e4a0-7b1c-7cc3-9a5e-3f1d2b4c5a03",
+					widthIn: 2.25,
+					align: "right",
+					color: "ink-blue",
+				},
+			},
+		];
+		expect(humanSeal(content, ownFonts)).toBe(
+			"Written in Karla's own handwriting · doodles hand-drawn · signed by hand",
+		);
+	});
+
+	it("a signature alone is a seal", () => {
+		const content = letter([]);
+		content.doc.content = [
+			...content.doc.content,
+			{
+				type: "signature",
+				attrs: {
+					drawingId: "0192e4a0-7b1c-7cc3-9a5e-3f1d2b4c5a03",
+					widthIn: 1.5,
+					align: "right",
+					color: "sepia",
+				},
+			},
+		];
+		expect(humanSeal(content, ownFonts)).toBe("Signed by hand");
+	});
+
 	it("nothing human gives no seal", () => {
 		const content = letter([run("Dear Alex", caveat)]);
 		expect(humanSeal(content, ownFonts)).toBeNull();

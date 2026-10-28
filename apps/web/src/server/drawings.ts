@@ -17,3 +17,11 @@ export const listDoodles = cache(async (): Promise<LibraryDrawing[]> => {
 		"doodle",
 	);
 });
+
+export const listSignatures = cache(async (): Promise<LibraryDrawing[]> => {
+	await getSessionOrRedirect();
+	return getDrawingService().listDrawings(
+		await requireUserOrganization(),
+		"signature",
+	);
+});

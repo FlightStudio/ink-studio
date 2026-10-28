@@ -41,3 +41,4 @@ export { LetterPrint, LetterText } from "./letter-print.tsx";
 export type { LetterMeasure, MeasureInput } from "./measure.ts";
 export { measureLetter } from "./measure.ts";
 export { MergeChip } from "./merge-chip.tsx";
+export { SignatureMark } from "./signature-mark.tsx";

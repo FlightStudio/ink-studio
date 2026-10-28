@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, a doodle library, moving a placed doodle, lifting ink from a photo in the worker, photographing a doodle, building a drawn handwriting font, writing a letter in that hand, making a font from a photo of the printed template, building a font from an uploaded font file, exporting a proof, making a postcard, and merge fields are ready on your own computer.</p>
-  <div class="progress" aria-hidden="true"><span style="width:92%"></span></div>
-  <p class="log">33 of 36 steps in the repository. Step 33 adds merge fields.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, a doodle library, moving a placed doodle, lifting ink from a photo in the worker, photographing a doodle, building a drawn handwriting font, writing a letter in that hand, making a font from a photo of the printed template, building a font from an uploaded font file, exporting a proof, making a postcard, merge fields, and signing a letter are ready on your own computer.</p>
+  <div class="progress" aria-hidden="true"><span style="width:94%"></span></div>
+  <p class="log">34 of 36 steps in the repository. Step 34 signs the letter.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -725,7 +725,32 @@ pnpm --filter web test:e2e</pre>
       <p>The names read like “a field the catalogue does not have is refused”, “a chip prints the recipient's value”, “a letter that fits with Alex but not with the longest name fails the export”, “@ opens the field menu and a pick inserts a chip”, “the menu filters and Escape leaves the text”, “an @ in an email address stays text”, “backspace after a chip removes the whole chip”, “a chip keeps the ink around it”, and “the preview prints the sample”.</p>
       <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, 335 tests, including 2 new render tests and 1 new worker test. <code>pnpm test:e2e</code>, 49 journeys, covers the merge-field menu. Using the menu on an iPad is still unchecked. There is no iPad in this setup.</p>
     </details>
-    <details id="step-34"><summary><span class="tag later">Later</span> 34. Sign the letter</summary><p>Your own signature, after the last line.</p></details>
+    <details id="step-34">
+      <summary><span class="tag done">Done</span> 34. Sign the letter</summary>
+      <p>Sign opens your own signatures. Pick a width and an ink, then tap one. It sits after the last line, on the right. Sign again and the newer one replaces it. The seal adds “signed by hand”.</p>
+      <ul class="points">
+        <li>Under the page, Sign opens the library on Signatures. Doodles stay on their own tab.</li>
+        <li>The widths are 1.5 in, 2.25 in, and 3 in, next to the same ink swatches as the rest of the letter.</li>
+        <li>Nothing saved yet offers Draw and Photograph. A signature you draw or photograph belongs to you. It is not a doodle the studio shares.</li>
+        <li>Tap a signature and it lands after the last line. Tap another and that one takes its place.</li>
+        <li>Enter at the end of the last paragraph adds a line above the signature. A signature in the middle of the letter cannot be saved.</li>
+        <li>A letter in a stock font with a doodle on it reads “Doodles hand-drawn · signed by hand”. A signature by itself reads “Signed by hand”.</li>
+        <li>A doodle cannot be used as a signature. A teammate in the same studio cannot sign with yours, and the letter opens read-only for them.</li>
+        <li>Export proof still needs the render worker. The proof loads the signature’s mask with the rest of the letter.</li>
+      </ul>
+      <p>After <code>git pull</code> and <code>pnpm install</code>:</p>
+      <pre>docker compose up -d
+pnpm dev</pre>
+      <p>Open a letter at <a href="http://127.0.0.1:3000/letters">http://127.0.0.1:3000/letters</a>, click Sign, draw one, pick a width and an ink, and tap it. The seal reads signed by hand.</p>
+      <p>The tests run on throwaway Postgres, and one of them exports the signed letter:</p>
+      <pre>pnpm --filter @repo/types test --reporter=verbose
+pnpm --filter web test --reporter=verbose
+pnpm --filter @repo/render test --reporter=verbose
+pnpm --filter @repo/services test --reporter=verbose
+pnpm --filter worker test --reporter=verbose</pre>
+      <p>The names read like “a signature adds signed by hand”, “a signature alone is a seal”, “signing twice keeps one signature, the newer one”, “Enter at the end of the last paragraph adds a paragraph above the signature”, “a signature in the middle is refused”, “the signature's mask URL comes from the resources”, “a signature drawing the resources lack throws”, “a doodle cannot be used as a signature”, “a letter cannot sign with another organization's signature”, “a teammate in the same organization cannot sign with Karla's signature”, “a signed letter's resources hold its signature mask”, and “a signed letter's export loads the signature mask”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, 347 tests, including 2 new type tests, 2 new editor tests, 1 new parser test, 2 new render tests, 4 new letter service tests, and 1 new worker test. Signing on an iPad is still unchecked. There is no iPad in this setup.</p>
+    </details>
 
     <h3>M10. Text wrap</h3>
     <details id="step-35"><summary><span class="tag later">Later</span> 35. Text wrap around a doodle</summary><p>Text flows around a doodle that asks for it.</p></details>

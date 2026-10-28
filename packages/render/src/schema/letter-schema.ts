@@ -72,7 +72,7 @@ function inkStyle(attrs: InkMark["attrs"]): string {
 const LetterDocument = Node.create({
 	name: "doc",
 	topNode: true,
-	content: "paragraph+",
+	content: "paragraph+ signature?",
 	addAttributes() {
 		return {
 			elements: { default: [], rendered: false },
@@ -111,6 +111,27 @@ const Paragraph = Node.create({
 const Text = Node.create({
 	name: "text",
 	group: "inline",
+});
+
+const Signature = Node.create({
+	name: "signature",
+	group: "block",
+	atom: true,
+	addAttributes() {
+		return {
+			drawingId: { default: null, rendered: false },
+			widthIn: { default: 2.25, rendered: false },
+			align: { default: "right", rendered: false },
+			color: { default: "ink-blue", rendered: false },
+		};
+	},
+	renderHTML({ node }) {
+		const drawingId = node.attrs.drawingId;
+		return [
+			"div",
+			typeof drawingId === "string" ? { "data-signature": drawingId } : {},
+		];
+	},
 });
 
 const MergeField = Node.create({
@@ -197,6 +218,7 @@ const LetterHistory = Extension.create({
 export const letterExtensions: Extensions = [
 	LetterDocument,
 	Paragraph,
+	Signature,
 	Text,
 	HardBreak,
 	MergeField,

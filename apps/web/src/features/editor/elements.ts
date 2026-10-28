@@ -1,4 +1,4 @@
-import type { PlacedElement } from "@repo/types";
+import type { PlacedElement, SignatureNode } from "@repo/types";
 import { closeHistory } from "@tiptap/pm/history";
 import type { EditorState, Transaction } from "@tiptap/pm/state";
 
@@ -40,6 +40,26 @@ export function updateElement(
 	if (!current) throw new Error(`Element ${id} is not on the letter`);
 	next[index] = { ...current, ...change };
 	return replaceElements(state, next);
+}
+
+export function signLetter(
+	state: EditorState,
+	signature: SignatureNode["attrs"],
+): Transaction {
+	const type = state.schema.nodes.signature;
+	if (!type) throw new Error("the letter cannot hold a signature");
+	const node = type.create(signature);
+	const { doc } = state;
+	const transaction = state.tr;
+	const last = doc.lastChild;
+	const end = doc.content.size;
+	if (last?.type.name === "signature") {
+		transaction.replaceWith(end - last.nodeSize, end, node);
+	} else {
+		transaction.insert(end, node);
+	}
+	closeHistory(transaction);
+	return transaction;
 }
 
 export function removeElement(state: EditorState, id: string): Transaction {

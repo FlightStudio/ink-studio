@@ -1,7 +1,7 @@
 "use client";
 
 import { createDrawing, uploadFile } from "@repo/api";
-import type { LibraryDrawing, Stroke } from "@repo/types";
+import type { DrawingKind, LibraryDrawing, Stroke } from "@repo/types";
 import { Button } from "@repo/ui/components/ui/button";
 import {
 	Dialog,
@@ -21,24 +21,32 @@ export type DrawDoodleDialogProps = {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	onSaved: (drawing: LibraryDrawing) => void;
+	kind?: DrawingKind;
 };
 
 export function DrawDoodleDialog({
 	open,
 	onOpenChange,
 	onSaved,
+	kind = "doodle",
 }: DrawDoodleDialogProps) {
+	const signature = kind === "signature";
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="sm:max-w-xl">
 				<DialogHeader>
-					<DialogTitle>Draw a doodle</DialogTitle>
+					<DialogTitle>
+						{signature ? "Draw a signature" : "Draw a doodle"}
+					</DialogTitle>
 					<DialogDescription>
-						Draw on the page, name it, and save it to the library.
+						{signature
+							? "Draw your signature, name it, and save it."
+							: "Draw on the page, name it, and save it to the library."}
 					</DialogDescription>
 				</DialogHeader>
 				{open ? (
 					<DrawForm
+						kind={kind}
 						onSaved={(drawing) => {
 							onSaved(drawing);
 							onOpenChange(false);
@@ -50,10 +58,18 @@ export function DrawDoodleDialog({
 	);
 }
 
-function DrawForm({ onSaved }: { onSaved: (drawing: LibraryDrawing) => void }) {
+function DrawForm({
+	kind,
+	onSaved,
+}: {
+	kind: DrawingKind;
+	onSaved: (drawing: LibraryDrawing) => void;
+}) {
 	const canvas = useRef<InkCanvasHandle>(null);
 	const [strokes, setStrokes] = useState<Stroke[]>([]);
-	const [name, setName] = useState("Doodle");
+	const [name, setName] = useState(
+		kind === "signature" ? "Signature" : "Doodle",
+	);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const trimmed = name.trim();
@@ -72,11 +88,15 @@ function DrawForm({ onSaved }: { onSaved: (drawing: LibraryDrawing) => void }) {
 				},
 			);
 			if (uploaded.status !== 201) {
-				setError("That doodle could not be saved.");
+				setError(
+					kind === "signature"
+						? "That signature could not be saved."
+						: "That doodle could not be saved.",
+				);
 				return;
 			}
 			const created = await createDrawing({
-				kind: "doodle",
+				kind,
 				name: trimmed,
 				maskAssetId: uploaded.data.id,
 				source: {
@@ -89,18 +109,26 @@ function DrawForm({ onSaved }: { onSaved: (drawing: LibraryDrawing) => void }) {
 				},
 			});
 			if (created.status !== 201) {
-				setError("That doodle could not be saved.");
+				setError(
+					kind === "signature"
+						? "That signature could not be saved."
+						: "That doodle could not be saved.",
+				);
 				return;
 			}
 			onSaved({
 				id: created.data.id,
-				kind: "doodle",
+				kind,
 				name: trimmed,
 				aspect: raster.aspect,
 				maskAssetId: uploaded.data.id,
 			});
 		} catch {
-			setError("That doodle could not be saved.");
+			setError(
+				kind === "signature"
+					? "That signature could not be saved."
+					: "That doodle could not be saved.",
+			);
 		} finally {
 			setSaving(false);
 		}
@@ -112,7 +140,7 @@ function DrawForm({ onSaved }: { onSaved: (drawing: LibraryDrawing) => void }) {
 				ref={canvas}
 				widthPx={BOX.widthPx}
 				heightPx={BOX.heightPx}
-				aria-label="Doodle"
+				aria-label={kind === "signature" ? "Signature" : "Doodle"}
 				className="rounded-md bg-paper text-ink ring-1 ring-rule"
 				onStrokeEnd={setStrokes}
 			/>
@@ -150,7 +178,7 @@ function DrawForm({ onSaved }: { onSaved: (drawing: LibraryDrawing) => void }) {
 				disabled={strokes.length === 0 || trimmed === "" || saving}
 				onClick={() => void save()}
 			>
-				Save doodle
+				{kind === "signature" ? "Save signature" : "Save doodle"}
 			</Button>
 		</div>
 	);

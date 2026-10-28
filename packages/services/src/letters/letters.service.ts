@@ -62,8 +62,9 @@ function newLetterContent(format: PageFormatId): LetterContent {
 
 function fontRefs(content: LetterContent): FontRef[] {
 	const refs = [content.defaults.font];
-	for (const paragraph of content.doc.content) {
-		for (const node of paragraph.content ?? []) {
+	for (const block of content.doc.content) {
+		if (block.type !== "paragraph") continue;
+		for (const node of block.content ?? []) {
 			for (const mark of node.marks ?? []) {
 				if (mark.attrs.font) refs.push(mark.attrs.font);
 			}
@@ -162,18 +163,56 @@ function validTitle(title: string): string {
 	return trimmed;
 }
 
+function placedDrawingIds(content: LetterContent): string[] {
+	return [
+		...new Set(content.doc.attrs.elements.map((element) => element.drawingId)),
+	];
+}
+
+function signatureIds(content: LetterContent): string[] {
+	return [
+		...new Set(
+			content.doc.content.flatMap((block) =>
+				block.type === "signature" ? [block.attrs.drawingId] : [],
+			),
+		),
+	];
+}
+
 async function knownDrawings(
 	db: Tx,
 	organizationId: string,
 	content: LetterContent,
 ): Promise<void> {
-	const ids = [
-		...new Set(content.doc.attrs.elements.map((element) => element.drawingId)),
-	];
+	const ids = placedDrawingIds(content);
 	if (ids.length === 0) return;
 	const found = await db.drawings.referenced(organizationId, ids);
 	if (found.length !== ids.length) {
 		throw new ServiceError("invalid_input", "invalid_letter");
+	}
+}
+
+async function knownSignatures(
+	db: Tx,
+	member: Member,
+	content: LetterContent,
+): Promise<void> {
+	const ids = signatureIds(content);
+	if (ids.length === 0) return;
+	const found = await db.drawings.referenced(
+		member.userOrganization.organizationId,
+		ids,
+	);
+	if (found.length !== ids.length) {
+		throw new ServiceError("invalid_input", "invalid_letter");
+	}
+	for (const drawing of found) {
+		if (drawing.kind !== "signature") {
+			throw new ServiceError("invalid_input", "invalid_letter");
+		}
+		if (drawing.ownerUserId !== member.user.id) {
+			throw new ServiceError("forbidden", "not_owner");
+		}
 	}
 }
 
@@ -202,7 +241,7 @@ export async function letterResources(
 	bases: { assetBaseUrl: string; stockFontBaseUrl: string } = EDITOR_BASES,
 ): Promise<LetterResources> {
 	const ids = [
-		...new Set(content.doc.attrs.elements.map((element) => element.drawingId)),
+		...new Set([...placedDrawingIds(content), ...signatureIds(content)]),
 	];
 	const found =
 		ids.length === 0 ? [] : await tx.drawings.referenced(organizationId, ids);
@@ -237,8 +276,20 @@ export async function letterOwnerIds(
 	organizationId: string,
 	content: LetterContent,
 ): Promise<Set<string>> {
-	const fonts = await referencedFonts(tx, organizationId, content);
-	return new Set(fonts.map((font) => font.ownerUserId));
+	const owners = new Set<string>();
+	for (const font of await referencedFonts(tx, organizationId, content)) {
+		owners.add(font.ownerUserId);
+	}
+	const signatures = signatureIds(content);
+	if (signatures.length > 0) {
+		for (const drawing of await tx.drawings.referenced(
+			organizationId,
+			signatures,
+		)) {
+			if (drawing.kind === "signature") owners.add(drawing.ownerUserId);
+		}
+	}
+	return owners;
 }
 
 function proofOutputs(content: LetterContent): PrintOutput[] {
@@ -327,6 +378,7 @@ export class LetterService {
 		const title = validTitle(params.title);
 		const organizationId = member.userOrganization.organizationId;
 		await knownDrawings(this.db, organizationId, content);
+		await knownSignatures(this.db, member, content);
 		await knownCover(this.db, organizationId, content);
 		await knownFonts(this.db, member, content);
 		const revision = await this.db.letters.save(organizationId, letterId, {

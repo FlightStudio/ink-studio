@@ -678,3 +678,127 @@ it("a teammate cannot export a letter in Karla's hand", async () => {
 		letters.requestExport(sam, id, { revision: 2 }),
 	).rejects.toMatchObject({ kind: "forbidden", code: "not_owner" });
 });
+
+async function inkDrawing(
+	caller: Member,
+	kind: "doodle" | "signature",
+	name: string,
+) {
+	const maskId = uuidv7();
+	const organization = organizationId(caller);
+	await testDb.db.assets.create({
+		id: maskId,
+		organizationId: organization,
+		storageKey: `organizations/${organization}/assets/${maskId}`,
+		mimeType: "image/png",
+		byteSize: 33,
+		checksum: "c".repeat(64),
+		origin: {
+			source: "uploaded",
+			purpose: "mask",
+			filename: `${name}.png`,
+			uploadedByUserId: caller.user.id,
+		},
+		processing: { status: "done", attempts: 0 },
+	});
+	return testDb.db.drawings.create({
+		organizationId: organization,
+		ownerUserId: caller.user.id,
+		kind,
+		name,
+		source: {
+			kind: "drawn",
+			box: { widthPx: 10, heightPx: 10 },
+			strokes: [],
+		},
+		maskAssetId: maskId,
+		aspect: 3,
+	});
+}
+
+function withSignature(
+	content: LetterContent,
+	drawingId: string,
+): LetterContent {
+	return {
+		...content,
+		doc: {
+			...content.doc,
+			content: [
+				...content.doc.content,
+				{
+					type: "signature",
+					attrs: {
+						drawingId,
+						widthIn: 2.25,
+						align: "right",
+						color: "ink-blue",
+					},
+				},
+			],
+		},
+	};
+}
+
+it("a doodle cannot be used as a signature", async () => {
+	const ada = await member("ada-signature-doodle");
+	const doodle = await inkDrawing(ada, "doodle", "Star");
+	const { id } = await letters.createLetter(ada, {});
+	const { content } = await stored(ada, id);
+	await expect(
+		letters.saveLetter(ada, id, {
+			title: "Signed",
+			content: withSignature(content, doodle.id),
+			expectedRevision: 1,
+		}),
+	).rejects.toMatchObject({ kind: "invalid_input", code: "invalid_letter" });
+	expect((await stored(ada, id)).revision).toBe(1);
+});
+
+it("a letter cannot sign with another organization's signature", async () => {
+	const ada = await member("ada-foreign-signature");
+	const bob = await member("bob-foreign-signature");
+	const signature = await inkDrawing(bob, "signature", "Bob");
+	const { id } = await letters.createLetter(ada, {});
+	const { content } = await stored(ada, id);
+	await expect(
+		letters.saveLetter(ada, id, {
+			title: "Borrowed",
+			content: withSignature(content, signature.id),
+			expectedRevision: 1,
+		}),
+	).rejects.toMatchObject({ kind: "invalid_input", code: "invalid_letter" });
+	expect((await stored(ada, id)).revision).toBe(1);
+});
+
+it("a teammate in the same organization cannot sign with Karla's signature", async () => {
+	const karla = await member("karla-signature-owner");
+	const sam = await teammate(karla, "sam-signature-owner");
+	const signature = await inkDrawing(karla, "signature", "Karla");
+	const { id } = await letters.createLetter(sam, {});
+	const { content } = await stored(sam, id);
+	await expect(
+		letters.saveLetter(sam, id, {
+			title: "Not mine",
+			content: withSignature(content, signature.id),
+			expectedRevision: 1,
+		}),
+	).rejects.toMatchObject({ kind: "forbidden", code: "not_owner" });
+});
+
+it("a signed letter's resources hold its signature mask", async () => {
+	const ada = await member("ada-signature-resources");
+	const signature = await inkDrawing(ada, "signature", "Ada");
+	const { id } = await letters.createLetter(ada, {});
+	const { content } = await stored(ada, id);
+	await letters.saveLetter(ada, id, {
+		title: "Signed",
+		content: withSignature(content, signature.id),
+		expectedRevision: 1,
+	});
+	const letter = await letters.getLetter(ada, id);
+	expect(letter?.resources.drawings[signature.id]?.maskAssetId).toBe(
+		signature.maskAssetId,
+	);
+	expect(letter?.editable).toBe(true);
+});
