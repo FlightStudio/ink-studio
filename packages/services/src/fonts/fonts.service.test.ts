@@ -264,3 +264,34 @@ it("a build request is a pending asset beside the current build", async () => {
 		assetId,
 	});
 });
+
+it("another organization's photo cannot make a template font", async () => {
+	const karla = await member("karla-template");
+	const sam = await member("sam-template");
+	const photoId = crypto.randomUUID();
+	await testDb.db.assets.create({
+		id: photoId,
+		organizationId: sam.userOrganization.organizationId,
+		storageKey: `organizations/${sam.userOrganization.organizationId}/assets/${photoId}`,
+		mimeType: "image/png",
+		byteSize: 12,
+		checksum: "b".repeat(64),
+		origin: {
+			source: "uploaded",
+			purpose: "photo",
+			filename: "template.png",
+			uploadedByUserId: sam.user.id,
+		},
+		processing: { status: "done", attempts: 0 },
+	});
+	await expect(
+		fonts.createFont(karla, {
+			ownerName: "Karla",
+			source: {
+				kind: "template-photo",
+				templateVersion: 1,
+				photoAssetId: photoId,
+			},
+		}),
+	).rejects.toMatchObject({ kind: "not_found", code: "not_found" });
+});

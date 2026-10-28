@@ -22,6 +22,20 @@ export class AssetBuildFontProcessor implements MessageProcessor {
 		},
 	) {}
 
+	private async photoOf(
+		organizationId: string,
+		assetId: string,
+	): Promise<Uint8Array> {
+		const photo = await this.params.db.assets.byId(organizationId, assetId);
+		if (
+			photo?.origin.source !== "uploaded" ||
+			photo.origin.purpose !== "photo"
+		) {
+			throw new ServiceError("invalid_input", "template_markers_not_found");
+		}
+		return this.params.storage.get(photo.storageKey);
+	}
+
 	async process(message: QueueMessage): Promise<void> {
 		const parsed = assetJobMessageSchema.safeParse(message.data);
 		if (!parsed.success) return;
@@ -34,16 +48,26 @@ export class AssetBuildFontProcessor implements MessageProcessor {
 					job.fontId,
 				);
 				if (!font) throw new ServiceError("invalid_input", "font_incomplete");
-				const built = await this.params.builder.fromStrokeOutlines({
-					familyName: `own-${font.id}`,
-					glyphs: font.source.glyphs.map((glyph) => ({
-						char: glyph.char,
-						variant: glyph.variant,
-						polygons: glyph.strokes.map((stroke) =>
-							strokeOutline(stroke, CELL.strokeScale),
-						),
-					})),
-				});
+				const familyName = `own-${font.id}`;
+				const built =
+					font.source.kind === "template-photo"
+						? await this.params.builder.fromTemplatePhoto({
+								familyName,
+								photo: await this.photoOf(
+									font.organizationId,
+									font.source.photoAssetId,
+								),
+							})
+						: await this.params.builder.fromStrokeOutlines({
+								familyName,
+								glyphs: font.source.glyphs.map((glyph) => ({
+									char: glyph.char,
+									variant: glyph.variant,
+									polygons: glyph.strokes.map((stroke) =>
+										strokeOutline(stroke, CELL.strokeScale),
+									),
+								})),
+							});
 				return {
 					bytes: built.bytes,
 					mimeType: "font/otf",

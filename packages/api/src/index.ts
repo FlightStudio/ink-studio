@@ -18,6 +18,7 @@ export type {
 	SavedLetter,
 	SaveGlyphRequest,
 	SaveLetterRequest,
+	TemplatePhotoFontSource,
 	UploadedAsset,
 	UploadFileParams,
 } from "./gen/api.ts";
@@ -41,6 +42,8 @@ export {
 	requestLift,
 	saveGlyph,
 	saveLetter,
+	TemplatePhotoFontSourceKind,
+	TemplatePhotoFontSourceTemplateVersion,
 	UploadPurpose,
 	uploadFile,
 } from "./gen/api.ts";
@@ -67,6 +70,7 @@ export {
 	savedLetterSchema,
 	saveGlyphRequestSchema,
 	saveLetterRequestSchema,
+	templatePhotoFontSourceSchema,
 	uploadedAssetSchema,
 	uploadPurposeSchema,
 } from "./zod.ts";

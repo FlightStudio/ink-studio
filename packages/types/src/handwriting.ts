@@ -61,6 +61,27 @@ export const HANDWRITING_GLYPHS = [
 	required: boolean;
 }[];
 
+export const HANDWRITING_TEMPLATE = {
+	version: 1,
+	page: { widthIn: 8.5, heightIn: 11 },
+	marker: { sizeIn: 0.4, insetIn: 0.4, notchIn: 0.12 },
+	grid: {
+		columns: 8,
+		rows: 13,
+		xIn: 0.9,
+		yIn: 1.2,
+		cellWidthIn: 0.84,
+		cellHeightIn: 0.72,
+		cellInsetIn: 0.06,
+	},
+	printColors: {
+		border: "#8fd3e8",
+		guide: "#c4ecf6",
+		label: "#8fd3e8",
+		marker: "#000000",
+	},
+} as const;
+
 export const CELL = {
 	size: 1000,
 	ascender: 150,

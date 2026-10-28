@@ -11,7 +11,9 @@ export const STOCK_FONTS = {
 
 export type StockFontId = keyof typeof STOCK_FONTS;
 
-export type FontSource = { kind: "drawn"; glyphs: DrawnGlyph[] };
+export type FontSource =
+	| { kind: "drawn"; glyphs: DrawnGlyph[] }
+	| { kind: "template-photo"; templateVersion: 1; photoAssetId: string };
 
 export type Font = {
 	id: string;

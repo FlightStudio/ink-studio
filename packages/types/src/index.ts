@@ -26,6 +26,7 @@ export {
 	CELL,
 	GLYPH_LIMITS,
 	HANDWRITING_GLYPHS,
+	HANDWRITING_TEMPLATE,
 	missingChars,
 } from "./handwriting.ts";
 export type { InkColorId, TextSizePt } from "./ink.ts";
