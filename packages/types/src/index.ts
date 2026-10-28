@@ -8,6 +8,12 @@ export type {
 } from "./asset.ts";
 export { assetMessageType } from "./asset.ts";
 export type {
+	Drawing,
+	DrawingKind,
+	DrawingSource,
+	LibraryDrawing,
+} from "./drawing.ts";
+export type {
 	EditableFont,
 	Font,
 	FontOption,

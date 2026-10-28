@@ -285,7 +285,7 @@ export function LetterPage(props: LetterPageProps): ReactElement {
 					{content.doc.attrs.elements.map((element) => (
 						<div
 							key={element.id}
-							className="letter-element"
+							className="letter-element animate-settle"
 							data-element-id={element.id}
 							style={elementStyle(spec, element, resources, gapIn)}
 						/>

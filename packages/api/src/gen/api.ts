@@ -136,11 +136,84 @@ export const ApiErrorCode = {
   photo_unreadable: 'photo_unreadable',
   photo_too_large: 'photo_too_large',
   no_ink_found: 'no_ink_found',
+  invalid_mask: 'invalid_mask',
+  invalid_drawing: 'invalid_drawing',
 } as const;
 
 export interface AssetStatus {
   status: AssetProcessingStatus;
   error: ApiErrorCode | null;
+}
+
+export type DrawingKind = typeof DrawingKind[keyof typeof DrawingKind];
+
+
+export const DrawingKind = {
+  doodle: 'doodle',
+  signature: 'signature',
+} as const;
+
+export type StrokeInput = typeof StrokeInput[keyof typeof StrokeInput];
+
+
+export const StrokeInput = {
+  pen: 'pen',
+  mouse: 'mouse',
+  touch: 'touch',
+} as const;
+
+export interface Stroke {
+  input: StrokeInput;
+  /**
+     * @items.minItems 4
+     * @items.maxItems 4
+     */
+  points: number[][];
+}
+
+export type DrawnSourceKind = typeof DrawnSourceKind[keyof typeof DrawnSourceKind];
+
+
+export const DrawnSourceKind = {
+  drawn: 'drawn',
+} as const;
+
+export type DrawnSourceBox = {
+  widthPx: number;
+  heightPx: number;
+};
+
+export interface DrawnSource {
+  kind: DrawnSourceKind;
+  box: DrawnSourceBox;
+  strokes: Stroke[];
+}
+
+export type PhotoSourceKind = typeof PhotoSourceKind[keyof typeof PhotoSourceKind];
+
+
+export const PhotoSourceKind = {
+  photo: 'photo',
+} as const;
+
+export interface PhotoSource {
+  kind: PhotoSourceKind;
+  photoAssetId: string;
+}
+
+export interface CreateDrawingRequest {
+  kind: DrawingKind;
+  name: string;
+  maskAssetId: string;
+  source: DrawnSource | PhotoSource;
+}
+
+export interface CreatedDrawing {
+  id: string;
+}
+
+export interface RenameDrawingRequest {
+  name: string;
 }
 
 export interface Health {
@@ -977,4 +1050,239 @@ export const getAssetStatus = async (assetId: string, options?: RequestInit): Pr
 
   const data: getAssetStatusResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getAssetStatusResponse
+}
+
+
+
+export type createDrawingResponse201 = {
+  data: CreatedDrawing
+  status: 201
+}
+
+export type createDrawingResponse400 = {
+  data: InvalidRequestResponse
+  status: 400
+}
+
+export type createDrawingResponse401 = {
+  data: UnauthenticatedResponse
+  status: 401
+}
+
+export type createDrawingResponse403 = {
+  data: ForbiddenResponse
+  status: 403
+}
+
+export type createDrawingResponse404 = {
+  data: NotFoundResponse
+  status: 404
+}
+
+export type createDrawingResponse415 = {
+  data: UnsupportedMediaTypeResponse
+  status: 415
+}
+
+export type createDrawingResponse500 = {
+  data: InternalErrorResponse
+  status: 500
+}
+
+export type createDrawingResponseSuccess = (createDrawingResponse201) & {
+  headers: Headers;
+};
+export type createDrawingResponseError = (createDrawingResponse400 | createDrawingResponse401 | createDrawingResponse403 | createDrawingResponse404 | createDrawingResponse415 | createDrawingResponse500) & {
+  headers: Headers;
+};
+
+export type createDrawingResponse = (createDrawingResponseSuccess | createDrawingResponseError)
+
+export const getCreateDrawingUrl = () => {
+
+
+
+
+  return `/api/drawings`
+}
+
+export const createDrawing = async (createDrawingRequest: CreateDrawingRequest, options?: RequestInit): Promise<createDrawingResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCreateDrawingUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createDrawingRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createDrawingResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createDrawingResponse
+}
+
+
+
+export type renameDrawingResponse204 = {
+  data: void
+  status: 204
+}
+
+export type renameDrawingResponse400 = {
+  data: InvalidRequestResponse
+  status: 400
+}
+
+export type renameDrawingResponse401 = {
+  data: UnauthenticatedResponse
+  status: 401
+}
+
+export type renameDrawingResponse403 = {
+  data: ForbiddenResponse
+  status: 403
+}
+
+export type renameDrawingResponse404 = {
+  data: NotFoundResponse
+  status: 404
+}
+
+export type renameDrawingResponse415 = {
+  data: UnsupportedMediaTypeResponse
+  status: 415
+}
+
+export type renameDrawingResponse500 = {
+  data: InternalErrorResponse
+  status: 500
+}
+
+export type renameDrawingResponseSuccess = (renameDrawingResponse204) & {
+  headers: Headers;
+};
+export type renameDrawingResponseError = (renameDrawingResponse400 | renameDrawingResponse401 | renameDrawingResponse403 | renameDrawingResponse404 | renameDrawingResponse415 | renameDrawingResponse500) & {
+  headers: Headers;
+};
+
+export type renameDrawingResponse = (renameDrawingResponseSuccess | renameDrawingResponseError)
+
+export const getRenameDrawingUrl = (drawingId: string,) => {
+
+
+
+
+  return `/api/drawings/${drawingId}`
+}
+
+export const renameDrawing = async (drawingId: string,
+    renameDrawingRequest: RenameDrawingRequest, options?: RequestInit): Promise<renameDrawingResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getRenameDrawingUrl(drawingId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(renameDrawingRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: renameDrawingResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as renameDrawingResponse
+}
+
+
+
+export type deleteDrawingResponse204 = {
+  data: void
+  status: 204
+}
+
+export type deleteDrawingResponse401 = {
+  data: UnauthenticatedResponse
+  status: 401
+}
+
+export type deleteDrawingResponse403 = {
+  data: ForbiddenResponse
+  status: 403
+}
+
+export type deleteDrawingResponse404 = {
+  data: NotFoundResponse
+  status: 404
+}
+
+export type deleteDrawingResponse500 = {
+  data: InternalErrorResponse
+  status: 500
+}
+
+export type deleteDrawingResponseSuccess = (deleteDrawingResponse204) & {
+  headers: Headers;
+};
+export type deleteDrawingResponseError = (deleteDrawingResponse401 | deleteDrawingResponse403 | deleteDrawingResponse404 | deleteDrawingResponse500) & {
+  headers: Headers;
+};
+
+export type deleteDrawingResponse = (deleteDrawingResponseSuccess | deleteDrawingResponseError)
+
+export const getDeleteDrawingUrl = (drawingId: string,) => {
+
+
+
+
+  return `/api/drawings/${drawingId}`
+}
+
+export const deleteDrawing = async (drawingId: string, options?: RequestInit): Promise<deleteDrawingResponse> => {
+
+  const res = await fetch(getDeleteDrawingUrl(drawingId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: deleteDrawingResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as deleteDrawingResponse
 }

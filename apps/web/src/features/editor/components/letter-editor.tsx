@@ -13,7 +13,15 @@ import {
 } from "@repo/render/html";
 import { letterExtensions } from "@repo/render/schema";
 import type { EditableLetter } from "@repo/services/letters";
-import type { FontRef, LetterContent, LetterDoc, PageSpec } from "@repo/types";
+import type {
+	FontRef,
+	LetterContent,
+	LetterDoc,
+	LetterResources,
+	LibraryDrawing,
+	PageSpec,
+	PlacedElement,
+} from "@repo/types";
 import { PAGE_SPECS } from "@repo/types";
 import { Desk } from "@repo/ui/components/desk";
 import { EditorContent, useEditor } from "@tiptap/react";
@@ -27,7 +35,9 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { LibrarySheet } from "@/features/library/components/library-sheet";
 import { useAutosave } from "@/lib/use-autosave";
+import { placeElement } from "../elements.ts";
 import { AddSide } from "./add-side.tsx";
 import { EditorToolbar, useCoarsePointer } from "./editor-toolbar.tsx";
 import { HumanSeal } from "./human-seal.tsx";
@@ -38,6 +48,7 @@ import { SaveLine } from "./save-line.tsx";
 import { SidesIndicator } from "./sides-indicator.tsx";
 
 const PX_PER_IN = 96;
+const PLACED_LONG_SIDE_IN = 2;
 const MAX_SCALE = 1.25;
 const INK_READY_TIMEOUT_MS = 3000;
 
@@ -112,8 +123,6 @@ export type PageState = {
 	issues: PlacementIssue[];
 };
 
-export type LetterEditorProps = { letter: EditableLetter };
-
 function placedBoxes(doc: LetterDoc) {
 	return (doc.attrs.elements ?? []).map((element) => ({
 		id: element.id,
@@ -156,7 +165,69 @@ function restingState(doc: LetterDoc): PageState {
 	};
 }
 
-export function LetterEditor({ letter }: LetterEditorProps) {
+function placedSize(aspect: number): { widthIn: number; heightIn: number } {
+	if (aspect >= 1) {
+		return {
+			widthIn: PLACED_LONG_SIDE_IN,
+			heightIn: PLACED_LONG_SIDE_IN / aspect,
+		};
+	}
+	return {
+		widthIn: PLACED_LONG_SIDE_IN * aspect,
+		heightIn: PLACED_LONG_SIDE_IN,
+	};
+}
+
+function visibleSideCentre(): {
+	side: number;
+	xIn: number;
+	yIn: number;
+} | null {
+	const view = window.visualViewport;
+	const left = view?.offsetLeft ?? 0;
+	const top = view?.offsetTop ?? 0;
+	const right = left + (view?.width ?? window.innerWidth);
+	const bottom = top + (view?.height ?? window.innerHeight);
+	const sheets = [...document.querySelectorAll<HTMLElement>(".letter-sheet")];
+	let best: { area: number; rect: DOMRect; sheet: HTMLElement } | null = null;
+	for (const sheet of sheets) {
+		const rect = sheet.getBoundingClientRect();
+		const width = Math.max(
+			0,
+			Math.min(rect.right, right) - Math.max(rect.left, left),
+		);
+		const height = Math.max(
+			0,
+			Math.min(rect.bottom, bottom) - Math.max(rect.top, top),
+		);
+		const area = width * height;
+		if (!best || area > best.area) best = { area, rect, sheet };
+	}
+	if (!best || best.rect.width === 0 || best.rect.height === 0) return null;
+	const sheetWidthIn = Number.parseFloat(best.sheet.style.width);
+	const sheetHeightIn = Number.parseFloat(best.sheet.style.height);
+	if (!sheetWidthIn || !sheetHeightIn) return null;
+	const visLeft = Math.max(best.rect.left, left);
+	const visRight = Math.min(best.rect.right, right);
+	const visTop = Math.max(best.rect.top, top);
+	const visBottom = Math.min(best.rect.bottom, bottom);
+	return {
+		side: Number(best.sheet.dataset.side ?? 0),
+		xIn:
+			(((visLeft + visRight) / 2 - best.rect.left) / best.rect.width) *
+			sheetWidthIn,
+		yIn:
+			(((visTop + visBottom) / 2 - best.rect.top) / best.rect.height) *
+			sheetHeightIn,
+	};
+}
+
+export type LetterEditorProps = {
+	letter: EditableLetter;
+	doodles: LibraryDrawing[];
+};
+
+export function LetterEditor({ letter, doodles }: LetterEditorProps) {
 	const router = useRouter();
 	const spec = PAGE_SPECS[letter.content.format];
 	const [title, setTitle] = useState(letter.title);
@@ -165,6 +236,8 @@ export function LetterEditor({ letter }: LetterEditorProps) {
 		restingState(letter.content.doc),
 	);
 	const [flowHeightIn, setFlowHeightIn] = useState(0);
+	const [resources, setResources] = useState<LetterResources>(letter.resources);
+	const [libraryOpen, setLibraryOpen] = useState(false);
 	const pageRef = useRef<HTMLDivElement>(null);
 	const inkReady = useInkReady(letter.content);
 	const desk = useDeskScale(spec.widthIn);
@@ -222,6 +295,7 @@ export function LetterEditor({ letter }: LetterEditorProps) {
 		const onUpdate = () => {
 			edited();
 			setEmpty(editor.isEmpty);
+			setDoc(editor.getJSON() as LetterDoc);
 			measure();
 		};
 		editor.on("update", onUpdate);
@@ -267,6 +341,41 @@ export function LetterEditor({ letter }: LetterEditorProps) {
 	const scale = desk.scale ?? 1;
 	const live = { ...letter.content, doc };
 
+	function placeDrawing(drawing: LibraryDrawing) {
+		if (!editor) return;
+		const centre = visibleSideCentre() ?? {
+			side: 0,
+			xIn: spec.widthIn / 2,
+			yIn: spec.heightIn / 2,
+		};
+		const size = placedSize(drawing.aspect);
+		const element: PlacedElement = {
+			id: crypto.randomUUID(),
+			kind: "drawing",
+			drawingId: drawing.id,
+			side: centre.side,
+			xIn: centre.xIn - size.widthIn / 2,
+			yIn: centre.yIn - size.heightIn / 2,
+			widthIn: size.widthIn,
+			heightIn: size.heightIn,
+			rotationDeg: 0,
+			tint: letter.content.defaults.color,
+			wrap: false,
+		};
+		setResources((current) => ({
+			...current,
+			drawings: {
+				...current.drawings,
+				[drawing.id]: {
+					maskAssetId: drawing.maskAssetId,
+					aspect: drawing.aspect,
+				},
+			},
+		}));
+		editor.view.dispatch(placeElement(editor.state, element));
+		setLibraryOpen(false);
+	}
+
 	return (
 		<Desk className="flex flex-col">
 			<header className="flex items-center px-4 pt-4 sm:px-6">
@@ -292,6 +401,7 @@ export function LetterEditor({ letter }: LetterEditorProps) {
 						defaults={letter.content.defaults}
 						coarsePointer={coarsePointer}
 						onKeyboardClearance={setKeyboardClearancePx}
+						onLibrary={() => setLibraryOpen(true)}
 					/>
 				) : null}
 				<div ref={desk.ref} className="flex w-full justify-center">
@@ -325,7 +435,7 @@ export function LetterEditor({ letter }: LetterEditorProps) {
 								<LetterPage
 									letterId={letter.id}
 									content={live}
-									resources={letter.resources}
+									resources={resources}
 									mode="edit"
 									mergeValues={null}
 									sheets={sheets}
@@ -366,7 +476,7 @@ export function LetterEditor({ letter }: LetterEditorProps) {
 						<PrintPreview
 							letterId={letter.id}
 							content={live}
-							resources={letter.resources}
+							resources={resources}
 						/>
 					</div>
 					<HumanSeal content={live} />
@@ -401,6 +511,14 @@ export function LetterEditor({ letter }: LetterEditorProps) {
 					)}
 				</footer>
 			</main>
+			{letter.editable ? (
+				<LibrarySheet
+					open={libraryOpen}
+					onOpenChange={setLibraryOpen}
+					drawings={doodles}
+					onPlace={placeDrawing}
+				/>
+			) : null}
 		</Desk>
 	);
 }

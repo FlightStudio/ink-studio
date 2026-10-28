@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { DeskMessage } from "@/features/editor/components/desk-message";
 import { LetterEditor } from "@/features/editor/components/letter-editor";
+import { listDoodles } from "@/server/drawings";
 import { getLetter } from "@/server/letters";
 
 type Props = { params: Promise<{ letterId: string }> };
@@ -29,7 +30,12 @@ export default async function LetterEditorPage({ params }: Props) {
 			</DeskMessage>
 		);
 	}
+	const doodles = letter.editable ? await listDoodles() : [];
 	return (
-		<LetterEditor key={`${letter.id}:${letter.revision}`} letter={letter} />
+		<LetterEditor
+			key={`${letter.id}:${letter.revision}`}
+			letter={letter}
+			doodles={doodles}
+		/>
 	);
 }

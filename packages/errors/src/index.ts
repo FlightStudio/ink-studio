@@ -20,6 +20,8 @@ export const apiErrorCodes = [
 	"photo_unreadable",
 	"photo_too_large",
 	"no_ink_found",
+	"invalid_mask",
+	"invalid_drawing",
 ] as const;
 
 export type ApiErrorCode = (typeof apiErrorCodes)[number];
@@ -48,6 +50,8 @@ export const errorMessages = {
 	photo_unreadable: "That photo could not be opened, so try another one.",
 	photo_too_large: "That photo has too many pixels, so try a smaller one.",
 	no_ink_found: "No ink was found in that photo.",
+	invalid_mask: "That picture cannot be used as a mask.",
+	invalid_drawing: "That drawing is not valid.",
 } as const satisfies Record<ApiErrorCode, string>;
 
 export type ApiErrorBody = {

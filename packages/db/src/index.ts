@@ -1,6 +1,7 @@
 export type {
 	Assets,
 	Db,
+	Drawings,
 	Fonts,
 	Letter,
 	LetterChange,
