@@ -1,6 +1,6 @@
 import type { TestDb } from "@repo/db";
 import { seedDevIdentity, startTestDb } from "@repo/db/testing";
-import type { LetterContent, Member } from "@repo/types";
+import type { LetterContent, Member, UploadPurpose } from "@repo/types";
 import { SAMPLE_MERGE_VALUES } from "@repo/types";
 import { v7 as uuidv7 } from "uuid";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
@@ -86,6 +86,7 @@ it("a new letter is an untitled empty Caveat letter in ink blue", async () => {
 			stockFontBaseUrl: "/fonts/stock/",
 			fonts: {},
 			drawings: {},
+			frontImageAssetId: null,
 		},
 		sealFonts: {},
 		editable: true,
@@ -173,6 +174,7 @@ it("the list holds this organization's live letters, newest first", async () => 
 		title: "Touched last",
 		updatedAt: (await stored(ada, older.id)).updatedAt,
 		humanSeal: null,
+		productLabel: "Letter",
 	});
 	expect(list[1]?.title).toBe("Untitled letter");
 });
@@ -373,6 +375,30 @@ async function teammate(owner: Member, name: string): Promise<Member> {
 	};
 }
 
+async function storedAsset(
+	caller: Member,
+	purpose: UploadPurpose,
+	mimeType: string,
+): Promise<string> {
+	const id = uuidv7();
+	await testDb.db.assets.create({
+		id,
+		organizationId: organizationId(caller),
+		storageKey: `organizations/${organizationId(caller)}/assets/${id}`,
+		mimeType,
+		byteSize: 8,
+		checksum: "c".repeat(64),
+		origin: {
+			source: "uploaded",
+			purpose,
+			filename: "front",
+			uploadedByUserId: caller.user.id,
+		},
+		processing: { status: "done", attempts: 0 },
+	});
+	return id;
+}
+
 async function fontFile(caller: Member): Promise<string> {
 	const asset = await testDb.db.assets.create(
 		generatedAsset(organizationId(caller), {
@@ -567,6 +593,73 @@ it("a letter exports one PDF", async () => {
 	});
 	expect(publish).toHaveBeenCalledExactlyOnceWith("asset.render-letter", {
 		assetId: assetIds[0],
+	});
+});
+
+it("a postcard's front image must be the organization's cover", async () => {
+	const ada = await member("ada-cover-letter");
+	const bob = await member("bob-cover-letter");
+	const { id } = await letters.createLetter(ada, {
+		format: "thanksio:postcard-6x9",
+	});
+	const { content, title } = await stored(ada, id);
+	const foreign = await storedAsset(bob, "cover", "image/jpeg");
+	const photo = await storedAsset(ada, "photo", "image/jpeg");
+	const cover = await storedAsset(ada, "cover", "image/png");
+	const withFront = (assetId: string): LetterContent => ({
+		...content,
+		doc: {
+			...content.doc,
+			attrs: { ...content.doc.attrs, frontImageAssetId: assetId },
+		},
+	});
+	for (const assetId of [foreign, photo]) {
+		await expect(
+			letters.saveLetter(ada, id, {
+				title,
+				content: withFront(assetId),
+				expectedRevision: 1,
+			}),
+		).rejects.toMatchObject({ kind: "invalid_input", code: "invalid_letter" });
+	}
+	expect((await stored(ada, id)).revision).toBe(1);
+	expect(
+		await letters.saveLetter(ada, id, {
+			title,
+			content: withFront(cover),
+			expectedRevision: 1,
+		}),
+	).toEqual({ revision: 2 });
+	const seen = await letters.getLetter(ada, id);
+	expect(seen?.content.doc.attrs.frontImageAssetId).toBe(cover);
+	expect(seen?.resources.frontImageAssetId).toBe(cover);
+});
+
+it("a postcard exports one PNG per side", async () => {
+	const ada = await member("ada-postcard-export");
+	const publish = vi.fn<Publisher["publish"]>(async () => {});
+	const exporting = new LetterService(testDb.db, { publish });
+	const { id } = await exporting.createLetter(ada, {
+		format: "thanksio:postcard-6x9",
+	});
+	const { assetIds } = await exporting.requestExport(ada, id, { revision: 1 });
+	expect(assetIds).toHaveLength(2);
+	const outputs = [];
+	for (const assetId of assetIds) {
+		const asset = await testDb.db.assets.byId(organizationId(ada), assetId);
+		const job = asset?.origin.source === "generated" ? asset.origin.job : null;
+		outputs.push(job?.kind === "render-letter" ? job.output : null);
+	}
+	expect(outputs).toEqual([
+		{ format: "png", side: 0 },
+		{ format: "png", side: 1 },
+	]);
+	expect(publish).toHaveBeenCalledTimes(2);
+	expect(publish).toHaveBeenNthCalledWith(1, "asset.render-letter", {
+		assetId: assetIds[0],
+	});
+	expect(publish).toHaveBeenNthCalledWith(2, "asset.render-letter", {
+		assetId: assetIds[1],
 	});
 });
 

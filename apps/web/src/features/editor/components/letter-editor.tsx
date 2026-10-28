@@ -43,6 +43,7 @@ import { AddSide } from "./add-side.tsx";
 import { EditorToolbar, useCoarsePointer } from "./editor-toolbar.tsx";
 import { ElementHandles, placementSentence } from "./element-handles.tsx";
 import { ExportButton } from "./export-button.tsx";
+import { FrontImagePicker } from "./front-image-picker.tsx";
 import { HumanSeal } from "./human-seal.tsx";
 import { LetterTitle } from "./letter-title.tsx";
 import { OverflowNotice } from "./overflow-notice.tsx";
@@ -556,6 +557,9 @@ export function LetterEditor({
 					/>
 					<div className="flex flex-wrap items-center justify-center gap-3">
 						<SidesIndicator sides={pageState.sides} maxPages={spec.maxPages} />
+						{editor && letter.editable && spec.front === "image" ? (
+							<FrontImagePicker editor={editor} />
+						) : null}
 						{editor && letter.editable ? (
 							<AddSide editor={editor} maxPages={spec.maxPages} />
 						) : null}

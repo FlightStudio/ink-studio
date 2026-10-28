@@ -244,6 +244,46 @@ it("a doodle in the barcode corner fails the export", async () => {
 	});
 });
 
+it("a postcard side has its own download name", async () => {
+	const ada = await member("ada-postcard-name");
+	const letters = new LetterService(testDb.db, { publish: async () => {} });
+	const { id } = await letters.createLetter(ada, {
+		format: "thanksio:postcard-6x9",
+	});
+	const letter = await testDb.db.letters.byId(
+		ada.userOrganization.organizationId,
+		id,
+	);
+	if (!letter) throw new Error("the letter is not stored");
+	const asset = await testDb.db.assets.create(
+		generatedAsset(ada.userOrganization.organizationId, {
+			kind: "render-letter",
+			letterId: id,
+			title: "Hello from the pier",
+			content: letter.content,
+			mergeValues: SAMPLE_MERGE_VALUES,
+			output: { format: "png", side: 1 },
+		}),
+	);
+	const { renderer } = rendererReturning(
+		{ lineTopsIn: [1], textBottomIn: 2, wordsPastLimit: 0 },
+		Uint8Array.from([9, 9]),
+	);
+	const processor = processorFor(renderer);
+	await processor.process(message(processor, asset.id));
+	const stored = await testDb.db.assets.byId(
+		ada.userOrganization.organizationId,
+		asset.id,
+	);
+	expect(stored?.mimeType).toBe("image/png");
+	await assets.getAssetReadUrl(ada.userOrganization, asset.id);
+	expect(storage.signedReadUrl).toHaveBeenCalledWith({
+		key: stored?.storageKey,
+		expiresInSeconds: 300,
+		downloadName: "hello-from-the-pier-proof-side-1.png",
+	});
+});
+
 it("the export is a PDF proof with a safe download name", async () => {
 	const ada = await member("ada-export-name");
 	const content = await freshContent(ada);

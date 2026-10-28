@@ -614,6 +614,7 @@ components:
         - photo
         - mask
         - font-file
+        - cover
     UploadedAsset:
       type: object
       additionalProperties: false

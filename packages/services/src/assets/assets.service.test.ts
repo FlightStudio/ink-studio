@@ -46,6 +46,15 @@ const OTF = bytes([
 	0x20,
 	...ascii("CFF "),
 ]);
+const WEBP = bytes([
+	...ascii("RIFF"),
+	0x00,
+	0x00,
+	0x00,
+	0x00,
+	...ascii("WEBP"),
+	...ascii("VP8 "),
+]);
 const WOFF = bytes([
 	...ascii("wOFF"),
 	0x00,
@@ -209,6 +218,22 @@ it("a type the purpose does not take is refused", async () => {
 		upload(ada, "font-file", "heart.ttf", PNG),
 	).rejects.toMatchObject({ kind: "invalid_input", code: "unsupported_file" });
 	expect(storage.put).not.toHaveBeenCalled();
+});
+
+it("a cover takes JPEG and PNG, not WebP, and can be read back", async () => {
+	const ada = await member("ada-cover");
+	expect((await upload(ada, "cover", "front.jpg", JPEG)).mimeType).toBe(
+		"image/jpeg",
+	);
+	const png = await upload(ada, "cover", "front.png", PNG);
+	expect(png.mimeType).toBe("image/png");
+	await expect(upload(ada, "cover", "front.webp", WEBP)).rejects.toMatchObject({
+		kind: "invalid_input",
+		code: "unsupported_file",
+	});
+	expect(await assets.getAssetReadUrl(ada.userOrganization, png.id)).toBe(
+		`https://storage.test/${png.storageKey}?signed`,
+	);
 });
 
 it("TrueType and OpenType are taken, WOFF is not", async () => {

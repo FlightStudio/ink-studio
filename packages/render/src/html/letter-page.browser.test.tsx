@@ -49,6 +49,7 @@ const resources: LetterResources = {
 	stockFontBaseUrl: "https://letter.invalid/stock/",
 	fonts: {},
 	drawings: {},
+	frontImageAssetId: null,
 };
 
 let browsers: TestBrowsers | undefined;

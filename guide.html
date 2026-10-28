@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, a doodle library, moving a placed doodle, lifting ink from a photo in the worker, photographing a doodle, building a drawn handwriting font, writing a letter in that hand, making a font from a photo of the printed template, building a font from an uploaded font file, and exporting a proof are ready on your own computer.</p>
-  <div class="progress" aria-hidden="true"><span style="width:86%"></span></div>
-  <p class="log">31 of 36 steps in the repository. Step 31 exports a proof from the render pool.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, a doodle library, moving a placed doodle, lifting ink from a photo in the worker, photographing a doodle, building a drawn handwriting font, writing a letter in that hand, making a font from a photo of the printed template, building a font from an uploaded font file, exporting a proof, and making a postcard are ready on your own computer.</p>
+  <div class="progress" aria-hidden="true"><span style="width:89%"></span></div>
+  <p class="log">32 of 36 steps in the repository. Step 32 makes postcards.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -679,7 +679,27 @@ pnpm --filter worker test --reporter=verbose</pre>
       <p>The names read like “an export of a stale revision is refused”, “an export carries the letter as it was and one recipient's values”, “a letter exports one PDF”, “a teammate cannot export a letter in Karla's hand”, “text that does not fit fails the export with its reason”, “a doodle in the barcode corner fails the export”, and “the overflow fixture fails as overflow and the one-and-a-half fixture prints two pages”.</p>
       <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, 327 tests, including 4 new letter service tests and 5 new worker tests, one of them in Chromium. Exporting from an iPad is still unchecked. There is no iPad in this setup.</p>
     </details>
-    <details id="step-32"><summary><span class="tag later">Later</span> 32. Postcards</summary><p>Pick the product, choose the front image, export two PNGs.</p></details>
+    <details id="step-32">
+      <summary><span class="tag done">Done</span> 32. Postcards</summary>
+      <p>You can make a postcard as well as a letter. The front is one picture, edge to edge. The back is where you write, and the address block in the bottom right stays clear. The proof is two pictures, one for each side, at the size Thanks.io prints.</p>
+      <ul class="points">
+        <li>From Letters, New letter or Start a letter opens a choice. Letter comes first. Postcard 6 × 9 is the other card, with its size.</li>
+        <li>A new postcard shows “Choose a front image” on the front and “2 of 2 sides” under the page. There is no Add a side.</li>
+        <li>Choose a front image takes a JPEG or PNG. It fills the front. Undo takes it off again. The list names the product under the title.</li>
+        <li>Writing on the back stays out of the hatched address block.</li>
+        <li>Export proof, with the render worker running, makes two downloads. Each file is a PNG, 2738 by 1838 pixels, and the back’s name ends in side 1.</li>
+      </ul>
+      <p>The render worker has to be running for the proof. After <code>git pull</code> and <code>pnpm install</code>:</p>
+      <pre>docker compose up -d
+pnpm dev</pre>
+      <p>Open <a href="http://127.0.0.1:3000/letters/new">http://127.0.0.1:3000/letters/new</a>, pick Postcard 6 × 9, choose a front image, write on the back, and export the proof.</p>
+      <p>The tests run on throwaway Postgres, and one of them prints the back in Chromium:</p>
+      <pre>pnpm --filter @repo/services test --reporter=verbose
+pnpm --filter worker test --reporter=verbose
+pnpm --filter web test:e2e</pre>
+      <p>The names read like “a cover takes JPEG and PNG, not WebP, and can be read back”, “a postcard's front image must be the organization's cover”, “a postcard exports one PNG per side”, “a postcard side has its own download name”, “a postcard's back renders as a 2738×1838 PNG with no ink in the address block”, “a new postcard shows a front to fill and a back to write on”, and “a postcard proof downloads two PNGs”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, 332 tests, including 3 new service tests and 2 new worker tests, one of them in Chromium. Making a postcard on an iPad is still unchecked. There is no iPad in this setup.</p>
+    </details>
 
     <h3>M9. Merge fields and signature</h3>
     <details id="step-33"><summary><span class="tag later">Later</span> 33. Merge fields</summary><p>Type @ for first name and last name.</p></details>

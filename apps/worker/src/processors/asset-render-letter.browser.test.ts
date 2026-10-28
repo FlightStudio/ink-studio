@@ -7,6 +7,7 @@ import { AssetService } from "@repo/services/assets";
 import { LetterService } from "@repo/services/letters";
 import { startTestBrowser, type TestBrowsers } from "@repo/testing/browser";
 import type { Member } from "@repo/types";
+import sharp from "sharp";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { AssetRenderLetterProcessor } from "./asset-render-letter.ts";
 
@@ -120,4 +121,62 @@ it("the overflow fixture fails as overflow and the one-and-a-half fixture prints
 	if (!pdf) throw new Error("the proof was not stored");
 	const text = Buffer.from(pdf).toString("latin1");
 	expect(text.match(/\/Type\s*\/Page\b/g)).toHaveLength(2);
+});
+
+it("a postcard's back renders as a 2738×1838 PNG with no ink in the address block", async () => {
+	const ada = await member("ada-postcard-back");
+	const letters = new LetterService(testDb.db, { publish: async () => {} });
+	const created = await letters.createLetter(ada, {
+		format: "thanksio:postcard-6x9",
+	});
+	await letters.saveLetter(ada, created.id, {
+		title: "From the pier",
+		content: fixtureContent(letterFixture("postcard-back")),
+		expectedRevision: 1,
+	});
+	const exported = await letters.requestExport(ada, created.id, {
+		revision: 2,
+	});
+	const organizationId = ada.userOrganization.organizationId;
+	let backId = "";
+	for (const assetId of exported.assetIds) {
+		const asset = await testDb.db.assets.byId(organizationId, assetId);
+		if (
+			asset?.origin.source === "generated" &&
+			asset.origin.job.kind === "render-letter" &&
+			asset.origin.job.output.format === "png" &&
+			asset.origin.job.output.side === 1
+		) {
+			backId = assetId;
+		}
+	}
+	const processor = new AssetRenderLetterProcessor({
+		db: testDb.db,
+		assets,
+		storage,
+		renderer,
+		stockFontsDir,
+	});
+	await processor.process({
+		id: backId,
+		type: processor.type,
+		data: { assetId: backId },
+		attributes: {},
+	});
+	const stored = await testDb.db.assets.byId(organizationId, backId);
+	const png = stored ? files.get(stored.storageKey) : undefined;
+	if (!png) throw new Error("the proof was not stored");
+	const meta = await sharp(png).metadata();
+	expect(meta.width).toBe(2738);
+	expect(meta.height).toBe(1838);
+	const block = await sharp(png)
+		.extract({ left: 2738 - 1193, top: 1838 - 923, width: 1193, height: 923 })
+		.removeAlpha()
+		.raw()
+		.toBuffer();
+	let darkest = 255;
+	for (const value of block) {
+		if (value < darkest) darkest = value;
+	}
+	expect(darkest).toBeGreaterThanOrEqual(250);
 });

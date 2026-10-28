@@ -21,6 +21,7 @@ const resources: LetterResources = {
 	stockFontBaseUrl: "https://letter.invalid/stock/",
 	fonts: { [OWN_FONT_ID]: OWN_FONT_ASSET_ID },
 	drawings: { [DRAWING_ID]: { maskAssetId: MASK_ASSET_ID, aspect: 1 } },
+	frontImageAssetId: null,
 };
 
 function withParagraphs(
