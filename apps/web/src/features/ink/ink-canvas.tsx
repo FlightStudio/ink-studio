@@ -28,6 +28,7 @@ export type InkCanvasProps = {
 	background?: ReactNode;
 	strokeScale?: number;
 	composite?: "source-over" | "destination-out";
+	underlay?: CanvasImageSource | null;
 	onStrokeEnd(strokes: Stroke[]): void;
 	ref?: Ref<InkCanvasHandle>;
 	className?: string;
@@ -69,6 +70,7 @@ export function InkCanvas({
 	background,
 	strokeScale = 1,
 	composite = "source-over",
+	underlay = null,
 	onStrokeEnd,
 	ref,
 	className,
@@ -108,6 +110,10 @@ export function InkCanvas({
 		context.globalCompositeOperation = "source-over";
 		context.clearRect(0, 0, canvas.width, canvas.height);
 		context.setTransform(ratio, 0, 0, ratio, 0, 0);
+		if (underlay) {
+			context.globalCompositeOperation = "source-over";
+			context.drawImage(underlay, 0, 0, widthPx, heightPx);
+		}
 		context.globalCompositeOperation = composite;
 		context.fillStyle = getComputedStyle(canvas).color;
 		const { strokes, active } = session.current;
@@ -117,7 +123,7 @@ export function InkCanvas({
 				new Path2D(outlinePath(strokeOutline(active.stroke, strokeScale))),
 			);
 		}
-	}, [widthPx, strokeScale, composite]);
+	}, [widthPx, heightPx, strokeScale, composite, underlay]);
 
 	const dispatch = useCallback(
 		(event: PointerSessionEvent) => {

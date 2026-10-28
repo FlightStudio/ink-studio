@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, a doodle library, moving a placed doodle, and lifting ink from a photo in the worker are ready on your own computer.</p>
-  <div class="progress" aria-hidden="true"><span style="width:69%"></span></div>
-  <p class="log">25 of 36 steps in the repository. Step 21 asks the worker to lift the ink out of a photo.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, a doodle library, moving a placed doodle, lifting ink from a photo in the worker, and photographing a doodle are ready on your own computer.</p>
+  <div class="progress" aria-hidden="true"><span style="width:72%"></span></div>
+  <p class="log">26 of 36 steps in the repository. Step 22 lets you photograph a doodle, crop and erase it, and save it.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -480,7 +480,24 @@ pnpm --filter worker test --reporter=verbose</pre>
       <p>The names read like “only a photo can be lifted”, “a lift request is a pending asset published after it commits”, and “the processor stores the lifted mask”.</p>
       <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, 277 tests, including 3 new drawing service tests and 3 worker lift tests. Lifting a photo on an iPad is still unchecked, because this step has no screen. There is no iPad in this setup.</p>
     </details>
-    <details id="step-22"><summary><span class="tag later">Later</span> 22. Crop and erase a photo doodle</summary><p>Crop, erase leftovers, save to the library.</p></details>
+    <details id="step-22">
+      <summary><span class="tag done">Done</span> 22. Crop and erase a photo doodle</summary>
+      <p>You can photograph a doodle, wait while the ink is lifted off the paper, crop it, rub out what you do not want, and save it in the library like a doodle you drew.</p>
+      <ul class="points">
+        <li>Open a letter, open the library, and choose Photograph. The file picker accepts JPEG, PNG and WebP. It does not offer HEIC.</li>
+        <li>While the worker lifts the ink, a status pill reads “Lifting the ink”. If that is still going after two minutes, the dialog says “This is taking longer than usual” and offers to try again.</li>
+        <li>The ink shows on the paper in your ink colour. Drag a corner of the frame to keep part of it. The eraser is a brush, the slider sets its size, and Undo takes the last stroke back.</li>
+        <li>Save stores the cropped picture and remembers the photo it came from. The library lists it, and tapping it places it like any other doodle.</li>
+      </ul>
+      <p>The worker has to be running, because the website only asks for the lift. After <code>git pull</code> and <code>pnpm install</code>:</p>
+      <pre>docker compose up -d
+pnpm dev</pre>
+      <p>Open <a href="http://127.0.0.1:3000">http://127.0.0.1:3000</a>, open a letter, then Library, then Photograph. A photo of ink on ruled paper is the one to try.</p>
+      <p>The browser journeys are:</p>
+      <pre>pnpm --filter web test:e2e</pre>
+      <p>The names read like “a photographed doodle becomes a library drawing”, “erasing through the ink clears exactly what was erased”, “the file picker does not offer HEIC”, and “a lift that takes too long says so”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, 280 tests, including 3 new drawing service tests, and <code>pnpm test:e2e</code>, 32 browser journeys including the four new photo journeys. Photographing a doodle on an iPad is still unchecked. There is no iPad in this setup.</p>
+    </details>
 
     <h3>M7. Handwriting fonts (separable)</h3>
     <details id="step-23">

@@ -30,3 +30,10 @@ export const drawnSourceSchema: z.ZodType<
 	}),
 	strokes: z.array(strokeSchema).max(DRAWING_LIMITS.strokes),
 });
+
+export const photoSourceSchema: z.ZodType<
+	Extract<DrawingSource, { kind: "photo" }>
+> = z.strictObject({
+	kind: z.literal("photo"),
+	photoAssetId: z.uuid(),
+});
