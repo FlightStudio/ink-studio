@@ -6,7 +6,7 @@ import {
 	requestLift,
 	uploadFile,
 } from "@repo/api";
-import type { LibraryDrawing } from "@repo/types";
+import type { DrawingKind, LibraryDrawing } from "@repo/types";
 import { StatusPill } from "@repo/ui/components/status-pill";
 import { Button } from "@repo/ui/components/ui/button";
 import {
@@ -27,6 +27,7 @@ export type PhotoDoodleDialogProps = {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	onSaved: (drawing: LibraryDrawing) => void;
+	kind?: DrawingKind;
 };
 
 type Phase = "pick" | "lifting" | "edit" | "failed";
@@ -35,19 +36,25 @@ export function PhotoDoodleDialog({
 	open,
 	onOpenChange,
 	onSaved,
+	kind = "doodle",
 }: PhotoDoodleDialogProps) {
+	const signature = kind === "signature";
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
 				<DialogHeader>
-					<DialogTitle>Photograph a doodle</DialogTitle>
+					<DialogTitle>
+						{signature ? "Photograph a signature" : "Photograph a doodle"}
+					</DialogTitle>
 					<DialogDescription>
-						Choose a photo of ink on paper. Crop and erase, then save it to the
-						library.
+						{signature
+							? "Choose a photo of ink on paper. Crop and erase, then save your signature."
+							: "Choose a photo of ink on paper. Crop and erase, then save it to the library."}
 					</DialogDescription>
 				</DialogHeader>
 				{open ? (
 					<PhotoForm
+						kind={kind}
 						onSaved={(drawing) => {
 							onSaved(drawing);
 							onOpenChange(false);
@@ -60,8 +67,10 @@ export function PhotoDoodleDialog({
 }
 
 function PhotoForm({
+	kind,
 	onSaved,
 }: {
+	kind: DrawingKind;
 	onSaved: (drawing: LibraryDrawing) => void;
 }) {
 	const file = useRef<HTMLInputElement>(null);
@@ -75,7 +84,9 @@ function PhotoForm({
 	);
 	const [polling, setPolling] = useState(false);
 	const [slow, setSlow] = useState(false);
-	const [name, setName] = useState("Doodle");
+	const [name, setName] = useState(
+		kind === "signature" ? "Signature" : "Doodle",
+	);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const trimmed = name.trim();
@@ -172,28 +183,40 @@ function PhotoForm({
 				{ headers: { "x-file-name": encodeURIComponent(`${trimmed}.png`) } },
 			);
 			if (uploaded.status !== 201) {
-				setError("That doodle could not be saved.");
+				setError(
+					kind === "signature"
+						? "That signature could not be saved."
+						: "That doodle could not be saved.",
+				);
 				return;
 			}
 			const created = await createDrawing({
-				kind: "doodle",
+				kind,
 				name: trimmed,
 				maskAssetId: uploaded.data.id,
 				source: { kind: "photo", photoAssetId },
 			});
 			if (created.status !== 201) {
-				setError("That doodle could not be saved.");
+				setError(
+					kind === "signature"
+						? "That signature could not be saved."
+						: "That doodle could not be saved.",
+				);
 				return;
 			}
 			onSaved({
 				id: created.data.id,
-				kind: "doodle",
+				kind,
 				name: trimmed,
 				aspect: composed.aspect,
 				maskAssetId: uploaded.data.id,
 			});
 		} catch {
-			setError("That doodle could not be saved.");
+			setError(
+				kind === "signature"
+					? "That signature could not be saved."
+					: "That doodle could not be saved.",
+			);
 		} finally {
 			setSaving(false);
 		}
@@ -255,7 +278,7 @@ function PhotoForm({
 					disabled={trimmed === "" || saving}
 					onClick={() => void save()}
 				>
-					Save doodle
+					{kind === "signature" ? "Save signature" : "Save doodle"}
 				</Button>
 			) : null}
 		</div>

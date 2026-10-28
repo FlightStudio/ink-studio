@@ -211,6 +211,77 @@ it("text that does not fit fails the export with its reason", async () => {
 	});
 });
 
+it("a signed letter's export loads the signature mask", async () => {
+	const ada = await member("ada-export-signature");
+	const maskId = crypto.randomUUID();
+	const key = `organizations/${ada.userOrganization.organizationId}/assets/${maskId}`;
+	const bytes = Uint8Array.from([4, 5, 6]);
+	await testDb.db.assets.create({
+		id: maskId,
+		organizationId: ada.userOrganization.organizationId,
+		storageKey: key,
+		mimeType: "image/png",
+		byteSize: bytes.byteLength,
+		checksum: "d".repeat(64),
+		origin: {
+			source: "uploaded",
+			purpose: "mask",
+			filename: "sign.png",
+			uploadedByUserId: ada.user.id,
+		},
+		processing: { status: "done", attempts: 0 },
+	});
+	await storage.put({ key, bytes, contentType: "image/png" });
+	const drawing = await testDb.db.drawings.create({
+		organizationId: ada.userOrganization.organizationId,
+		ownerUserId: ada.user.id,
+		kind: "signature",
+		name: "Ada",
+		source: {
+			kind: "drawn",
+			box: { widthPx: 30, heightPx: 10 },
+			strokes: [],
+		},
+		maskAssetId: maskId,
+		aspect: 3,
+	});
+	const base = await freshContent(ada);
+	const content: LetterContent = {
+		...base,
+		doc: {
+			...base.doc,
+			content: [
+				...base.doc.content,
+				{
+					type: "signature",
+					attrs: {
+						drawingId: drawing.id,
+						widthIn: 2.25,
+						align: "right",
+						color: "ink-blue",
+					},
+				},
+			],
+		},
+	};
+	const { assetId } = await exportLetter(ada, content, "Signed");
+	const measure = vi.fn<PrintRenderer["measure"]>(async () => ({
+		lineTopsIn: [1],
+		textBottomIn: 2,
+		wordsPastLimit: 0,
+	}));
+	const render = vi.fn<PrintRenderer["render"]>(async () =>
+		Uint8Array.from([1]),
+	);
+	const processor = processorFor({ measure, render });
+	await processor.process(message(processor, assetId));
+	const resources = measure.mock.calls[0]?.[0].resources;
+	expect(
+		resources?.get(`https://letter.invalid/assets/${maskId}`)?.bytes,
+	).toEqual(bytes);
+	expect(render).toHaveBeenCalled();
+});
+
 it("a doodle in the barcode corner fails the export", async () => {
 	const ada = await member("ada-export-barcode");
 	const maskId = crypto.randomUUID();

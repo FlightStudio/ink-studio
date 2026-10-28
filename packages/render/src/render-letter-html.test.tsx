@@ -79,6 +79,55 @@ function urlsIn(html: string): string[] {
 }
 
 describe("renderLetterHtml", () => {
+	test("the signature's mask URL comes from the resources", () => {
+		const signatureId = "0190a8d6-5c1e-7b3a-9f00-000000000008";
+		const content = fixtureContent(letterFixture("note"));
+		content.doc.content = [
+			...content.doc.content,
+			{
+				type: "signature",
+				attrs: {
+					drawingId: signatureId,
+					widthIn: 2.25,
+					align: "right",
+					color: "sepia",
+				},
+			},
+		];
+		const signedResources: LetterResources = {
+			...resources,
+			drawings: {
+				...resources.drawings,
+				[signatureId]: { maskAssetId: MASK_ASSET_ID, aspect: 3 },
+			},
+		};
+		const html = renderLetterHtml({
+			letterId: LETTER_ID,
+			content,
+			resources: signedResources,
+			mergeValues: SAMPLE_MERGE_VALUES,
+		});
+		expect(html).toContain(`${resources.assetBaseUrl}${MASK_ASSET_ID}`);
+		expect(html).toContain(`data-signature="${signatureId}"`);
+	});
+
+	test("a signature drawing the resources lack throws", () => {
+		const content = fixtureContent(letterFixture("note"));
+		content.doc.content = [
+			...content.doc.content,
+			{
+				type: "signature",
+				attrs: {
+					drawingId: "0190a8d6-5c1e-7b3a-9f00-0000000000ee",
+					widthIn: 3,
+					align: "center",
+					color: "ink-blue",
+				},
+			},
+		];
+		expect(() => render(content)).toThrow();
+	});
+
 	test("a chip prints the recipient's value", () => {
 		const content = withParagraphs(fixtureContent(letterFixture("note")), [
 			{

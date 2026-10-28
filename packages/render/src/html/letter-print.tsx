@@ -1,5 +1,15 @@
-import type { LetterDoc, MergeFieldKey, MergeValues } from "@repo/types";
-import { MERGE_FIELDS, PAGE_SPECS } from "@repo/types";
+import type {
+	LetterDoc,
+	MergeFieldKey,
+	MergeValues,
+	SignatureNode,
+} from "@repo/types";
+import {
+	INK_COLORS,
+	MERGE_FIELDS,
+	PAGE_SPECS,
+	SIGNATURE_WIDTHS,
+} from "@repo/types";
 import type { DOMOutputSpec, Node } from "@tiptap/pm/model";
 import type { NodeProps } from "@tiptap/static-renderer";
 import {
@@ -10,6 +20,7 @@ import React, { type ReactElement, type ReactNode } from "react";
 import { letterExtensions } from "../schema/letter-schema.ts";
 import { LetterPage, type LetterPageProps } from "./letter-page.tsx";
 import { MergeChip } from "./merge-chip.tsx";
+import { SignatureMark } from "./signature-mark.tsx";
 
 export type LetterPrintProps = Pick<
 	LetterPageProps,
@@ -31,6 +42,30 @@ function StaticParagraph({
 	);
 }
 
+function signatureAttrs(node: Node): SignatureNode["attrs"] {
+	const { drawingId, widthIn, align, color } = node.attrs;
+	const width = SIGNATURE_WIDTHS.find((value) => value === widthIn);
+	if (
+		typeof drawingId !== "string" ||
+		width === undefined ||
+		(align !== "left" && align !== "center" && align !== "right") ||
+		typeof color !== "string" ||
+		!Object.hasOwn(INK_COLORS, color)
+	) {
+		throw new Error("The letter's signature is not one the catalogue allows.");
+	}
+	return {
+		drawingId,
+		widthIn: width,
+		align,
+		color: color as SignatureNode["attrs"]["color"],
+	};
+}
+
+function StaticSignature({ node }: NodeProps<Node, ReactNode>): ReactElement {
+	return <SignatureMark {...signatureAttrs(node)} />;
+}
+
 function StaticMergeField({ node }: NodeProps<Node, ReactNode>): ReactElement {
 	const field = node.attrs.field;
 	if (typeof field !== "string" || !Object.hasOwn(MERGE_FIELDS, field)) {
@@ -49,6 +84,7 @@ export function LetterText({ doc }: { doc: LetterDoc }): ReactElement {
 					nodeMapping: {
 						paragraph: StaticParagraph,
 						mergeField: StaticMergeField,
+						signature: StaticSignature,
 					},
 				},
 			})}

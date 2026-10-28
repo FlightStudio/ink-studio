@@ -1,7 +1,9 @@
 "use client";
 
 import { deleteDrawing, renameDrawing } from "@repo/api";
-import type { LibraryDrawing } from "@repo/types";
+import type { InkColorId, LibraryDrawing } from "@repo/types";
+import { INK_COLORS, SIGNATURE_WIDTHS } from "@repo/types";
+import { Swatch } from "@repo/ui/components/swatch";
 import { Button } from "@repo/ui/components/ui/button";
 import {
 	Sheet,
@@ -31,25 +33,56 @@ function useNarrow(): boolean {
 	);
 }
 
+export type LibraryTab = "doodle" | "signature";
+
 export type LibrarySheetProps = {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	drawings: LibraryDrawing[];
+	doodles: LibraryDrawing[];
+	signatures: LibraryDrawing[];
+	tab: LibraryTab;
+	onTab: (tab: LibraryTab) => void;
 	onPlace: (drawing: LibraryDrawing) => void;
+	onSign: (
+		drawing: LibraryDrawing,
+		choice: {
+			widthIn: (typeof SIGNATURE_WIDTHS)[number];
+			color: InkColorId;
+		},
+	) => void;
 };
 
 export function LibrarySheet({
 	open,
 	onOpenChange,
-	drawings: initial,
+	doodles: initialDoodles,
+	signatures: initialSignatures,
+	tab,
+	onTab,
 	onPlace,
+	onSign,
 }: LibrarySheetProps) {
 	const narrow = useNarrow();
-	const [drawings, setDrawings] = useState(initial);
+	const [doodles, setDoodles] = useState(initialDoodles);
+	const [signatures, setSignatures] = useState(initialSignatures);
 	const [drawOpen, setDrawOpen] = useState(false);
 	const [photoOpen, setPhotoOpen] = useState(false);
 	const [renaming, setRenaming] = useState<string | null>(null);
 	const [draft, setDraft] = useState("");
+	const [widthIn, setWidthIn] =
+		useState<(typeof SIGNATURE_WIDTHS)[number]>(2.25);
+	const [color, setColor] = useState<InkColorId>("ink-blue");
+	const signature = tab === "signature";
+	const drawings = signature ? signatures : doodles;
+	const kind = signature ? "signature" : "doodle";
+
+	function replace(
+		drawingKind: LibraryDrawing["kind"],
+		update: (current: LibraryDrawing[]) => LibraryDrawing[],
+	) {
+		if (drawingKind === "signature") setSignatures(update);
+		else setDoodles(update);
+	}
 
 	async function saveName(drawing: LibraryDrawing) {
 		const name = draft.trim();
@@ -59,7 +92,7 @@ export function LibrarySheet({
 		}
 		const response = await renameDrawing(drawing.id, { name });
 		if (response.status === 204) {
-			setDrawings((current) =>
+			replace(drawing.kind, (current) =>
 				current.map((item) =>
 					item.id === drawing.id ? { ...item, name } : item,
 				),
@@ -71,7 +104,7 @@ export function LibrarySheet({
 	async function remove(drawing: LibraryDrawing) {
 		const response = await deleteDrawing(drawing.id);
 		if (response.status === 204) {
-			setDrawings((current) =>
+			replace(drawing.kind, (current) =>
 				current.filter((item) => item.id !== drawing.id),
 			);
 		}
@@ -87,13 +120,73 @@ export function LibrarySheet({
 					<SheetHeader>
 						<SheetTitle>Library</SheetTitle>
 						<SheetDescription>
-							Doodles saved for this studio. Tap one to put it on the page.
+							{signature
+								? "Signatures belong to you. Pick a size and an ink, then tap one to sign."
+								: "Doodles saved for this studio. Tap one to put it on the page."}
 						</SheetDescription>
 					</SheetHeader>
 					<div className="flex flex-col gap-3 px-4 pb-4">
+						<div className="flex gap-2" role="tablist" aria-label="Library">
+							<Button
+								type="button"
+								role="tab"
+								aria-selected={tab === "doodle"}
+								variant={tab === "doodle" ? "default" : "outline"}
+								onClick={() => onTab("doodle")}
+							>
+								Doodles
+							</Button>
+							<Button
+								type="button"
+								role="tab"
+								aria-selected={tab === "signature"}
+								variant={tab === "signature" ? "default" : "outline"}
+								onClick={() => onTab("signature")}
+							>
+								Signatures
+							</Button>
+						</div>
+						{signature ? (
+							<>
+								<fieldset
+									aria-label="Width"
+									className="m-0 flex gap-2 border-0 p-0"
+								>
+									{SIGNATURE_WIDTHS.map((width) => (
+										<Button
+											key={width}
+											type="button"
+											size="sm"
+											variant={widthIn === width ? "default" : "outline"}
+											aria-pressed={widthIn === width}
+											onClick={() => setWidthIn(width)}
+										>
+											{width} in
+										</Button>
+									))}
+								</fieldset>
+								<fieldset
+									aria-label="Ink"
+									className="m-0 flex flex-wrap gap-1 border-0 p-0"
+								>
+									{Object.entries(INK_COLORS).map(([id, ink]) => (
+										<Swatch
+											key={id}
+											color={ink.css}
+											label={ink.label}
+											selected={color === id}
+											labelHidden
+											onSelect={() => setColor(id as InkColorId)}
+										/>
+									))}
+								</fieldset>
+							</>
+						) : null}
 						{drawings.length === 0 ? (
 							<p className="text-ui text-ink-muted">
-								Nothing saved yet. Draw one, or photograph one.
+								{signature
+									? "No signatures yet. Draw one, or photograph one."
+									: "Nothing saved yet. Draw one, or photograph one."}
 							</p>
 						) : null}
 						<div className="flex gap-2">
@@ -118,7 +211,11 @@ export function LibrarySheet({
 										<button
 											type="button"
 											className="flex min-w-0 flex-1 items-center gap-3 text-left"
-											onClick={() => onPlace(drawing)}
+											onClick={() =>
+												signature
+													? onSign(drawing, { widthIn, color })
+													: onPlace(drawing)
+											}
 										>
 											<span
 												aria-hidden
@@ -183,12 +280,18 @@ export function LibrarySheet({
 			<DrawDoodleDialog
 				open={drawOpen}
 				onOpenChange={setDrawOpen}
-				onSaved={(drawing) => setDrawings((current) => [drawing, ...current])}
+				kind={kind}
+				onSaved={(drawing) =>
+					replace(drawing.kind, (current) => [drawing, ...current])
+				}
 			/>
 			<PhotoDoodleDialog
 				open={photoOpen}
 				onOpenChange={setPhotoOpen}
-				onSaved={(drawing) => setDrawings((current) => [drawing, ...current])}
+				kind={kind}
+				onSaved={(drawing) =>
+					replace(drawing.kind, (current) => [drawing, ...current])
+				}
 			/>
 		</>
 	);

@@ -46,9 +46,10 @@ export type {
 	ParagraphNode,
 	PlacedElement,
 	SealFont,
+	SignatureNode,
 	TextNode,
 } from "./letter.ts";
-export { humanSeal } from "./letter.ts";
+export { humanSeal, SIGNATURE_WIDTHS } from "./letter.ts";
 export type { MergeFieldKey, MergeValues } from "./merge-field.ts";
 export {
 	LONGEST_MERGE_VALUES,

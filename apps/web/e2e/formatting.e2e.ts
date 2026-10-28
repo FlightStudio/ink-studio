@@ -119,9 +119,13 @@ describe("formatting from the toolbar", () => {
 		expect(style?.family.startsWith("stock-homemade-apple")).toBe(true);
 		expect(style?.color).toBe(rgbOf(INK_COLORS.oxblood.css));
 		const stored = await harness.letters.getLetter(member, letterId);
-		const alex = stored?.content.doc.content[0]?.content?.find(
-			(node) => node.type === "text" && node.text === "Alex",
-		);
+		const block = stored?.content.doc.content[0];
+		const alex =
+			block?.type === "paragraph"
+				? block.content?.find(
+						(node) => node.type === "text" && node.text === "Alex",
+					)
+				: undefined;
 		expect(alex?.marks).toEqual([
 			{
 				type: "ink",
@@ -149,9 +153,11 @@ describe("formatting from the toolbar", () => {
 		expect(await letterText(page).textContent()).toBe("Dear Alex");
 		await expect
 			.poll(
-				async () =>
-					(await harness.letters.getLetter(member, letterId))?.content.doc
-						.content[0]?.content,
+				async () => {
+					const block = (await harness.letters.getLetter(member, letterId))
+						?.content.doc.content[0];
+					return block?.type === "paragraph" ? block.content : undefined;
+				},
 				{ timeout: 10_000 },
 			)
 			.toEqual([{ type: "text", text: "Dear Alex" }]);
@@ -171,6 +177,9 @@ describe("formatting from the toolbar", () => {
 			.evaluate((paragraph) => getComputedStyle(paragraph).textAlign);
 		expect(align).toBe("center");
 		const stored = await harness.letters.getLetter(member, letterId);
-		expect(stored?.content.doc.content[0]?.attrs.align).toBe("center");
+		const block = stored?.content.doc.content[0];
+		expect(block?.type === "paragraph" ? block.attrs.align : undefined).toBe(
+			"center",
+		);
 	});
 });

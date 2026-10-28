@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { DeskMessage } from "@/features/editor/components/desk-message";
 import { LetterEditor } from "@/features/editor/components/letter-editor";
-import { listDoodles } from "@/server/drawings";
+import { listDoodles, listSignatures } from "@/server/drawings";
 import { listFonts } from "@/server/fonts";
 import { getLetter } from "@/server/letters";
 
@@ -32,12 +32,14 @@ export default async function LetterEditorPage({ params }: Props) {
 		);
 	}
 	const doodles = letter.editable ? await listDoodles() : [];
+	const signatures = letter.editable ? await listSignatures() : [];
 	const fonts = await listFonts();
 	return (
 		<LetterEditor
 			key={`${letter.id}:${letter.revision}`}
 			letter={letter}
 			doodles={doodles}
+			signatures={signatures}
 			fonts={fonts}
 		/>
 	);

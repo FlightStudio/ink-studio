@@ -3,6 +3,8 @@ import type { InkColorId, TextSizePt } from "./ink.ts";
 import type { MergeFieldKey } from "./merge-field.ts";
 import type { PageFormatId } from "./page.ts";
 
+export const SIGNATURE_WIDTHS = [1.5, 2.25, 3] as const;
+
 export type Align = "left" | "center" | "right";
 export type FontRef =
 	| { kind: "stock"; id: StockFontId }
@@ -29,6 +31,15 @@ export type ParagraphNode = {
 	attrs: { align: Align };
 	content?: InlineNode[];
 };
+export type SignatureNode = {
+	type: "signature";
+	attrs: {
+		drawingId: string;
+		widthIn: (typeof SIGNATURE_WIDTHS)[number];
+		align: Align;
+		color: InkColorId;
+	};
+};
 
 export type PlacedElement = {
 	id: string;
@@ -50,7 +61,7 @@ export type LetterDoc = {
 		minSides: number;
 		frontImageAssetId: string | null;
 	};
-	content: ParagraphNode[];
+	content: (ParagraphNode | SignatureNode)[];
 };
 export type LetterContent = {
 	schemaVersion: 1;
@@ -82,9 +93,14 @@ export function humanSeal(
 ): string | null {
 	let visible = 0;
 	let handwritten = 0;
+	let signed = false;
 	const owners = new Set<string>();
-	for (const paragraph of content.doc.content) {
-		for (const node of paragraph.content ?? []) {
+	for (const block of content.doc.content) {
+		if (block.type === "signature") {
+			signed = true;
+			continue;
+		}
+		for (const node of block.content ?? []) {
 			if (node.type !== "text") continue;
 			const ink = node.marks?.find((mark) => mark.type === "ink");
 			const font = ink?.attrs.font ?? content.defaults.font;
@@ -109,6 +125,7 @@ export function humanSeal(
 	) {
 		clauses.push("doodles hand-drawn");
 	}
+	if (signed) clauses.push("signed by hand");
 	const seal = clauses.join(" · ");
 	return seal === "" ? null : `${seal.charAt(0).toUpperCase()}${seal.slice(1)}`;
 }

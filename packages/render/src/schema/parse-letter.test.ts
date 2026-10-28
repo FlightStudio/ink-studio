@@ -113,7 +113,11 @@ function letterOf(format: PageFormatId): LetterContent {
 
 function inkAttrs(content: unknown): Record<string, unknown> {
 	const doc = (content as LetterContent).doc;
-	const node = doc.content[0]?.content?.[2];
+	const block = doc.content[0];
+	if (block?.type !== "paragraph") {
+		throw new Error("the fixture lost its ink mark");
+	}
+	const node = block.content?.[2];
 	const attrs = node?.marks?.[0]?.attrs;
 	if (!attrs) throw new Error("the fixture lost its ink mark");
 	return attrs;
@@ -169,7 +173,11 @@ describe("parseLetterContent", () => {
 
 	it("a bold mark is refused", () => {
 		const content = copy();
-		const text = content.doc.content[0]?.content?.[0] as { marks?: unknown[] };
+		const block = content.doc.content[0];
+		if (block?.type !== "paragraph") {
+			throw new Error("the fixture lost its text");
+		}
+		const text = block.content?.[0] as { marks?: unknown[] };
 		text.marks = [{ type: "bold" }];
 		expect(() => parseLetterContent(content)).toThrow();
 	});
@@ -255,6 +263,26 @@ describe("parseLetterContent", () => {
 		expect(parsed.doc.attrs.elements[1]?.wrap).toBe(false);
 	});
 
+	it("a signature in the middle is refused", () => {
+		const content = copy();
+		const paragraph = content.doc.content[0];
+		if (!paragraph) throw new Error("the letter has no paragraph");
+		content.doc.content = [
+			paragraph,
+			{
+				type: "signature",
+				attrs: {
+					drawingId: "0192e4a0-7b1c-7cc3-9a5e-3f1d2b4c5a20",
+					widthIn: 2.25,
+					align: "right",
+					color: "ink-blue",
+				},
+			},
+			paragraph,
+		];
+		expect(() => parseLetterContent(content)).toThrow();
+	});
+
 	it("a field the catalogue does not have is refused", () => {
 		const content = copy();
 		const json = {
@@ -279,12 +307,14 @@ describe("parseLetterContent", () => {
 				content: [{ type: "mergeField", attrs: { field: "first_name" } }],
 			},
 		];
-		expect(parseLetterContent(chip).doc.content[0]?.content?.[0]).toMatchObject(
-			{
-				type: "mergeField",
-				attrs: { field: "first_name" },
-			},
-		);
+		const stored = parseLetterContent(chip).doc.content[0];
+		if (stored?.type !== "paragraph") {
+			throw new Error("the chip was not stored");
+		}
+		expect(stored.content?.[0]).toMatchObject({
+			type: "mergeField",
+			attrs: { field: "first_name" },
+		});
 	});
 
 	it("minSides above the spec's maxPages is refused", () => {
