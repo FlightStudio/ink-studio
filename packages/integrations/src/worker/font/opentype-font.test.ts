@@ -222,3 +222,188 @@ describe("fromStrokeOutlines", () => {
 		expect(alpha(20, 20)).toBeLessThan(20);
 	});
 });
+
+const UNITS = 2048;
+
+function letterGlyph(
+	char: string,
+	advanceWidth: number,
+	draw: (path: opentype.Path) => void,
+): opentype.Glyph {
+	const path = new opentype.Path();
+	draw(path);
+	return new opentype.Glyph({
+		name: char,
+		unicode: char.codePointAt(0),
+		advanceWidth,
+		path,
+	});
+}
+
+function uploadBytes(options: {
+	familyName?: string;
+	glyphs?: opentype.Glyph[];
+	lowercase?: boolean;
+}): Uint8Array {
+	const glyphs = [
+		new opentype.Glyph({
+			name: ".notdef",
+			advanceWidth: UNITS / 2,
+			path: new opentype.Path(),
+		}),
+		...(options.glyphs ?? []),
+	];
+	if (options.lowercase !== false) {
+		for (const char of "abcdefghijklmnopqrstuvwxyz") {
+			if (glyphs.some((glyph) => glyph.name === char)) continue;
+			glyphs.push(
+				letterGlyph(char, 400, (path) => {
+					path.moveTo(0, 0);
+					path.lineTo(100, 0);
+				}),
+			);
+		}
+	}
+	const font = new opentype.Font({
+		familyName: options.familyName ?? "Uploaded",
+		styleName: "Regular",
+		unitsPerEm: UNITS,
+		ascender: 1600,
+		descender: -400,
+		glyphs,
+	});
+	return new Uint8Array(font.toArrayBuffer());
+}
+
+function parsedUpload(bytes: Uint8Array) {
+	return opentype.parse(
+		bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+	);
+}
+
+describe("fromUpload", () => {
+	test("an uploaded font is rebuilt at 1000 units with scaled advances", async () => {
+		const file = uploadBytes({
+			glyphs: [
+				letterGlyph("a", 520, (path) => {
+					path.moveTo(0, 0);
+					path.lineTo(200, 0);
+				}),
+				letterGlyph("b", 610, (path) => {
+					path.moveTo(0, 0);
+					path.lineTo(200, 0);
+				}),
+			],
+		});
+		const built = await new OpentypeFontBuilder().fromUpload({
+			familyName: "own-test",
+			file,
+		});
+		const font = parsedUpload(built.bytes);
+		expect(font.charToGlyph("a").advanceWidth).toBe(254);
+		expect(font.charToGlyph("b").advanceWidth).toBe(298);
+	});
+
+	test("curves survive the rebuild", async () => {
+		const file = uploadBytes({
+			glyphs: [
+				letterGlyph("a", 800, (path) => {
+					path.moveTo(0, 0);
+					path.bezierCurveTo(512, 1024, 1024, 1536, 2048, 512);
+				}),
+			],
+		});
+		const built = await new OpentypeFontBuilder().fromUpload({
+			familyName: "own-test",
+			file,
+		});
+		const cubic = parsedUpload(built.bytes)
+			.charToGlyph("a")
+			.path.commands.find((command) => command.type === "C");
+		expect(cubic).toMatchObject({
+			type: "C",
+			x1: 250,
+			y1: 500,
+			x2: 500,
+			y2: 750,
+			x: 1000,
+			y: 250,
+		});
+	});
+
+	test("nothing from the upload's name table survives", async () => {
+		const file = uploadBytes({ familyName: "ACME Secret Foundry" });
+		const built = await new OpentypeFontBuilder().fromUpload({
+			familyName: "own-test",
+			file,
+		});
+		expect(Buffer.from(built.bytes).includes("ACME Secret Foundry")).toBe(
+			false,
+		);
+		expect(parsedUpload(built.bytes).getEnglishName("fontFamily")).toBe(
+			"own-test",
+		);
+	});
+
+	test("truncated bytes are refused", async () => {
+		const file = uploadBytes({});
+		await expect(
+			new OpentypeFontBuilder().fromUpload({
+				familyName: "own-test",
+				file: file.subarray(0, 32),
+			}),
+		).rejects.toMatchObject({ code: "font_unreadable" });
+	});
+
+	test("a font without lowercase letters is refused", async () => {
+		const file = uploadBytes({
+			lowercase: false,
+			glyphs: [
+				letterGlyph("A", 600, (path) => {
+					path.moveTo(0, 0);
+					path.lineTo(100, 400);
+				}),
+			],
+		});
+		await expect(
+			new OpentypeFontBuilder().fromUpload({ familyName: "own-test", file }),
+		).rejects.toMatchObject({ code: "font_missing_glyphs" });
+	});
+
+	test("a glyph with too many points is refused", async () => {
+		const file = uploadBytes({
+			glyphs: [
+				letterGlyph("a", 500, (path) => {
+					path.moveTo(0, 0);
+					for (let index = 0; index < 2001; index += 1) {
+						path.lineTo(index, index);
+					}
+				}),
+			],
+		});
+		await expect(
+			new OpentypeFontBuilder().fromUpload({ familyName: "own-test", file }),
+		).rejects.toMatchObject({ code: "font_unreadable" });
+	});
+
+	test("a parse that runs too long is stopped", async () => {
+		const before = process
+			.getActiveResourcesInfo()
+			.filter((name) => name === "Worker").length;
+		const file = uploadBytes({});
+		await expect(
+			new OpentypeFontBuilder({
+				thread: {
+					url: new URL("./parse-thread.ts", import.meta.url),
+					execArgv: ["--import", "tsx"],
+				},
+				parseTimeoutMs: 1,
+				parseMaxMemoryMb: 256,
+			}).fromUpload({ familyName: "own-test", file }),
+		).rejects.toMatchObject({ code: "font_timeout" });
+		expect(
+			process.getActiveResourcesInfo().filter((name) => name === "Worker")
+				.length,
+		).toBe(before);
+	});
+});

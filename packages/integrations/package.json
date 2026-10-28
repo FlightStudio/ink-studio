@@ -28,6 +28,7 @@
 		"@repo/typescript-config": "workspace:*",
 		"@types/node": "catalog:",
 		"testcontainers": "catalog:",
+		"tsx": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
 	}

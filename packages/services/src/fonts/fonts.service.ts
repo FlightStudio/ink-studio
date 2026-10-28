@@ -116,6 +116,45 @@ export class FontService {
 			await publishAssetJob(this.publisher, created.asset);
 			return { id: created.font.id, assetId: created.asset.id };
 		}
+		if (params.source?.kind === "upload") {
+			const file = await this.db.assets.byId(
+				organizationId,
+				params.source.fileAssetId,
+			);
+			if (!file) throw new ServiceError("not_found", "not_found");
+			if (
+				file.origin.source !== "uploaded" ||
+				file.origin.purpose !== "font-file"
+			) {
+				throw new ServiceError("invalid_input", "unsupported_file");
+			}
+			const created = await this.db.transaction(async (tx) => {
+				const font = await tx.fonts.create({
+					organizationId,
+					ownerUserId: member.user.id,
+					ownerName,
+					source: { kind: "upload", fileAssetId: file.id },
+					fontAssetId: null,
+					pendingFontAssetId: null,
+					chars: "",
+				});
+				const asset = await tx.assets.create(
+					generatedAsset(organizationId, {
+						kind: "build-font",
+						fontId: font.id,
+					}),
+				);
+				const pending = await tx.fonts.setPending(
+					organizationId,
+					font.id,
+					asset.id,
+				);
+				if (!pending) throw new ServiceError("not_found", "not_found");
+				return { font, asset };
+			});
+			await publishAssetJob(this.publisher, created.asset);
+			return { id: created.font.id, assetId: created.asset.id };
+		}
 		const font = await this.db.fonts.create({
 			organizationId,
 			ownerUserId: member.user.id,

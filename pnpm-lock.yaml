@@ -367,6 +367,9 @@ importers:
       testcontainers:
         specifier: 'catalog:'
         version: 12.2.1
+      tsx:
+        specifier: 'catalog:'
+        version: 4.23.15
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

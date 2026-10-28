@@ -26,6 +26,7 @@ import {
 	TemplatePhotoFontSourceKind,
 	TemplatePhotoFontSourceTemplateVersion,
 	type UploadedAsset,
+	UploadFontSourceKind,
 	UploadPurpose,
 } from "./gen/api.ts";
 
@@ -84,11 +85,20 @@ export const templatePhotoFontSourceSchema = z.strictObject({
 	photoAssetId: z.uuid(),
 });
 
+export const uploadFontSourceSchema = z.strictObject({
+	kind: z.enum(UploadFontSourceKind),
+	fileAssetId: z.uuid(),
+});
+
 export const createFontRequestSchema: z.ZodType<CreateFontRequest> =
 	z.strictObject({
 		ownerName: z.string(),
 		source: z
-			.union([drawnFontSourceSchema, templatePhotoFontSourceSchema])
+			.union([
+				drawnFontSourceSchema,
+				templatePhotoFontSourceSchema,
+				uploadFontSourceSchema,
+			])
 			.optional(),
 	});
 

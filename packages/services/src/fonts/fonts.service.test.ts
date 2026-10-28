@@ -9,7 +9,8 @@ import {
 	type Stroke,
 } from "@repo/types";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
-import { generatedAsset } from "../assets/assets.service.ts";
+import { AssetService, generatedAsset } from "../assets/assets.service.ts";
+import type { AssetStorage } from "../assets/assets.types.ts";
 import type { Publisher } from "../queue/index.ts";
 import { FontService } from "./fonts.service.ts";
 
@@ -294,4 +295,99 @@ it("another organization's photo cannot make a template font", async () => {
 			},
 		}),
 	).rejects.toMatchObject({ kind: "not_found", code: "not_found" });
+});
+
+it("only a font file can make an upload font", async () => {
+	const karla = await member("karla-upload-photo");
+	const photoId = crypto.randomUUID();
+	await testDb.db.assets.create({
+		id: photoId,
+		organizationId: karla.userOrganization.organizationId,
+		storageKey: `organizations/${karla.userOrganization.organizationId}/assets/${photoId}`,
+		mimeType: "image/png",
+		byteSize: 12,
+		checksum: "b".repeat(64),
+		origin: {
+			source: "uploaded",
+			purpose: "photo",
+			filename: "desk.png",
+			uploadedByUserId: karla.user.id,
+		},
+		processing: { status: "done", attempts: 0 },
+	});
+	await expect(
+		fonts.createFont(karla, {
+			ownerName: "Karla",
+			source: { kind: "upload", fileAssetId: photoId },
+		}),
+	).rejects.toMatchObject({
+		kind: "invalid_input",
+		code: "unsupported_file",
+	});
+});
+
+it("another organization's font file cannot make an upload font", async () => {
+	const karla = await member("karla-upload");
+	const sam = await member("sam-upload");
+	const fileId = crypto.randomUUID();
+	await testDb.db.assets.create({
+		id: fileId,
+		organizationId: sam.userOrganization.organizationId,
+		storageKey: `organizations/${sam.userOrganization.organizationId}/assets/${fileId}`,
+		mimeType: "font/ttf",
+		byteSize: 12,
+		checksum: "c".repeat(64),
+		origin: {
+			source: "uploaded",
+			purpose: "font-file",
+			filename: "hand.ttf",
+			uploadedByUserId: sam.user.id,
+		},
+		processing: { status: "done", attempts: 0 },
+	});
+	await expect(
+		fonts.createFont(karla, {
+			ownerName: "Karla",
+			source: { kind: "upload", fileAssetId: fileId },
+		}),
+	).rejects.toMatchObject({ kind: "not_found", code: "not_found" });
+});
+
+it("the uploaded file is never read back", async () => {
+	const karla = await member("karla-upload-read");
+	const fileId = crypto.randomUUID();
+	const organizationId = karla.userOrganization.organizationId;
+	await testDb.db.assets.create({
+		id: fileId,
+		organizationId,
+		storageKey: `organizations/${organizationId}/assets/${fileId}`,
+		mimeType: "font/otf",
+		byteSize: 12,
+		checksum: "d".repeat(64),
+		origin: {
+			source: "uploaded",
+			purpose: "font-file",
+			filename: "hand.otf",
+			uploadedByUserId: karla.user.id,
+		},
+		processing: { status: "done", attempts: 0 },
+	});
+	const signedReadUrl = vi.fn<AssetStorage["signedReadUrl"]>(
+		async () => "https://secret",
+	);
+	const storage: AssetStorage = {
+		put: async () => {},
+		get: async () => new Uint8Array(),
+		signedReadUrl,
+	};
+	const assets = new AssetService(testDb.db, storage, publisher);
+	const created = await fonts.createFont(karla, {
+		ownerName: "Karla",
+		source: { kind: "upload", fileAssetId: fileId },
+	});
+	expect(created.assetId).toEqual(expect.any(String));
+	expect(
+		await assets.getAssetReadUrl(karla.userOrganization, fileId),
+	).toBeNull();
+	expect(signedReadUrl).not.toHaveBeenCalled();
 });

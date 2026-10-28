@@ -485,6 +485,18 @@ components:
         photoAssetId:
           type: string
           format: uuid
+    UploadFontSource:
+      type: object
+      additionalProperties: false
+      required: [kind, fileAssetId]
+      properties:
+        kind:
+          type: string
+          enum:
+            - upload
+        fileAssetId:
+          type: string
+          format: uuid
     CreateFontRequest:
       type: object
       additionalProperties: false
@@ -496,6 +508,7 @@ components:
           oneOf:
             - $ref: "#/components/schemas/DrawnFontSource"
             - $ref: "#/components/schemas/TemplatePhotoFontSource"
+            - $ref: "#/components/schemas/UploadFontSource"
     CreatedFont:
       type: object
       additionalProperties: false
@@ -722,6 +735,9 @@ components:
         - invalid_drawing
         - invalid_photo
         - template_markers_not_found
+        - font_unreadable
+        - font_timeout
+        - font_missing_glyphs
     ApiError:
       type: object
       additionalProperties: false
