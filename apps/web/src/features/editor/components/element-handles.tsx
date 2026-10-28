@@ -344,7 +344,9 @@ export function ElementHandles(props: ElementHandlesProps) {
 			{selected ? (
 				<ElementMenu
 					tint={selected.tint}
+					wrap={selected.wrap}
 					onTint={(tint) => props.onCommit(selected.id, { tint })}
+					onWrap={(wrap) => props.onCommit(selected.id, { wrap })}
 					onRemove={() => props.onRemove(selected.id)}
 					style={{
 						left: `${selected.xIn}in`,
