@@ -1,8 +1,23 @@
+import type { LetterContent } from "./letter.ts";
+import type { MergeValues } from "./merge-field.ts";
+
 export type UploadPurpose = "photo" | "mask" | "font-file";
+
+export type PrintOutput =
+	| { format: "pdf"; duplex: boolean }
+	| { format: "png"; side: number };
 
 export type AssetJob =
 	| { kind: "lift-ink"; photoAssetId: string }
-	| { kind: "build-font"; fontId: string };
+	| { kind: "build-font"; fontId: string }
+	| {
+			kind: "render-letter";
+			letterId: string;
+			title: string;
+			content: LetterContent;
+			mergeValues: MergeValues;
+			output: PrintOutput;
+	  };
 
 export function assetMessageType<K extends AssetJob["kind"]>(
 	kind: K,

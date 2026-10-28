@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, a doodle library, moving a placed doodle, lifting ink from a photo in the worker, photographing a doodle, building a drawn handwriting font, writing a letter in that hand, making a font from a photo of the printed template, and building a font from an uploaded font file are ready on your own computer.</p>
-  <div class="progress" aria-hidden="true"><span style="width:83%"></span></div>
-  <p class="log">30 of 36 steps in the repository. Step 29 builds a font from an uploaded TTF or OTF.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, a doodle library, moving a placed doodle, lifting ink from a photo in the worker, photographing a doodle, building a drawn handwriting font, writing a letter in that hand, making a font from a photo of the printed template, building a font from an uploaded font file, and exporting a proof are ready on your own computer.</p>
+  <div class="progress" aria-hidden="true"><span style="width:86%"></span></div>
+  <p class="log">31 of 36 steps in the repository. Step 31 exports a proof from the render pool.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -660,7 +660,25 @@ pnpm --filter worker test --reporter=verbose</pre>
       <p>The names read like “a three-side letter is four pages” and “an outside URL is never fetched”.</p>
       <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including all 7 renderer tests. A separate PDF reader confirmed the page sizes and picture sizes.</p>
     </details>
-    <details id="step-31"><summary><span class="tag later">Later</span> 31. Export a proof</summary><p>The render pool exports a PDF proof, refused with a reason when text does not fit.</p></details>
+    <details id="step-31">
+      <summary><span class="tag done">Done</span> 31. Export a proof</summary>
+      <p>You can export a proof of a letter. It is a PDF of the letter as it was when you asked, using the sample names Alex Rivera, and the file name says it is a proof. A letter that runs past the last page, or a doodle sitting in a corner the printer keeps clear, is refused with the reason. Only someone who may edit the letter can export it.</p>
+      <ul class="points">
+        <li>Open a letter. When the save line is quiet, Export proof is at the top. It stays quiet while you are still typing.</li>
+        <li>The render worker makes the PDF. A status pill says it is making the proof. When it is ready, Download the proof opens the file.</li>
+        <li>If the words do not fit, it says “The words do not fit on the page.” If a doodle is in a keep-clear corner, it says “A doodle sits where the printer needs clear paper.”</li>
+        <li>A teammate who can only read a letter in someone else's handwriting does not get the button.</li>
+      </ul>
+      <p>The render worker has to be running. After <code>git pull</code> and <code>pnpm install</code>:</p>
+      <pre>docker compose up -d
+pnpm dev</pre>
+      <p>Open a letter at <a href="http://127.0.0.1:3000/letters">http://127.0.0.1:3000/letters</a> and choose Export proof.</p>
+      <p>The tests run on throwaway Postgres, and one of them uses Chromium in Docker:</p>
+      <pre>pnpm --filter @repo/services test --reporter=verbose
+pnpm --filter worker test --reporter=verbose</pre>
+      <p>The names read like “an export of a stale revision is refused”, “an export carries the letter as it was and one recipient's values”, “a letter exports one PDF”, “a teammate cannot export a letter in Karla's hand”, “text that does not fit fails the export with its reason”, “a doodle in the barcode corner fails the export”, and “the overflow fixture fails as overflow and the one-and-a-half fixture prints two pages”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, 327 tests, including 4 new letter service tests and 5 new worker tests, one of them in Chromium. Exporting from an iPad is still unchecked. There is no iPad in this setup.</p>
+    </details>
     <details id="step-32"><summary><span class="tag later">Later</span> 32. Postcards</summary><p>Pick the product, choose the front image, export two PNGs.</p></details>
 
     <h3>M9. Merge fields and signature</h3>

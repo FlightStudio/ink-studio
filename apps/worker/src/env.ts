@@ -12,6 +12,8 @@ export const env = createEnv({
 		PUBSUB_JOBS_SUBSCRIPTION: z.string().min(1),
 		WORKER_POOL: z.enum(["standard", "render"]),
 		SWEEP_EVERY_MS: z.coerce.number().int().positive().optional(),
+		BROWSER_WS_ENDPOINT: z.string().min(1).optional(),
+		STOCK_FONTS_DIR: z.string().min(1),
 		NODE_ENV: z
 			.enum(["development", "test", "production"])
 			.default("development"),

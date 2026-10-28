@@ -42,6 +42,7 @@ import { placeElement, removeElement, updateElement } from "../elements.ts";
 import { AddSide } from "./add-side.tsx";
 import { EditorToolbar, useCoarsePointer } from "./editor-toolbar.tsx";
 import { ElementHandles, placementSentence } from "./element-handles.tsx";
+import { ExportButton } from "./export-button.tsx";
 import { HumanSeal } from "./human-seal.tsx";
 import { LetterTitle } from "./letter-title.tsx";
 import { OverflowNotice } from "./overflow-notice.tsx";
@@ -418,6 +419,14 @@ export function LetterEditor({
 					<ChevronLeft className="size-4" />
 					Letters
 				</Link>
+				{letter.editable ? (
+					<ExportButton
+						letterId={letter.id}
+						revision={
+							autosave.state.status === "saved" ? autosave.state.revision : null
+						}
+					/>
+				) : null}
 			</header>
 			<main
 				className="flex flex-1 flex-col items-center px-4 pt-4 pb-6 sm:px-8"

@@ -29,6 +29,8 @@ export const apiErrorCodes = [
 	"font_unreadable",
 	"font_timeout",
 	"font_missing_glyphs",
+	"letter_overflow",
+	"letter_placement",
 ] as const;
 
 export type ApiErrorCode = (typeof apiErrorCodes)[number];
@@ -66,6 +68,8 @@ export const errorMessages = {
 	font_unreadable: "That font file could not be read.",
 	font_timeout: "That font took too long to read.",
 	font_missing_glyphs: "That font is missing lowercase letters.",
+	letter_overflow: "The words do not fit on the page.",
+	letter_placement: "A doodle sits where the printer needs clear paper.",
 } as const satisfies Record<ApiErrorCode, string>;
 
 export type ApiErrorBody = {

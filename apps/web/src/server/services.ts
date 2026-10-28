@@ -24,7 +24,7 @@ export function getDb(): Db {
 }
 
 export function getLetterService(): LetterService {
-	letters ??= new LetterService(getDb());
+	letters ??= new LetterService(getDb(), getPublisher());
 	return letters;
 }
 

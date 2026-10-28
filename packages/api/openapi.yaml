@@ -108,6 +108,43 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalError"
+  /api/letters/{letterId}/exports:
+    parameters:
+      - name: letterId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: requestExport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestExportRequest"
+      responses:
+        "201":
+          description: The proof was requested.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestedExport"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /api/fonts:
     post:
       operationId: createFont
@@ -430,6 +467,24 @@ components:
         id:
           type: string
           format: uuid
+    RequestExportRequest:
+      type: object
+      additionalProperties: false
+      required: [revision]
+      properties:
+        revision:
+          type: integer
+          minimum: 1
+    RequestedExport:
+      type: object
+      additionalProperties: false
+      required: [assetIds]
+      properties:
+        assetIds:
+          type: array
+          items:
+            type: string
+            format: uuid
     SaveLetterRequest:
       type: object
       additionalProperties: false
@@ -738,6 +793,8 @@ components:
         - font_unreadable
         - font_timeout
         - font_missing_glyphs
+        - letter_overflow
+        - letter_placement
     ApiError:
       type: object
       additionalProperties: false
