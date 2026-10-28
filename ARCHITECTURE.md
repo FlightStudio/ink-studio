@@ -130,12 +130,17 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | web               | `apps/web/src/app/(studio)/fonts/page.tsx`                         | The handwriting list                                               |
 | web               | `apps/web/src/app/(studio)/fonts/new/page.tsx`                     | Start a handwriting font                                           |
 | web               | `apps/web/src/app/(studio)/fonts/[fontId]/draw/page.tsx`           | Draw the cells of one font                                         |
+| web               | `apps/web/src/app/(studio)/fonts/template/page.tsx`                | The printable handwriting template                                 |
+| web               | `apps/web/src/features/fonts/components/template-sheet.tsx`        | The template page, markers and cyan cells                          |
+| web               | `apps/web/src/features/fonts/components/template-photo-dialog.tsx` | Photograph the written template and wait for the build             |
+| web               | `apps/web/src/features/fonts/components/template-actions.tsx`      | Print and photograph controls                                      |
+| integrations      | `packages/integrations/src/worker/font/template.ts`                | `readTemplate`, corner marks to cell masks                         |
 | web               | `apps/web/src/features/editor/components/print-preview.tsx`        | `PrintPreview`, the print page in a same-origin frame              |
 | worker            | `apps/worker/src/index.ts`                                         | `main`, one pool per process, picked by `WORKER_POOL`              |
 | worker            | `apps/worker/src/env.ts`                                           | The worker's validated environment                                 |
 | worker            | `apps/worker/src/processors/sweep.ts`                              | `sweepProcessor`, the `sweep` message                              |
 | worker            | `apps/worker/src/processors/asset-lift-ink.ts`                     | `AssetLiftInkProcessor` for the lift-ink message                   |
-| worker            | `apps/worker/src/processors/asset-build-font.ts`                   | `AssetBuildFontProcessor` for a drawn handwriting font             |
+| worker            | `apps/worker/src/processors/asset-build-font.ts`                   | `AssetBuildFontProcessor` for a drawn or photographed font         |
 | worker            | `apps/worker/package.json`                                         | `dev` runs the standard pool, `dev:render` the render pool         |
 | tools             | `tools/check-comments.ts`                                          | No-comment check                                                   |
 | tools             | `tools/check-architecture.ts`                                      | This map stays honest                                              |
@@ -344,6 +349,8 @@ One processor per kind, typed by `assetMessageType`. Each job kind gets one proc
 A drawn font builds the same way. `requestBuild` inserts a pending build-font asset, records it as `pendingFontAssetId`, and publishes only after that commits. The last finished build stays in `fontAssetId` until the new one is done. When the job finishes, that pending asset becomes `fontAssetId` and the file's characters are stored beside it. An older build that finishes after a newer one was requested leaves the current build in place. Only the owner writes with a font. People in the same organization receive its file through `@font-face` so a letter in that hand can be read. No other organization ever does. A finished build-font file is servable the same way a mask is.
 
 Drawing that font happens on `apps/web/src/app/(studio)/fonts/[fontId]/draw/page.tsx`. Each cell is an `InkCanvas` with the cell's guides. `toCellUnits` in `apps/web/src/features/fonts/cell-units.ts` stores the stroke in the cell's own units, so the same mark on a large cell and a small cell is the same glyph. The toolbar's My handwriting group lists fonts that have finished a build. Choosing one adds that file to the letter's resources, and the page shows it at once. An empty group links to `apps/web/src/app/(studio)/fonts/new/page.tsx`.
+
+A photographed template builds at once. The printable page is `apps/web/src/app/(studio)/fonts/template/page.tsx`. Its corner marks are black. Its cell borders, guide lines and labels are light cyan, so the lift keeps the handwriting and drops the printed template. `readTemplate` in `packages/integrations/src/worker/font/template.ts` finds the four marks, takes the notched one as the top left, and reads each cell. A photo without those marks is refused. `createFont` with that photo requires the photo to belong to the same organization, and it asks the worker to build before it returns.
 
 The sweep. The `sweep` processor calls `sweep` on `AssetService`, which reads `stale` work and republishes every pending asset untouched for `STALE_PENDING_MS` and every running asset past its lease, so a publish lost after a commit or a worker that died mid-job is picked up again. Only the standard pool takes `sweep` and only it publishes the timer: when `SWEEP_EVERY_MS` is set, `main` publishes `sweep` on that interval, and the render pool, whose subscription never receives `sweep`, publishes nothing. `pnpm jobs:sweep` runs `tools/dev/sweep.ts`, which publishes one `sweep` by hand.
 

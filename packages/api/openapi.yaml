@@ -469,6 +469,22 @@ components:
           type: string
           enum:
             - drawn
+    TemplatePhotoFontSource:
+      type: object
+      additionalProperties: false
+      required: [kind, templateVersion, photoAssetId]
+      properties:
+        kind:
+          type: string
+          enum:
+            - template-photo
+        templateVersion:
+          type: integer
+          enum:
+            - 1
+        photoAssetId:
+          type: string
+          format: uuid
     CreateFontRequest:
       type: object
       additionalProperties: false
@@ -477,13 +493,18 @@ components:
         ownerName:
           type: string
         source:
-          $ref: "#/components/schemas/DrawnFontSource"
+          oneOf:
+            - $ref: "#/components/schemas/DrawnFontSource"
+            - $ref: "#/components/schemas/TemplatePhotoFontSource"
     CreatedFont:
       type: object
       additionalProperties: false
       required: [id]
       properties:
         id:
+          type: string
+          format: uuid
+        assetId:
           type: string
           format: uuid
     GlyphStroke:
@@ -700,6 +721,7 @@ components:
         - invalid_mask
         - invalid_drawing
         - invalid_photo
+        - template_markers_not_found
     ApiError:
       type: object
       additionalProperties: false

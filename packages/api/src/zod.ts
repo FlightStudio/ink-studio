@@ -23,6 +23,8 @@ import {
 	type SaveGlyphRequest,
 	type SaveLetterRequest,
 	StrokeInput,
+	TemplatePhotoFontSourceKind,
+	TemplatePhotoFontSourceTemplateVersion,
 	type UploadedAsset,
 	UploadPurpose,
 } from "./gen/api.ts";
@@ -76,14 +78,23 @@ export const drawnFontSourceSchema = z.strictObject({
 	kind: z.enum(DrawnFontSourceKind),
 });
 
+export const templatePhotoFontSourceSchema = z.strictObject({
+	kind: z.enum(TemplatePhotoFontSourceKind),
+	templateVersion: z.literal(TemplatePhotoFontSourceTemplateVersion.NUMBER_1),
+	photoAssetId: z.uuid(),
+});
+
 export const createFontRequestSchema: z.ZodType<CreateFontRequest> =
 	z.strictObject({
 		ownerName: z.string(),
-		source: drawnFontSourceSchema.optional(),
+		source: z
+			.union([drawnFontSourceSchema, templatePhotoFontSourceSchema])
+			.optional(),
 	});
 
 export const createdFontSchema: z.ZodType<CreatedFont> = z.strictObject({
 	id: z.uuid(),
+	assetId: z.uuid().optional(),
 });
 
 const glyphPointSchema = z.tuple([

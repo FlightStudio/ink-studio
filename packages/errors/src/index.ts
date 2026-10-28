@@ -25,6 +25,7 @@ export const apiErrorCodes = [
 	"invalid_mask",
 	"invalid_drawing",
 	"invalid_photo",
+	"template_markers_not_found",
 ] as const;
 
 export type ApiErrorCode = (typeof apiErrorCodes)[number];
@@ -58,6 +59,7 @@ export const errorMessages = {
 	invalid_mask: "That picture cannot be used as a mask.",
 	invalid_drawing: "That drawing is not valid.",
 	invalid_photo: "Only a photo can be lifted.",
+	template_markers_not_found: "The template's corner marks were not found.",
 } as const satisfies Record<ApiErrorCode, string>;
 
 export type ApiErrorBody = {

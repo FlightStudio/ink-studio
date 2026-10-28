@@ -2,6 +2,7 @@
 
 import { createFont } from "@repo/api";
 import { Button } from "@repo/ui/components/ui/button";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -46,7 +47,11 @@ export function NewFontForm() {
 			<Button type="button" onClick={() => void draw()} disabled={saving}>
 				Draw it here
 			</Button>
-			<p className="text-ui text-ink-muted">Photograph the template</p>
+			<p>
+				<Link href="/fonts/template" className="text-ui text-ink">
+					Photograph the template
+				</Link>
+			</p>
 			<p className="text-ui text-ink-muted">Upload a font file</p>
 		</div>
 	);

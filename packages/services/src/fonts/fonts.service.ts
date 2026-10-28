@@ -45,11 +45,15 @@ function toOption(font: Font): FontOption {
 	};
 }
 
+function drawnGlyphs(font: Font): DrawnGlyph[] {
+	return font.source.kind === "drawn" ? font.source.glyphs : [];
+}
+
 function toEditable(font: Font): EditableFont {
 	return {
 		id: font.id,
 		ownerName: font.ownerName,
-		glyphs: font.source.glyphs,
+		glyphs: drawnGlyphs(font),
 		assetId: font.fontAssetId,
 		building: font.pendingFontAssetId !== null,
 	};
@@ -64,13 +68,56 @@ export class FontService {
 	async createFont(
 		member: Member,
 		params: CreateFontParams,
-	): Promise<{ id: string }> {
+	): Promise<{ id: string; assetId?: string }> {
 		const ownerName = parseOwnerName(params.ownerName);
 		if (ownerName === null) {
 			throw new ServiceError("invalid_input", "invalid_owner_name");
 		}
+		const organizationId = member.userOrganization.organizationId;
+		if (params.source?.kind === "template-photo") {
+			const photo = await this.db.assets.byId(
+				organizationId,
+				params.source.photoAssetId,
+			);
+			if (
+				photo?.origin.source !== "uploaded" ||
+				photo.origin.purpose !== "photo"
+			) {
+				throw new ServiceError("not_found", "not_found");
+			}
+			const created = await this.db.transaction(async (tx) => {
+				const font = await tx.fonts.create({
+					organizationId,
+					ownerUserId: member.user.id,
+					ownerName,
+					source: {
+						kind: "template-photo",
+						templateVersion: 1,
+						photoAssetId: photo.id,
+					},
+					fontAssetId: null,
+					pendingFontAssetId: null,
+					chars: "",
+				});
+				const asset = await tx.assets.create(
+					generatedAsset(organizationId, {
+						kind: "build-font",
+						fontId: font.id,
+					}),
+				);
+				const pending = await tx.fonts.setPending(
+					organizationId,
+					font.id,
+					asset.id,
+				);
+				if (!pending) throw new ServiceError("not_found", "not_found");
+				return { font, asset };
+			});
+			await publishAssetJob(this.publisher, created.asset);
+			return { id: created.font.id, assetId: created.asset.id };
+		}
 		const font = await this.db.fonts.create({
-			organizationId: member.userOrganization.organizationId,
+			organizationId,
 			ownerUserId: member.user.id,
 			ownerName,
 			source: { kind: "drawn", glyphs: [] },
@@ -94,6 +141,9 @@ export class FontService {
 			if (!font) throw new ServiceError("not_found", "not_found");
 			if (!isOwnFont(member, font)) {
 				throw new ServiceError("forbidden", "not_owner");
+			}
+			if (font.source.kind !== "drawn") {
+				throw new ServiceError("invalid_input", "invalid_glyphs");
 			}
 			const source: FontSource = {
 				kind: "drawn",
@@ -132,7 +182,10 @@ export class FontService {
 			if (!isOwnFont(member, font)) {
 				throw new ServiceError("forbidden", "not_owner");
 			}
-			if (missingChars(font.source.glyphs).length > 0) {
+			if (
+				font.source.kind !== "drawn" ||
+				missingChars(font.source.glyphs).length > 0
+			) {
 				throw new ServiceError("invalid_input", "font_incomplete");
 			}
 			const created = await tx.assets.create(

@@ -1,5 +1,7 @@
 import { CELL } from "@repo/types";
 import opentype from "opentype.js";
+import { readTemplate } from "./template.ts";
+import { vectorize } from "./vectorize.ts";
 
 export type PathSegment =
 	| ["M", number, number]
@@ -277,10 +279,15 @@ export type FromStrokeOutlinesParams = {
 	familyName: string;
 	glyphs: OutlineGlyph[];
 };
+export type FromTemplatePhotoParams = {
+	familyName: string;
+	photo: Uint8Array;
+};
 export type BuiltFont = { bytes: Uint8Array; chars: string };
 
 export interface FontBuilder {
 	fromStrokeOutlines(params: FromStrokeOutlinesParams): Promise<BuiltFont>;
+	fromTemplatePhoto(params: FromTemplatePhotoParams): Promise<BuiltFont>;
 }
 
 const SIDE_BEARING = 60;
@@ -308,6 +315,27 @@ function sameWay(points: readonly Point[]): Point[] {
 	return signedArea(mapped) < 0 ? [...mapped].reverse() : mapped;
 }
 
+function outlineOf(
+	char: string,
+	variant: number,
+	polygons: readonly Point[][],
+): GlyphOutline | null {
+	const usable = polygons.filter((points) => points.length >= 3);
+	if (usable.length === 0) return null;
+	const xs = usable.flat().map((point) => point[0]);
+	const minX = Math.min(...xs);
+	const maxX = Math.max(...xs);
+	const shift = SIDE_BEARING - minX;
+	return {
+		char,
+		variant,
+		advanceWidth: maxX - minX + SIDE_BEARING * 2,
+		contours: usable.map((points) =>
+			contourOf(points.map((point) => [point[0] + shift, point[1]])),
+		),
+	};
+}
+
 function contourOf(points: readonly Point[]): Contour {
 	const first = points[0];
 	if (!first) return [];
@@ -331,30 +359,48 @@ export class OpentypeFontBuilder implements FontBuilder {
 	async fromStrokeOutlines(
 		params: FromStrokeOutlinesParams,
 	): Promise<BuiltFont> {
+		return this.assemble(
+			params.familyName,
+			params.glyphs.flatMap((glyph) => {
+				const outline = outlineOf(
+					glyph.char,
+					glyph.variant,
+					glyph.polygons.map(sameWay),
+				);
+				return outline ? [outline] : [];
+			}),
+		);
+	}
+
+	async fromTemplatePhoto(params: FromTemplatePhotoParams): Promise<BuiltFont> {
+		const cells = await readTemplate(params.photo);
 		const glyphs: GlyphOutline[] = [];
+		for (const cell of cells) {
+			const polygons = vectorize(cell.mask).map((loop) =>
+				loop
+					.map(
+						([x, y]): Point =>
+							fontPoint([
+								(x / cell.mask.widthPx) * CELL.size,
+								(y / cell.mask.heightPx) * CELL.size,
+							]),
+					)
+					.reverse(),
+			);
+			const outline = outlineOf(cell.char, cell.variant, polygons);
+			if (outline) glyphs.push(outline);
+		}
+		return this.assemble(params.familyName, glyphs);
+	}
+
+	private assemble(familyName: string, glyphs: GlyphOutline[]): BuiltFont {
 		const chars: string[] = [];
-		for (const glyph of params.glyphs) {
-			const polygons = glyph.polygons
-				.map(sameWay)
-				.filter((points) => points.length >= 3);
-			if (polygons.length === 0) continue;
-			const xs = polygons.flat().map((point) => point[0]);
-			const minX = Math.min(...xs);
-			const maxX = Math.max(...xs);
-			const shift = SIDE_BEARING - minX;
-			glyphs.push({
-				char: glyph.char,
-				variant: glyph.variant,
-				advanceWidth: maxX - minX + SIDE_BEARING * 2,
-				contours: polygons.map((points) =>
-					contourOf(points.map((point) => [point[0] + shift, point[1]])),
-				),
-			});
+		for (const glyph of glyphs) {
 			if (!chars.includes(glyph.char)) chars.push(glyph.char);
 		}
 		return {
 			bytes: buildFont({
-				familyName: params.familyName,
+				familyName,
 				ascender: CELL.baseline - CELL.ascender,
 				descender: CELL.baseline - CELL.descender,
 				glyphs,

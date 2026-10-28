@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, a doodle library, moving a placed doodle, lifting ink from a photo in the worker, photographing a doodle, building a drawn handwriting font, and writing a letter in that hand are ready on your own computer.</p>
-  <div class="progress" aria-hidden="true"><span style="width:78%"></span></div>
-  <p class="log">28 of 36 steps in the repository. Step 26 draws a handwriting font and writes with it.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, a doodle library, moving a placed doodle, lifting ink from a photo in the worker, photographing a doodle, building a drawn handwriting font, writing a letter in that hand, and making a font from a photo of the printed template are ready on your own computer.</p>
+  <div class="progress" aria-hidden="true"><span style="width:81%"></span></div>
+  <p class="log">29 of 36 steps in the repository. Step 28 builds a font from a photo of the printed template.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -604,7 +604,26 @@ pnpm dev</pre>
       <p>The names read like “a ring is an outer contour and a hole wound the other way”, “pixels touching only at a corner stay one shape”, and “the contours fill back to the mask”.</p>
       <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including 5 new tracing tests, and a traced handwritten g drawn over its ink and looked at by eye.</p>
     </details>
-    <details id="step-28"><summary><span class="tag later">Later</span> 28. Font from a template photo</summary><p>Print the template, write, photograph, get a font.</p></details>
+    <details id="step-28">
+      <summary><span class="tag done">Done</span> 28. Font from a template photo</summary>
+      <p>You can print a page of empty cells, write in them, photograph the page, and get a handwriting font. The corner marks are black. The cell borders, the guide lines and the little character labels are light blue, so they disappear when the ink is lifted and only your writing remains. The top-left mark has a notch, so a sideways photo is still read the right way up.</p>
+      <ul class="points">
+        <li>Open a letter, open Font, and under My handwriting choose Make a handwriting font. Then choose Photograph the template.</li>
+        <li>The page is a letter-size sheet. Print it at 100%, so the cells stay the size the reader expects. Write in the cells. Photograph the whole page, including all four corner marks.</li>
+        <li>Choose Photograph it, type the name the seal should use, and choose the photo. The worker builds the font. When it is ready, the line in the dialog is set in that hand.</li>
+        <li>A photo that is missing a corner, or that is not the template, is refused with “The template's corner marks were not found.” A photo from another studio cannot be used.</li>
+      </ul>
+      <p>The worker has to be running, because the website only asks for the build. After <code>git pull</code> and <code>pnpm install</code>:</p>
+      <pre>docker compose up -d
+pnpm dev</pre>
+      <p>Open <a href="http://127.0.0.1:3000/fonts/template">http://127.0.0.1:3000/fonts/template</a>. Print at 100%, write, then photograph the page.</p>
+      <p>The tests run on throwaway Postgres in Docker, and on a synthetic photo that is tilted, scaled and lit unevenly:</p>
+      <pre>pnpm --filter @repo/integrations test --reporter=verbose
+pnpm --filter @repo/services test --reporter=verbose
+pnpm --filter worker test --reporter=verbose</pre>
+      <p>The names read like “the four markers are found within four pixels”, “a sideways photo without EXIF is read the right way up”, “printed borders and labels leave no ink”, “the o has an open counter”, and “another organization's photo cannot make a template font”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, 307 tests, including 7 new template tests, 1 new font service test, and 1 new worker test. Printing and photographing the template on an iPad is still unchecked. There is no iPad in this setup.</p>
+    </details>
     <details id="step-29"><summary><span class="tag later">Later</span> 29. Font from an uploaded TTF or OTF</summary><p>Rebuilt from its outlines in a locked-down thread, never served as uploaded.</p></details>
 
     <h3>M8. Proofs and postcards</h3>

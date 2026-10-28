@@ -4,6 +4,7 @@ export type {
 	Contour,
 	FontBuilder,
 	FromStrokeOutlinesParams,
+	FromTemplatePhotoParams,
 	GlyphOutline,
 	OutlineGlyph,
 	PathSegment,

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { HANDWRITING_GLYPHS, missingChars } from "./handwriting.ts";
+import {
+	HANDWRITING_GLYPHS,
+	HANDWRITING_TEMPLATE,
+	missingChars,
+} from "./handwriting.ts";
 import type { Stroke } from "./stroke.ts";
 
 const stroke: Stroke = {
@@ -60,6 +64,16 @@ describe("HANDWRITING_GLYPHS", () => {
 		).toEqual([..."abcdefghijklmnopqrstuvwxyz", ".", ",", "!", "?", "'"]);
 		expect(new Set(HANDWRITING_GLYPHS.map((glyph) => glyph.char)).size).toBe(
 			HANDWRITING_GLYPHS.length,
+		);
+	});
+
+	it("the glyphs fit the template grid", () => {
+		const cells = HANDWRITING_GLYPHS.reduce(
+			(sum, glyph) => sum + glyph.variants,
+			0,
+		);
+		expect(cells).toBeLessThanOrEqual(
+			HANDWRITING_TEMPLATE.grid.columns * HANDWRITING_TEMPLATE.grid.rows,
 		);
 	});
 });

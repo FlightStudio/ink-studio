@@ -54,13 +54,34 @@ export interface DrawnFontSource {
   kind: DrawnFontSourceKind;
 }
 
+export type TemplatePhotoFontSourceKind = typeof TemplatePhotoFontSourceKind[keyof typeof TemplatePhotoFontSourceKind];
+
+
+export const TemplatePhotoFontSourceKind = {
+  'template-photo': 'template-photo',
+} as const;
+
+export type TemplatePhotoFontSourceTemplateVersion = typeof TemplatePhotoFontSourceTemplateVersion[keyof typeof TemplatePhotoFontSourceTemplateVersion];
+
+
+export const TemplatePhotoFontSourceTemplateVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export interface TemplatePhotoFontSource {
+  kind: TemplatePhotoFontSourceKind;
+  templateVersion: TemplatePhotoFontSourceTemplateVersion;
+  photoAssetId: string;
+}
+
 export interface CreateFontRequest {
   ownerName: string;
-  source?: DrawnFontSource;
+  source?: DrawnFontSource | TemplatePhotoFontSource;
 }
 
 export interface CreatedFont {
   id: string;
+  assetId?: string;
 }
 
 export type GlyphStrokeInput = typeof GlyphStrokeInput[keyof typeof GlyphStrokeInput];
@@ -141,6 +162,7 @@ export const ApiErrorCode = {
   invalid_mask: 'invalid_mask',
   invalid_drawing: 'invalid_drawing',
   invalid_photo: 'invalid_photo',
+  template_markers_not_found: 'template_markers_not_found',
 } as const;
 
 export interface AssetStatus {
