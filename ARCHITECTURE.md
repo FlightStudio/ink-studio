@@ -143,6 +143,9 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | worker            | `apps/worker/src/processors/sweep.ts`                              | `sweepProcessor`, the `sweep` message                                |
 | worker            | `apps/worker/src/processors/asset-lift-ink.ts`                     | `AssetLiftInkProcessor` for the lift-ink message                     |
 | worker            | `apps/worker/src/processors/asset-build-font.ts`                   | `AssetBuildFontProcessor` for a drawn, photographed or uploaded font |
+| worker            | `apps/worker/src/processors/asset-render-letter.ts`                | `AssetRenderLetterProcessor` for a proof                             |
+| web               | `apps/web/src/features/editor/components/export-button.tsx`        | Export proof, then a status pill and a download                      |
+| root              | `Dockerfile.worker`                                                | The worker image, with Chromium and the stock fonts                  |
 | worker            | `apps/worker/package.json`                                         | `dev` runs the standard pool, `dev:render` the render pool           |
 | tools             | `tools/check-comments.ts`                                          | No-comment check                                                     |
 | tools             | `tools/check-architecture.ts`                                      | This map stays honest                                                |
@@ -277,6 +280,8 @@ The list in `apps/web/src/app/(studio)/letters/page.tsx` reads `listLetters`; a 
 
 `LetterEditor` measures after each edit and again when the document's fonts are ready. `PageState` holds that `LetterMeasure`, the `sidesUsed` count given `minSides`, `overflowIn`, and `placementIssues`. The inches passed in are the measure's gap-free inches. `sheets` is the sides in use, plus one ghost sheet when text overflows. `AddSide` is one document-attribute transaction on `minSides`, offered while that is below the spec's `maxPages`. `HumanSeal` renders `humanSeal` under the page; own fonts are an empty map until a later step. `SidesIndicator` reads both counts from the spec's `maxPages`.
 
+Export proof freezes the letter as it is saved and asks the render pool for the file. `requestExport` checks the revision and that the caller may edit the letter, then inserts one proof when the product's output is a PDF and one PNG per side when it is PNG. Each job carries that snapshot and the sample merge values. The render takes one recipient's values; the v2 proof uses the samples; project-post's fulfilment calls it once per recipient. The worker measures with the longest sample, refuses the proof when the words do not fit or a doodle sits in a keep-clear zone, and names the download from the title. A finished proof is servable. The uploaded photo and the raw font file still are not.
+
 Formatting sets one ink attribute. `EditorToolbar` in `apps/web/src/features/editor/components/editor-toolbar.tsx` offers `STOCK_FONTS`, `TEXT_SIZES`, `INK_COLORS` and the paragraph aligns, and each choice is one `setMark("ink", …)` or one paragraph attribute with only the changed value, so a colour change keeps the font and an unset attribute still falls back to the letter's defaults. Every formatting command closes the history first, so it is its own undo step even right after typing. Undo and redo are the history commands, on the toolbar and on Meta+Z and Shift+Meta+Z as well as Mod, in `packages/render/src/schema/letter-schema.ts`. The toolbar shows the selection's resolved style, mark over default, and shows nothing for an attribute the selection mixes. With a fine pointer it sticks to the top of the desk; with a coarse pointer it follows the browser's `visualViewport` to sit above the on-screen keyboard, and the title and save line move up to clear it. The formatted letter saves through the same parser as everything else.
 
 Autosave is one pure reducer, `autosave` in `apps/web/src/lib/autosave.ts`. An edit schedules a save `SAVE_DELAY_MS` later; an edit during a save saves again at once with the new revision; a failed save waits `RETRY_FIRST_MS`, doubling up to `RETRY_MAX_MS`, and an edit does not shorten the wait; a stale save holds every edit in `conflict` until the creator chooses. `useAutosave` in `apps/web/src/lib/use-autosave.ts` drives it with timers and the generated client, warns before unload while anything is unsaved, and when the tab comes back into view reloads a newer version if it has nothing unsaved. Load the latest refreshes the page; Keep mine reads the latest revision and saves over it. `SaveLine` shows which state the letter is in.
@@ -332,11 +337,12 @@ The worker runs as two pools from one codebase, `apps/worker`. Each process read
 
 Locally the `pubsub` service in `docker-compose.yml` runs the emulator from `tools/docker/Dockerfile.pubsub`, and its healthcheck passes once the subscriptions exist. `pnpm dev` runs `turbo run dev dev:render`, so the web, the standard pool (`dev`) and the render pool (`dev:render`, which sets `WORKER_POOL` and `PUBSUB_JOBS_SUBSCRIPTION` for the render pool) start together. Both pools read the worker's env file, copied from `apps/worker/.env.example`.
 
-| Message type | Pool     | Processor                                        | Data          |
-| ------------ | -------- | ------------------------------------------------ | ------------- |
-| `sweep`      | standard | `apps/worker/src/processors/sweep.ts`            | `{}`          |
-| lift-ink     | standard | `apps/worker/src/processors/asset-lift-ink.ts`   | `{ assetId }` |
-| build-font   | standard | `apps/worker/src/processors/asset-build-font.ts` | `{ assetId }` |
+| Message type  | Pool     | Processor                                           | Data          |
+| ------------- | -------- | --------------------------------------------------- | ------------- |
+| `sweep`       | standard | `apps/worker/src/processors/sweep.ts`               | `{}`          |
+| lift-ink      | standard | `apps/worker/src/processors/asset-lift-ink.ts`      | `{ assetId }` |
+| build-font    | standard | `apps/worker/src/processors/asset-build-font.ts`    | `{ assetId }` |
+| render-letter | render   | `apps/worker/src/processors/asset-render-letter.ts` | `{ assetId }` |
 
 ### One lifecycle for every generated file
 

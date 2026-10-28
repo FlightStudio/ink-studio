@@ -44,7 +44,7 @@ beforeEach(() => {
 		publish: vi.fn<Publisher["publish"]>(async () => {}),
 	};
 	drawings = new DrawingService(testDb.db, storage, publisher);
-	letters = new LetterService(testDb.db);
+	letters = new LetterService(testDb.db, publisher);
 	assets = new AssetService(testDb.db, storage, publisher);
 });
 

@@ -4,6 +4,7 @@ export type {
 	AssetOrigin,
 	AssetProcessing,
 	AssetProcessingStatus,
+	PrintOutput,
 	UploadPurpose,
 } from "./asset.ts";
 export { assetMessageType } from "./asset.ts";

@@ -29,7 +29,7 @@ export async function startHarness(): Promise<Harness> {
 	const url = process.env.DATABASE_URL;
 	if (!url) throw new Error("DATABASE_URL is required for the e2e harness");
 	const db = createDb(url);
-	const letters = new LetterService(db);
+	const letters = new LetterService(db, { publish: async () => {} });
 	const browsers = await startTestBrowser({
 		chromiumArgs: ["--host-resolver-rules=MAP localhost host.docker.internal"],
 	});

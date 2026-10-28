@@ -1,10 +1,12 @@
 import type { TestDb } from "@repo/db";
 import { seedDevIdentity, startTestDb } from "@repo/db/testing";
 import type { LetterContent, Member } from "@repo/types";
+import { SAMPLE_MERGE_VALUES } from "@repo/types";
 import { v7 as uuidv7 } from "uuid";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { generatedAsset } from "../assets/assets.service.ts";
 import { FontService } from "../fonts/fonts.service.ts";
+import type { Publisher } from "../queue/queue.types.ts";
 import { LetterService } from "./letters.service.ts";
 
 const ownFontId = "0192e4a0-7b1c-7cc3-9a5e-3f1d2b4c5a10";
@@ -14,7 +16,7 @@ let letters: LetterService;
 
 beforeAll(async () => {
 	testDb = await startTestDb();
-	letters = new LetterService(testDb.db);
+	letters = new LetterService(testDb.db, { publish: async () => {} });
 });
 
 afterAll(async () => {
@@ -503,4 +505,83 @@ it("a deleted font still renders in letters that use it", async () => {
 	const seen = await letters.getLetter(karla, id);
 	expect(seen?.resources.fonts).toEqual({ [font.id]: assetId });
 	expect(seen?.editable).toBe(true);
+});
+
+it("an export of a stale revision is refused", async () => {
+	const ada = await member("ada-stale-export");
+	const publish = vi.fn<Publisher["publish"]>(async () => {});
+	const exporting = new LetterService(testDb.db, { publish });
+	const { id } = await exporting.createLetter(ada, {});
+	await expect(
+		exporting.requestExport(ada, id, { revision: 2 }),
+	).rejects.toMatchObject({ kind: "conflict", code: "stale_revision" });
+	expect(publish).not.toHaveBeenCalled();
+});
+
+it("an export carries the letter as it was and one recipient's values", async () => {
+	const ada = await member("ada-export-snapshot");
+	const publish = vi.fn<Publisher["publish"]>(async () => {});
+	const exporting = new LetterService(testDb.db, { publish });
+	const { id } = await exporting.createLetter(ada, {});
+	const created = await stored(ada, id);
+	await exporting.saveLetter(ada, id, {
+		title: "First",
+		content: written(created.content, "Original sentence"),
+		expectedRevision: 1,
+	});
+	const before = await stored(ada, id);
+	const { assetIds } = await exporting.requestExport(ada, id, { revision: 2 });
+	await exporting.saveLetter(ada, id, {
+		title: "Second",
+		content: written(before.content, "Edited sentence"),
+		expectedRevision: 2,
+	});
+	const asset = await testDb.db.assets.byId(
+		organizationId(ada),
+		assetIds[0] ?? "",
+	);
+	expect(asset?.origin).toMatchObject({
+		source: "generated",
+		job: {
+			kind: "render-letter",
+			content: before.content,
+			mergeValues: SAMPLE_MERGE_VALUES,
+		},
+	});
+});
+
+it("a letter exports one PDF", async () => {
+	const ada = await member("ada-export-pdf");
+	const publish = vi.fn<Publisher["publish"]>(async () => {});
+	const exporting = new LetterService(testDb.db, { publish });
+	const { id } = await exporting.createLetter(ada, {});
+	const { assetIds } = await exporting.requestExport(ada, id, { revision: 1 });
+	expect(assetIds).toHaveLength(1);
+	const asset = await testDb.db.assets.byId(
+		organizationId(ada),
+		assetIds[0] ?? "",
+	);
+	expect(asset?.origin).toMatchObject({
+		source: "generated",
+		job: { output: { format: "pdf", duplex: true } },
+	});
+	expect(publish).toHaveBeenCalledExactlyOnceWith("asset.render-letter", {
+		assetId: assetIds[0],
+	});
+});
+
+it("a teammate cannot export a letter in Karla's hand", async () => {
+	const karla = await member("karla-export-owner");
+	const sam = await teammate(karla, "sam-export-owner");
+	const font = await handwriting(karla, await fontFile(karla));
+	const { id } = await letters.createLetter(karla, {});
+	const { content } = await stored(karla, id);
+	await letters.saveLetter(karla, id, {
+		title: "Her hand",
+		content: inHand(content, font.id),
+		expectedRevision: 1,
+	});
+	await expect(
+		letters.requestExport(sam, id, { revision: 2 }),
+	).rejects.toMatchObject({ kind: "forbidden", code: "not_owner" });
 });

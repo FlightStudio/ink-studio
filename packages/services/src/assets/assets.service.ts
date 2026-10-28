@@ -5,6 +5,7 @@ import {
 	type Asset,
 	type AssetJob,
 	assetMessageType,
+	type PrintOutput,
 	type UploadPurpose,
 	type UserOrganization,
 } from "@repo/types";
@@ -146,8 +147,18 @@ export function isServable(asset: Asset): boolean {
 	return (
 		asset.origin.source === "generated" &&
 		(asset.origin.job.kind === "lift-ink" ||
-			asset.origin.job.kind === "build-font")
+			asset.origin.job.kind === "build-font" ||
+			asset.origin.job.kind === "render-letter")
 	);
+}
+
+export function proofDownloadName(title: string, output: PrintOutput): string {
+	const slug = title
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/gu, "-")
+		.replace(/^-+|-+$/gu, "");
+	if (output.format === "pdf") return `${slug}-proof.pdf`;
+	return `${slug}-proof-side-${output.side}.png`;
 }
 
 export async function assetReadUrl(
@@ -155,9 +166,15 @@ export async function assetReadUrl(
 	asset: Asset,
 ): Promise<string | null> {
 	if (!isServable(asset)) return null;
+	const downloadName =
+		asset.origin.source === "generated" &&
+		asset.origin.job.kind === "render-letter"
+			? proofDownloadName(asset.origin.job.title, asset.origin.job.output)
+			: undefined;
 	return storage.signedReadUrl({
 		key: asset.storageKey,
 		expiresInSeconds: READ_URL_EXPIRES_IN_SECONDS,
+		...(downloadName === undefined ? {} : { downloadName }),
 	});
 }
 

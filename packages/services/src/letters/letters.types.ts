@@ -1,5 +1,9 @@
-import type { CreateLetterRequest, SaveLetterRequest } from "@repo/api";
-import type { LetterContent, LetterResources } from "@repo/types";
+import type {
+	CreateLetterRequest,
+	RequestExportRequest,
+	SaveLetterRequest,
+} from "@repo/api";
+import type { LetterContent, LetterResources, PrintOutput } from "@repo/types";
 
 export type LetterListItem = {
 	id: string;
@@ -24,6 +28,8 @@ export type SaveLetterParams = SaveLetterRequest;
 
 export type CreateLetterParams = CreateLetterRequest;
 
+export type RequestExportParams = RequestExportRequest;
+
 export type MeasureInput = {
 	heightIn: number;
 	marginIn: number;
@@ -39,9 +45,7 @@ export type LetterMeasure = {
 
 export type PrintResource = { bytes: Uint8Array; contentType: string };
 
-export type PrintOutput =
-	| { format: "pdf"; duplex: boolean }
-	| { format: "png"; side: number };
+export type { PrintOutput };
 
 export type MeasureParams = {
 	html: string;

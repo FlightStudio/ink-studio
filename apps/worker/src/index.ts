@@ -1,9 +1,11 @@
+import { pathToFileURL } from "node:url";
 import { createDb } from "@repo/db";
 import {
 	GcsAssetStorage,
 	PubSubPublisher,
 	PubSubSubscriber,
 } from "@repo/integrations/shared/gcp";
+import { PlaywrightPrintRenderer } from "@repo/integrations/worker/chromium";
 import { OpentypeFontBuilder } from "@repo/integrations/worker/font";
 import { SharpImageProcessor } from "@repo/integrations/worker/image";
 import { AssetService, SWEEP_MESSAGE_TYPE } from "@repo/services/assets";
@@ -12,7 +14,16 @@ import { env } from "./env.ts";
 import { logger } from "./lib/logger.ts";
 import { AssetBuildFontProcessor } from "./processors/asset-build-font.ts";
 import { AssetLiftInkProcessor } from "./processors/asset-lift-ink.ts";
+import { AssetRenderLetterProcessor } from "./processors/asset-render-letter.ts";
 import { sweepProcessor } from "./processors/sweep.ts";
+
+function stockFontsDir(): URL {
+	const url = env.STOCK_FONTS_DIR.startsWith("file:")
+		? new URL(env.STOCK_FONTS_DIR)
+		: pathToFileURL(env.STOCK_FONTS_DIR);
+	if (!url.pathname.endsWith("/")) url.pathname += "/";
+	return url;
+}
 
 function fontBuilderParams() {
 	const source = import.meta.url.endsWith(".ts");
@@ -51,23 +62,40 @@ async function main(): Promise<void> {
 	});
 	const assets = new AssetService(db, storage, publisher);
 	const standard = env.WORKER_POOL === "standard";
-	const processors: MessageProcessor[] = standard
-		? [
-				sweepProcessor(assets, log),
-				new AssetLiftInkProcessor({
-					db,
-					assets,
-					storage,
-					images: new SharpImageProcessor(),
-				}),
-				new AssetBuildFontProcessor({
-					db,
-					assets,
-					storage,
-					builder: new OpentypeFontBuilder(fontBuilderParams()),
-				}),
-			]
-		: [];
+	let renderer: PlaywrightPrintRenderer | undefined;
+	const processors: MessageProcessor[] = [];
+	if (standard) {
+		processors.push(
+			sweepProcessor(assets, log),
+			new AssetLiftInkProcessor({
+				db,
+				assets,
+				storage,
+				images: new SharpImageProcessor(),
+			}),
+			new AssetBuildFontProcessor({
+				db,
+				assets,
+				storage,
+				builder: new OpentypeFontBuilder(fontBuilderParams()),
+			}),
+		);
+	} else {
+		renderer = env.BROWSER_WS_ENDPOINT
+			? await PlaywrightPrintRenderer.connect({
+					wsEndpoint: env.BROWSER_WS_ENDPOINT,
+				})
+			: await PlaywrightPrintRenderer.launch();
+		processors.push(
+			new AssetRenderLetterProcessor({
+				db,
+				assets,
+				storage,
+				renderer,
+				stockFontsDir: stockFontsDir(),
+			}),
+		);
+	}
 	const queue = new QueueManager({ processors, logger: log });
 	const subscriber = new PubSubSubscriber({
 		projectId: env.GOOGLE_CLOUD_PROJECT,
@@ -100,6 +128,7 @@ async function main(): Promise<void> {
 	});
 	log.info("worker stopping", { signal });
 	clearInterval(sweepTimer);
+	await renderer?.close();
 	await subscriber.close();
 	await publisher.close();
 	await db.close();

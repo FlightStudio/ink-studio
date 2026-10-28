@@ -14,6 +14,7 @@ export type {
 	PrintRenderer,
 	PrintResource,
 	RenderParams,
+	RequestExportParams,
 	SaveLetterParams,
 	SealFontView,
 } from "./letters.types.ts";

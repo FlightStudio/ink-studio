@@ -9,14 +9,23 @@ import type {
 	LetterResources,
 	Member,
 	PageFormatId,
+	PrintOutput,
 	ProductKind,
 	SealFont,
 } from "@repo/types";
-import { DEFAULT_FORMAT, humanSeal, PAGE_SPECS } from "@repo/types";
+import {
+	DEFAULT_FORMAT,
+	humanSeal,
+	PAGE_SPECS,
+	SAMPLE_MERGE_VALUES,
+} from "@repo/types";
+import { generatedAsset, publishAssetJob } from "../assets/assets.service.ts";
+import type { Publisher } from "../queue/queue.types.ts";
 import type {
 	CreateLetterParams,
 	EditableLetter,
 	LetterListItem,
+	RequestExportParams,
 	SaveLetterParams,
 } from "./letters.types.ts";
 
@@ -168,10 +177,16 @@ async function knownDrawings(
 	}
 }
 
+const EDITOR_BASES = {
+	assetBaseUrl: "/api/assets/",
+	stockFontBaseUrl: "/fonts/stock/",
+};
+
 export async function letterResources(
 	tx: Tx,
 	organizationId: string,
 	content: LetterContent,
+	bases: { assetBaseUrl: string; stockFontBaseUrl: string } = EDITOR_BASES,
 ): Promise<LetterResources> {
 	const ids = [
 		...new Set(content.doc.attrs.elements.map((element) => element.drawingId)),
@@ -190,8 +205,8 @@ export async function letterResources(
 		if (font.fontAssetId !== null) fonts[font.id] = font.fontAssetId;
 	}
 	return {
-		assetBaseUrl: "/api/assets/",
-		stockFontBaseUrl: "/fonts/stock/",
+		assetBaseUrl: bases.assetBaseUrl,
+		stockFontBaseUrl: bases.stockFontBaseUrl,
 		fonts,
 		drawings,
 	};
@@ -206,8 +221,22 @@ export async function letterOwnerIds(
 	return new Set(fonts.map((font) => font.ownerUserId));
 }
 
+function proofOutputs(content: LetterContent): PrintOutput[] {
+	const spec = PAGE_SPECS[content.format];
+	if (spec.output === "pdf") {
+		return [{ format: "pdf", duplex: spec.duplex }];
+	}
+	return Array.from({ length: spec.maxPages }, (_, side) => ({
+		format: "png",
+		side,
+	}));
+}
+
 export class LetterService {
-	constructor(private readonly db: Db) {}
+	constructor(
+		private readonly db: Db,
+		private readonly publisher: Publisher,
+	) {}
 
 	async createLetter(
 		member: Member,
@@ -287,6 +316,45 @@ export class LetterService {
 		const existing = await this.db.letters.byId(organizationId, letterId);
 		if (existing) throw new ServiceError("conflict", "stale_revision");
 		throw new ServiceError("not_found", "not_found");
+	}
+
+	async requestExport(
+		member: Member,
+		letterId: string,
+		params: RequestExportParams,
+	): Promise<{ assetIds: string[] }> {
+		const organizationId = member.userOrganization.organizationId;
+		const created = await this.db.transaction(async (tx) => {
+			const letter = await tx.letters.byId(organizationId, letterId);
+			if (!letter) throw new ServiceError("not_found", "not_found");
+			if (letter.revision !== params.revision) {
+				throw new ServiceError("conflict", "stale_revision");
+			}
+			const owners = await letterOwnerIds(tx, organizationId, letter.content);
+			if (![...owners].every((id) => id === member.user.id)) {
+				throw new ServiceError("forbidden", "not_owner");
+			}
+			const assets = [];
+			for (const output of proofOutputs(letter.content)) {
+				assets.push(
+					await tx.assets.create(
+						generatedAsset(organizationId, {
+							kind: "render-letter",
+							letterId,
+							title: letter.title,
+							content: letter.content,
+							mergeValues: SAMPLE_MERGE_VALUES,
+							output,
+						}),
+					),
+				);
+			}
+			return assets;
+		});
+		for (const asset of created) {
+			await publishAssetJob(this.publisher, asset);
+		}
+		return { assetIds: created.map((asset) => asset.id) };
 	}
 
 	async deleteLetter(member: Member, letterId: string): Promise<void> {

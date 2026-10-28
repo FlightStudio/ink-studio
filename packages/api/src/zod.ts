@@ -16,7 +16,9 @@ import {
 	type LetterState,
 	PageFormatId,
 	type RenameDrawingRequest,
+	type RequestExportRequest,
 	type RequestedBuild,
+	type RequestedExport,
 	type RequestedLift,
 	type RequestLiftRequest,
 	type SavedLetter,
@@ -57,6 +59,17 @@ export const createLetterRequestSchema: z.ZodType<CreateLetterRequest> =
 export const createdLetterSchema: z.ZodType<CreatedLetter> = z.strictObject({
 	id: z.uuid(),
 });
+
+export const requestExportRequestSchema: z.ZodType<RequestExportRequest> =
+	z.strictObject({
+		revision: z.number().int().min(1),
+	});
+
+export const requestedExportSchema: z.ZodType<RequestedExport> = z.strictObject(
+	{
+		assetIds: z.array(z.uuid()),
+	},
+);
 
 export const saveLetterRequestSchema: z.ZodType<SaveLetterRequest> =
 	z.strictObject({

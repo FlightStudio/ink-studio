@@ -26,6 +26,15 @@ export interface CreatedLetter {
   id: string;
 }
 
+export interface RequestExportRequest {
+  /** @minimum 1 */
+  revision: number;
+}
+
+export interface RequestedExport {
+  assetIds: string[];
+}
+
 export interface SaveLetterRequest {
   title: string;
   content: LetterContentEnvelope;
@@ -178,6 +187,8 @@ export const ApiErrorCode = {
   font_unreadable: 'font_unreadable',
   font_timeout: 'font_timeout',
   font_missing_glyphs: 'font_missing_glyphs',
+  letter_overflow: 'letter_overflow',
+  letter_placement: 'letter_placement',
 } as const;
 
 export interface AssetStatus {
@@ -666,6 +677,98 @@ export const deleteLetter = async (letterId: string, options?: RequestInit): Pro
 
   const data: deleteLetterResponse['data'] = body ? JSON.parse(body) : undefined
   return { data, status: res.status, headers: res.headers } as deleteLetterResponse
+}
+
+
+
+export type requestExportResponse201 = {
+  data: RequestedExport
+  status: 201
+}
+
+export type requestExportResponse400 = {
+  data: InvalidRequestResponse
+  status: 400
+}
+
+export type requestExportResponse401 = {
+  data: UnauthenticatedResponse
+  status: 401
+}
+
+export type requestExportResponse403 = {
+  data: ForbiddenResponse
+  status: 403
+}
+
+export type requestExportResponse404 = {
+  data: NotFoundResponse
+  status: 404
+}
+
+export type requestExportResponse409 = {
+  data: ConflictResponse
+  status: 409
+}
+
+export type requestExportResponse415 = {
+  data: UnsupportedMediaTypeResponse
+  status: 415
+}
+
+export type requestExportResponse500 = {
+  data: InternalErrorResponse
+  status: 500
+}
+
+export type requestExportResponseSuccess = (requestExportResponse201) & {
+  headers: Headers;
+};
+export type requestExportResponseError = (requestExportResponse400 | requestExportResponse401 | requestExportResponse403 | requestExportResponse404 | requestExportResponse409 | requestExportResponse415 | requestExportResponse500) & {
+  headers: Headers;
+};
+
+export type requestExportResponse = (requestExportResponseSuccess | requestExportResponseError)
+
+export const getRequestExportUrl = (letterId: string,) => {
+
+
+
+
+  return `/api/letters/${letterId}/exports`
+}
+
+export const requestExport = async (letterId: string,
+    requestExportRequest: RequestExportRequest, options?: RequestInit): Promise<requestExportResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getRequestExportUrl(letterId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(requestExportRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: requestExportResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as requestExportResponse
 }
 
 
