@@ -4,6 +4,7 @@ import {
 	PubSubPublisher,
 } from "@repo/integrations/shared/gcp";
 import { AssetService, type AssetStorage } from "@repo/services/assets";
+import { FontService } from "@repo/services/fonts";
 import { LetterService } from "@repo/services/letters";
 import type { Publisher } from "@repo/services/queue";
 import { env } from "../env.ts";
@@ -13,6 +14,7 @@ let letters: LetterService | undefined;
 let assetStorage: AssetStorage | undefined;
 let publisher: Publisher | undefined;
 let assets: AssetService | undefined;
+let fonts: FontService | undefined;
 
 export function getDb(): Db {
 	db ??= createDb(env.DATABASE_URL);
@@ -45,4 +47,9 @@ export function getPublisher(): Publisher {
 export function getAssetService(): AssetService {
 	assets ??= new AssetService(getDb(), getAssetStorage(), getPublisher());
 	return assets;
+}
+
+export function getFontService(): FontService {
+	fonts ??= new FontService(getDb(), getPublisher());
+	return fonts;
 }

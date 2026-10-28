@@ -5,6 +5,7 @@
 	"exports": {
 		"./assets": "./src/assets/index.ts",
 		"./drawings": "./src/drawings/index.ts",
+		"./fonts": "./src/fonts/index.ts",
 		"./letters": "./src/letters/index.ts",
 		"./queue": "./src/queue/index.ts"
 	},

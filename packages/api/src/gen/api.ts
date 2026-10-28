@@ -43,6 +43,51 @@ export interface LetterState {
   content: LetterContentEnvelope;
 }
 
+export type DrawnFontSourceKind = typeof DrawnFontSourceKind[keyof typeof DrawnFontSourceKind];
+
+
+export const DrawnFontSourceKind = {
+  drawn: 'drawn',
+} as const;
+
+export interface DrawnFontSource {
+  kind: DrawnFontSourceKind;
+}
+
+export interface CreateFontRequest {
+  ownerName: string;
+  source?: DrawnFontSource;
+}
+
+export interface CreatedFont {
+  id: string;
+}
+
+export type GlyphStrokeInput = typeof GlyphStrokeInput[keyof typeof GlyphStrokeInput];
+
+
+export const GlyphStrokeInput = {
+  pen: 'pen',
+  mouse: 'mouse',
+  touch: 'touch',
+} as const;
+
+export interface GlyphStroke {
+  input: GlyphStrokeInput;
+  /**
+     * @items.minItems 4
+     * @items.maxItems 4
+     */
+  points: number[][];
+}
+
+export interface SaveGlyphRequest {
+  char: string;
+  /** @minimum 0 */
+  variant: number;
+  strokes: GlyphStroke[];
+}
+
 export type UploadPurpose = typeof UploadPurpose[keyof typeof UploadPurpose];
 
 
@@ -80,6 +125,9 @@ export const ApiErrorCode = {
   no_organization: 'no_organization',
   invalid_letter: 'invalid_letter',
   invalid_title: 'invalid_title',
+  invalid_owner_name: 'invalid_owner_name',
+  invalid_glyphs: 'invalid_glyphs',
+  not_owner: 'not_owner',
   stale_revision: 'stale_revision',
   file_too_large: 'file_too_large',
   unsupported_file: 'unsupported_file',
@@ -493,6 +541,236 @@ export const deleteLetter = async (letterId: string, options?: RequestInit): Pro
 
   const data: deleteLetterResponse['data'] = body ? JSON.parse(body) : undefined
   return { data, status: res.status, headers: res.headers } as deleteLetterResponse
+}
+
+
+
+export type createFontResponse201 = {
+  data: CreatedFont
+  status: 201
+}
+
+export type createFontResponse400 = {
+  data: InvalidRequestResponse
+  status: 400
+}
+
+export type createFontResponse401 = {
+  data: UnauthenticatedResponse
+  status: 401
+}
+
+export type createFontResponse403 = {
+  data: ForbiddenResponse
+  status: 403
+}
+
+export type createFontResponse415 = {
+  data: UnsupportedMediaTypeResponse
+  status: 415
+}
+
+export type createFontResponse500 = {
+  data: InternalErrorResponse
+  status: 500
+}
+
+export type createFontResponseSuccess = (createFontResponse201) & {
+  headers: Headers;
+};
+export type createFontResponseError = (createFontResponse400 | createFontResponse401 | createFontResponse403 | createFontResponse415 | createFontResponse500) & {
+  headers: Headers;
+};
+
+export type createFontResponse = (createFontResponseSuccess | createFontResponseError)
+
+export const getCreateFontUrl = () => {
+
+
+
+
+  return `/api/fonts`
+}
+
+export const createFont = async (createFontRequest: CreateFontRequest, options?: RequestInit): Promise<createFontResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getCreateFontUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createFontRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createFontResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as createFontResponse
+}
+
+
+
+export type deleteFontResponse204 = {
+  data: void
+  status: 204
+}
+
+export type deleteFontResponse401 = {
+  data: UnauthenticatedResponse
+  status: 401
+}
+
+export type deleteFontResponse403 = {
+  data: ForbiddenResponse
+  status: 403
+}
+
+export type deleteFontResponse404 = {
+  data: NotFoundResponse
+  status: 404
+}
+
+export type deleteFontResponse500 = {
+  data: InternalErrorResponse
+  status: 500
+}
+
+export type deleteFontResponseSuccess = (deleteFontResponse204) & {
+  headers: Headers;
+};
+export type deleteFontResponseError = (deleteFontResponse401 | deleteFontResponse403 | deleteFontResponse404 | deleteFontResponse500) & {
+  headers: Headers;
+};
+
+export type deleteFontResponse = (deleteFontResponseSuccess | deleteFontResponseError)
+
+export const getDeleteFontUrl = (fontId: string,) => {
+
+
+
+
+  return `/api/fonts/${fontId}`
+}
+
+export const deleteFont = async (fontId: string, options?: RequestInit): Promise<deleteFontResponse> => {
+
+  const res = await fetch(getDeleteFontUrl(fontId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: deleteFontResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as deleteFontResponse
+}
+
+
+
+export type saveGlyphResponse204 = {
+  data: void
+  status: 204
+}
+
+export type saveGlyphResponse400 = {
+  data: InvalidRequestResponse
+  status: 400
+}
+
+export type saveGlyphResponse401 = {
+  data: UnauthenticatedResponse
+  status: 401
+}
+
+export type saveGlyphResponse403 = {
+  data: ForbiddenResponse
+  status: 403
+}
+
+export type saveGlyphResponse404 = {
+  data: NotFoundResponse
+  status: 404
+}
+
+export type saveGlyphResponse415 = {
+  data: UnsupportedMediaTypeResponse
+  status: 415
+}
+
+export type saveGlyphResponse500 = {
+  data: InternalErrorResponse
+  status: 500
+}
+
+export type saveGlyphResponseSuccess = (saveGlyphResponse204) & {
+  headers: Headers;
+};
+export type saveGlyphResponseError = (saveGlyphResponse400 | saveGlyphResponse401 | saveGlyphResponse403 | saveGlyphResponse404 | saveGlyphResponse415 | saveGlyphResponse500) & {
+  headers: Headers;
+};
+
+export type saveGlyphResponse = (saveGlyphResponseSuccess | saveGlyphResponseError)
+
+export const getSaveGlyphUrl = (fontId: string,) => {
+
+
+
+
+  return `/api/fonts/${fontId}/glyphs`
+}
+
+export const saveGlyph = async (fontId: string,
+    saveGlyphRequest: SaveGlyphRequest, options?: RequestInit): Promise<saveGlyphResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getSaveGlyphUrl(fontId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(saveGlyphRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: saveGlyphResponse['data'] = body ? JSON.parse(body) : undefined
+  return { data, status: res.status, headers: res.headers } as saveGlyphResponse
 }
 
 
