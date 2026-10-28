@@ -149,6 +149,52 @@ it("a mask from another organization is not found", async () => {
 	).rejects.toMatchObject({ kind: "not_found", code: "not_found" });
 });
 
+it("a photographed doodle remembers its photo", async () => {
+	const ada = await member("ada-photo-source");
+	const photoAssetId = await upload(ada, "photo", JPEG);
+	const maskAssetId = await upload(ada, "mask", png(40, 20));
+	const { id } = await drawings.createDrawing(ada, {
+		kind: "doodle",
+		name: "Snap",
+		maskAssetId,
+		source: { kind: "photo", photoAssetId },
+	});
+	const stored = await testDb.db.drawings.byId(
+		ada.userOrganization.organizationId,
+		id,
+	);
+	expect(stored?.source).toEqual({ kind: "photo", photoAssetId });
+	expect(stored?.aspect).toBe(2);
+});
+
+it("another organization's photo is not the source of a doodle", async () => {
+	const ada = await member("ada-photo-owner");
+	const bob = await member("bob-photo-owner");
+	const photoAssetId = await upload(bob, "photo", JPEG);
+	const maskAssetId = await upload(ada, "mask", png(20, 20));
+	await expect(
+		drawings.createDrawing(ada, {
+			kind: "doodle",
+			name: "Snap",
+			maskAssetId,
+			source: { kind: "photo", photoAssetId },
+		}),
+	).rejects.toMatchObject({ kind: "not_found", code: "not_found" });
+});
+
+it("only a photo can be the source of a photographed doodle", async () => {
+	const ada = await member("ada-photo-kind");
+	const maskAssetId = await upload(ada, "mask", png(20, 20));
+	await expect(
+		drawings.createDrawing(ada, {
+			kind: "doodle",
+			name: "Snap",
+			maskAssetId,
+			source: { kind: "photo", photoAssetId: maskAssetId },
+		}),
+	).rejects.toMatchObject({ kind: "invalid_input", code: "invalid_drawing" });
+});
+
 it("a photo cannot be a mask", async () => {
 	const ada = await member("ada-photo-mask");
 	const photo = Uint8Array.from([

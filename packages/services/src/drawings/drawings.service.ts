@@ -4,7 +4,11 @@ import type { Drawing, DrawingKind, LibraryDrawing, Member } from "@repo/types";
 import { generatedAsset, publishAssetJob } from "../assets/assets.service.ts";
 import type { AssetStorage } from "../assets/assets.types.ts";
 import type { Publisher } from "../queue/queue.types.ts";
-import { DRAWING_LIMITS, drawnSourceSchema } from "./drawings.schemas.ts";
+import {
+	DRAWING_LIMITS,
+	drawnSourceSchema,
+	photoSourceSchema,
+} from "./drawings.schemas.ts";
 import type {
 	CreateDrawingParams,
 	RequestLiftParams,
@@ -123,8 +127,9 @@ export class DrawingService {
 		params: CreateDrawingParams,
 	): Promise<{ id: string }> {
 		const name = validName(params.name);
-		const source = drawnSourceSchema.safeParse(params.source);
-		if (!source.success) throw invalidDrawing();
+		const drawn = drawnSourceSchema.safeParse(params.source);
+		const photo = photoSourceSchema.safeParse(params.source);
+		if (!drawn.success && !photo.success) throw invalidDrawing();
 		if (params.kind !== "doodle" && params.kind !== "signature") {
 			throw invalidDrawing();
 		}
@@ -134,6 +139,25 @@ export class DrawingService {
 		if (asset.origin.source !== "uploaded" || asset.origin.purpose !== "mask") {
 			throw invalidMask();
 		}
+		if (photo.success) {
+			const sourcePhoto = await this.db.assets.byId(
+				organizationId,
+				photo.data.photoAssetId,
+			);
+			if (!sourcePhoto) throw new ServiceError("not_found", "not_found");
+			if (
+				sourcePhoto.origin.source !== "uploaded" ||
+				sourcePhoto.origin.purpose !== "photo"
+			) {
+				throw invalidDrawing();
+			}
+		}
+		const source = drawn.success
+			? drawn.data
+			: photo.success
+				? photo.data
+				: null;
+		if (!source) throw invalidDrawing();
 		const bytes = await this.storage.get(asset.storageKey);
 		const { width, height } = maskSize(bytes);
 		const drawing = await this.db.drawings.create({
@@ -141,7 +165,7 @@ export class DrawingService {
 			ownerUserId: member.user.id,
 			kind: params.kind,
 			name,
-			source: source.data,
+			source,
 			maskAssetId: asset.id,
 			aspect: width / height,
 		});

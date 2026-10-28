@@ -12,6 +12,7 @@ import {
 } from "@repo/ui/components/ui/sheet";
 import { useState, useSyncExternalStore } from "react";
 import { DrawDoodleDialog } from "./draw-doodle-dialog.tsx";
+import { PhotoDoodleDialog } from "./photo-doodle-dialog.tsx";
 
 const NARROW = "(max-width: 899px)";
 const NAME_LIMIT = 60;
@@ -46,6 +47,7 @@ export function LibrarySheet({
 	const narrow = useNarrow();
 	const [drawings, setDrawings] = useState(initial);
 	const [drawOpen, setDrawOpen] = useState(false);
+	const [photoOpen, setPhotoOpen] = useState(false);
 	const [renaming, setRenaming] = useState<string | null>(null);
 	const [draft, setDraft] = useState("");
 
@@ -88,25 +90,25 @@ export function LibrarySheet({
 							Doodles saved for this studio. Tap one to put it on the page.
 						</SheetDescription>
 					</SheetHeader>
-					{drawings.length === 0 ? (
-						<div className="flex flex-col gap-3 px-4 pb-4">
+					<div className="flex flex-col gap-3 px-4 pb-4">
+						{drawings.length === 0 ? (
 							<p className="text-ui text-ink-muted">
-								Nothing saved yet. Draw one, or photograph one later.
+								Nothing saved yet. Draw one, or photograph one.
 							</p>
-							<div className="flex gap-2">
-								<Button type="button" onClick={() => setDrawOpen(true)}>
-									Draw
-								</Button>
-								<Button type="button" variant="outline">
-									Photograph
-								</Button>
-							</div>
-						</div>
-					) : (
-						<div className="flex flex-col gap-3 px-4 pb-4">
+						) : null}
+						<div className="flex gap-2">
 							<Button type="button" onClick={() => setDrawOpen(true)}>
 								Draw
 							</Button>
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() => setPhotoOpen(true)}
+							>
+								Photograph
+							</Button>
+						</div>
+						{drawings.length > 0 ? (
 							<ul className="flex flex-col gap-3">
 								{drawings.map((drawing) => (
 									<li
@@ -174,13 +176,18 @@ export function LibrarySheet({
 									</li>
 								))}
 							</ul>
-						</div>
-					)}
+						) : null}
+					</div>
 				</SheetContent>
 			</Sheet>
 			<DrawDoodleDialog
 				open={drawOpen}
 				onOpenChange={setDrawOpen}
+				onSaved={(drawing) => setDrawings((current) => [drawing, ...current])}
+			/>
+			<PhotoDoodleDialog
+				open={photoOpen}
+				onOpenChange={setPhotoOpen}
 				onSaved={(drawing) => setDrawings((current) => [drawing, ...current])}
 			/>
 		</>

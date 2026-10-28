@@ -1,4 +1,8 @@
-export { DRAWING_LIMITS, drawnSourceSchema } from "./drawings.schemas.ts";
+export {
+	DRAWING_LIMITS,
+	drawnSourceSchema,
+	photoSourceSchema,
+} from "./drawings.schemas.ts";
 export { DrawingService, isUsableBy } from "./drawings.service.ts";
 export type {
 	CreateDrawingParams,
