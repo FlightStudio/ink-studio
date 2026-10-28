@@ -7,5 +7,6 @@ export default defineConfig({
 	target: "node22",
 	fixedExtension: true,
 	noExternal: [/^@repo\//],
+	external: ["sharp"],
 	dts: false,
 });

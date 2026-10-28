@@ -261,6 +261,14 @@ it("another organization's asset is invisible", async () => {
 	expect(storage.signedReadUrl).not.toHaveBeenCalled();
 });
 
+it("a finished lift-ink mask can be read back", async () => {
+	const ada = await member("ada-lift-servable");
+	const asset = await generated(ada, { status: "done", attempts: 1 });
+	expect(await assets.getAssetReadUrl(ada.userOrganization, asset.id)).toBe(
+		`https://storage.test/${asset.storageKey}?signed`,
+	);
+});
+
 it("a raw photo is never read back, a mask is", async () => {
 	const ada = await member("ada-servable");
 	const photo = await upload(ada, "photo", "desk.jpg", JPEG);

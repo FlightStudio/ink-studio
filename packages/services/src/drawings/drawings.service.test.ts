@@ -17,6 +17,7 @@ let files: Map<string, Uint8Array>;
 let drawings: DrawingService;
 let letters: LetterService;
 let assets: AssetService;
+let publisher: Publisher;
 
 beforeAll(async () => {
 	testDb = await startTestDb();
@@ -39,10 +40,10 @@ beforeEach(() => {
 			async ({ key }) => `https://storage.test/${key}?signed`,
 		),
 	};
-	const publisher: Publisher = {
+	publisher = {
 		publish: vi.fn<Publisher["publish"]>(async () => {}),
 	};
-	drawings = new DrawingService(testDb.db, storage);
+	drawings = new DrawingService(testDb.db, storage, publisher);
 	letters = new LetterService(testDb.db);
 	assets = new AssetService(testDb.db, storage, publisher);
 });
@@ -114,6 +115,11 @@ async function upload(
 	});
 	return asset.id;
 }
+
+const JPEG = Uint8Array.from([
+	0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01,
+	0x00, 0x00, 0x01, 0x00, 0x01,
+]);
 
 const point = [4, 8, 0.5, 12] as const satisfies StrokePoint;
 
@@ -399,5 +405,47 @@ it("a deleted drawing leaves the library and still renders in a letter using it"
 	const loaded = await letters.getLetter(ada, letterId);
 	expect(loaded?.resources.drawings).toEqual({
 		[drawingId]: { maskAssetId, aspect: 2 },
+	});
+});
+
+it("only a photo can be lifted", async () => {
+	const ada = await member("ada-lift-mask");
+	const maskId = await upload(ada, "mask", png(20, 10));
+	await expect(
+		drawings.requestLift(ada, { photoAssetId: maskId }),
+	).rejects.toMatchObject({ code: "invalid_photo" });
+});
+
+it("another organization's photo is not found", async () => {
+	const ada = await member("ada-lift-owner");
+	const bob = await member("bob-lift-other");
+	const photoId = await upload(ada, "photo", JPEG);
+	await expect(
+		drawings.requestLift(bob, { photoAssetId: photoId }),
+	).rejects.toMatchObject({ code: "not_found" });
+});
+
+it("a lift request is a pending asset published after it commits", async () => {
+	const ada = await member("ada-lift");
+	const photoId = await upload(ada, "photo", JPEG);
+	const organizationId = ada.userOrganization.organizationId;
+	vi.mocked(publisher.publish).mockImplementation(async (_type, data) => {
+		const assetId = (data as { assetId: string }).assetId;
+		const row = await testDb.db.assets.byId(organizationId, assetId);
+		expect(row?.processing).toEqual({
+			status: "pending",
+			attempts: 0,
+			lastError: null,
+		});
+		expect(row?.origin).toEqual({
+			source: "generated",
+			job: { kind: "lift-ink", photoAssetId: photoId },
+		});
+	});
+	const { assetId } = await drawings.requestLift(ada, {
+		photoAssetId: photoId,
+	});
+	expect(publisher.publish).toHaveBeenCalledExactlyOnceWith("asset.lift-ink", {
+		assetId,
 	});
 });

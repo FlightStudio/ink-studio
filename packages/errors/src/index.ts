@@ -22,6 +22,7 @@ export const apiErrorCodes = [
 	"no_ink_found",
 	"invalid_mask",
 	"invalid_drawing",
+	"invalid_photo",
 ] as const;
 
 export type ApiErrorCode = (typeof apiErrorCodes)[number];
@@ -52,6 +53,7 @@ export const errorMessages = {
 	no_ink_found: "No ink was found in that photo.",
 	invalid_mask: "That picture cannot be used as a mask.",
 	invalid_drawing: "That drawing is not valid.",
+	invalid_photo: "Only a photo can be lifted.",
 } as const satisfies Record<ApiErrorCode, string>;
 
 export type ApiErrorBody = {

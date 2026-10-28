@@ -14,10 +14,13 @@
 		"@google-cloud/pubsub": "catalog:",
 		"@google-cloud/storage": "catalog:",
 		"@repo/db": "workspace:*",
+		"@repo/errors": "workspace:*",
 		"@repo/integrations": "workspace:*",
 		"@repo/logger": "workspace:*",
 		"@repo/services": "workspace:*",
+		"@repo/types": "workspace:*",
 		"@t3-oss/env-core": "catalog:",
+		"sharp": "catalog:",
 		"zod": "catalog:"
 	},
 	"devDependencies": {
