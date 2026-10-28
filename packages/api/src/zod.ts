@@ -16,6 +16,8 @@ import {
 	type LetterState,
 	PageFormatId,
 	type RenameDrawingRequest,
+	type RequestedLift,
+	type RequestLiftRequest,
 	type SavedLetter,
 	type SaveGlyphRequest,
 	type SaveLetterRequest,
@@ -140,6 +142,15 @@ export const createDrawingRequestSchema: z.ZodType<CreateDrawingRequest> =
 			}),
 		]),
 	});
+
+export const requestLiftRequestSchema: z.ZodType<RequestLiftRequest> =
+	z.strictObject({
+		photoAssetId: z.uuid(),
+	});
+
+export const requestedLiftSchema: z.ZodType<RequestedLift> = z.strictObject({
+	assetId: z.uuid(),
+});
 
 export const createdDrawingSchema: z.ZodType<CreatedDrawing> = z.strictObject({
 	id: z.uuid(),

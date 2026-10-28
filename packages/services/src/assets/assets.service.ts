@@ -140,7 +140,12 @@ function asApiErrorCode(error: string): ApiErrorCode {
 
 export function isServable(asset: Asset): boolean {
 	if (asset.processing.status !== "done") return false;
-	return asset.origin.source === "uploaded" && asset.origin.purpose === "mask";
+	if (asset.origin.source === "uploaded" && asset.origin.purpose === "mask") {
+		return true;
+	}
+	return (
+		asset.origin.source === "generated" && asset.origin.job.kind === "lift-ink"
+	);
 }
 
 export async function assetReadUrl(

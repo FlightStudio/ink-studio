@@ -301,6 +301,34 @@ paths:
           $ref: "#/components/responses/UnsupportedMediaType"
         "500":
           $ref: "#/components/responses/InternalError"
+  /api/drawings/lifts:
+    post:
+      operationId: requestLift
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestLiftRequest"
+      responses:
+        "201":
+          description: The lift was requested.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestedLift"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /api/drawings/{drawingId}:
     parameters:
       - name: drawingId
@@ -570,6 +598,22 @@ components:
           oneOf:
             - $ref: "#/components/schemas/DrawnSource"
             - $ref: "#/components/schemas/PhotoSource"
+    RequestLiftRequest:
+      type: object
+      additionalProperties: false
+      required: [photoAssetId]
+      properties:
+        photoAssetId:
+          type: string
+          format: uuid
+    RequestedLift:
+      type: object
+      additionalProperties: false
+      required: [assetId]
+      properties:
+        assetId:
+          type: string
+          format: uuid
     CreatedDrawing:
       type: object
       additionalProperties: false
@@ -618,6 +662,7 @@ components:
         - no_ink_found
         - invalid_mask
         - invalid_drawing
+        - invalid_photo
     ApiError:
       type: object
       additionalProperties: false

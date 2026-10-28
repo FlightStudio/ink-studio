@@ -4,10 +4,12 @@ import {
 	PubSubPublisher,
 	PubSubSubscriber,
 } from "@repo/integrations/shared/gcp";
+import { SharpImageProcessor } from "@repo/integrations/worker/image";
 import { AssetService, SWEEP_MESSAGE_TYPE } from "@repo/services/assets";
 import { type MessageProcessor, QueueManager } from "@repo/services/queue";
 import { env } from "./env.ts";
 import { logger } from "./lib/logger.ts";
+import { AssetLiftInkProcessor } from "./processors/asset-lift-ink.ts";
 import { sweepProcessor } from "./processors/sweep.ts";
 
 async function main(): Promise<void> {
@@ -26,7 +28,15 @@ async function main(): Promise<void> {
 	const assets = new AssetService(db, storage, publisher);
 	const standard = env.WORKER_POOL === "standard";
 	const processors: MessageProcessor[] = standard
-		? [sweepProcessor(assets, log)]
+		? [
+				sweepProcessor(assets, log),
+				new AssetLiftInkProcessor({
+					db,
+					assets,
+					storage,
+					images: new SharpImageProcessor(),
+				}),
+			]
 		: [];
 	const queue = new QueueManager({ processors, logger: log });
 	const subscriber = new PubSubSubscriber({

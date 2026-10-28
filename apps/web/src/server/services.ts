@@ -57,6 +57,10 @@ export function getFontService(): FontService {
 }
 
 export function getDrawingService(): DrawingService {
-	drawingService ??= new DrawingService(getDb(), getAssetStorage());
+	drawingService ??= new DrawingService(
+		getDb(),
+		getAssetStorage(),
+		getPublisher(),
+	);
 	return drawingService;
 }

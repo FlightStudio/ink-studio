@@ -138,6 +138,7 @@ export const ApiErrorCode = {
   no_ink_found: 'no_ink_found',
   invalid_mask: 'invalid_mask',
   invalid_drawing: 'invalid_drawing',
+  invalid_photo: 'invalid_photo',
 } as const;
 
 export interface AssetStatus {
@@ -206,6 +207,14 @@ export interface CreateDrawingRequest {
   name: string;
   maskAssetId: string;
   source: DrawnSource | PhotoSource;
+}
+
+export interface RequestLiftRequest {
+  photoAssetId: string;
+}
+
+export interface RequestedLift {
+  assetId: string;
 }
 
 export interface CreatedDrawing {
@@ -1136,6 +1145,92 @@ const res = await fetch(getCreateDrawingUrl(),
 
   const data: createDrawingResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as createDrawingResponse
+}
+
+
+
+export type requestLiftResponse201 = {
+  data: RequestedLift
+  status: 201
+}
+
+export type requestLiftResponse400 = {
+  data: InvalidRequestResponse
+  status: 400
+}
+
+export type requestLiftResponse401 = {
+  data: UnauthenticatedResponse
+  status: 401
+}
+
+export type requestLiftResponse403 = {
+  data: ForbiddenResponse
+  status: 403
+}
+
+export type requestLiftResponse404 = {
+  data: NotFoundResponse
+  status: 404
+}
+
+export type requestLiftResponse415 = {
+  data: UnsupportedMediaTypeResponse
+  status: 415
+}
+
+export type requestLiftResponse500 = {
+  data: InternalErrorResponse
+  status: 500
+}
+
+export type requestLiftResponseSuccess = (requestLiftResponse201) & {
+  headers: Headers;
+};
+export type requestLiftResponseError = (requestLiftResponse400 | requestLiftResponse401 | requestLiftResponse403 | requestLiftResponse404 | requestLiftResponse415 | requestLiftResponse500) & {
+  headers: Headers;
+};
+
+export type requestLiftResponse = (requestLiftResponseSuccess | requestLiftResponseError)
+
+export const getRequestLiftUrl = () => {
+
+
+
+
+  return `/api/drawings/lifts`
+}
+
+export const requestLift = async (requestLiftRequest: RequestLiftRequest, options?: RequestInit): Promise<requestLiftResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+const res = await fetch(getRequestLiftUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(requestLiftRequest)
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: requestLiftResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as requestLiftResponse
 }
 
 

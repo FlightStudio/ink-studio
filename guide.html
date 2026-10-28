@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, a doodle library, and moving a placed doodle are ready on your own computer.</p>
-  <div class="progress" aria-hidden="true"><span style="width:67%"></span></div>
-  <p class="log">24 of 36 steps in the repository. Step 18 moves, resizes, rotates and recolours a placed doodle.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, a doodle library, moving a placed doodle, and lifting ink from a photo in the worker are ready on your own computer.</p>
+  <div class="progress" aria-hidden="true"><span style="width:69%"></span></div>
+  <p class="log">25 of 36 steps in the repository. Step 21 asks the worker to lift the ink out of a photo.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -458,7 +458,28 @@ pnpm --filter web test:e2e</pre>
       <p>The names read like “a grey graph-paper grid is removed and the writing kept”, “a wavy hand-drawn underline is kept”, and “specks are dropped and the dot on an i is kept”.</p>
       <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including 6 new lift tests, and a graph-paper page, a notebook page and a mid-grey grid lifted and looked at by eye.</p>
     </details>
-    <details id="step-21"><summary><span class="tag later">Later</span> 21. Lift a photo in the worker</summary><p>The worker lifts the ink and stores the result.</p></details>
+    <details id="step-21">
+      <summary><span class="tag done">Done</span> 21. Lift a photo in the worker</summary>
+      <p>You can ask the worker to lift the ink out of a photo before any screen exists for it. The answer is a transparent picture of the ink, stored like any other file, and you can download it once the job says done.</p>
+      <ul class="points">
+        <li>Only an uploaded photo can be lifted. A mask, or a photo from another studio, is refused.</li>
+        <li>The request saves a pending file first, then publishes the job, so the worker never hears about a row that is not there yet.</li>
+        <li>A photo that cannot be opened fails once, with “That photo could not be opened, so try another one.”, and is not tried again.</li>
+        <li>A finished lift can be downloaded. The original photo still cannot.</li>
+      </ul>
+      <p>There is no button yet. Step 22 adds the screen. To try the request on your computer, after <code>git pull</code> and <code>pnpm install</code>, start the containers, the website and the worker:</p>
+      <pre>docker compose up -d
+pnpm dev</pre>
+      <p>Open <a href="http://127.0.0.1:3000">http://127.0.0.1:3000</a> so the dev sign-in cookie is set, then from that same browser session, or with the <code>dev_user</code> cookie:</p>
+      <pre>curl -X POST -H 'Origin: http://127.0.0.1:3000' -H 'x-file-name: doodle.jpg' --data-binary @doodle.jpg 'http://127.0.0.1:3000/api/uploads?purpose=photo'
+curl -X POST -H 'Origin: http://127.0.0.1:3000' -H 'content-type: application/json' -d '{"photoAssetId":"&lt;id&gt;"}' http://127.0.0.1:3000/api/drawings/lifts</pre>
+      <p><code>GET /api/assets/&lt;liftId&gt;/status</code> shows <code>done</code>, and <code>curl -L http://127.0.0.1:3000/api/assets/&lt;liftId&gt;</code> downloads the mask. The worker must be running, because the website only publishes the job.</p>
+      <p>The tests run on throwaway Postgres in Docker:</p>
+      <pre>pnpm --filter @repo/services test --reporter=verbose
+pnpm --filter worker test --reporter=verbose</pre>
+      <p>The names read like “only a photo can be lifted”, “a lift request is a pending asset published after it commits”, and “the processor stores the lifted mask”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, 277 tests, including 3 new drawing service tests and 3 worker lift tests. Lifting a photo on an iPad is still unchecked, because this step has no screen. There is no iPad in this setup.</p>
+    </details>
     <details id="step-22"><summary><span class="tag later">Later</span> 22. Crop and erase a photo doodle</summary><p>Crop, erase leftovers, save to the library.</p></details>
 
     <h3>M7. Handwriting fonts (separable)</h3>

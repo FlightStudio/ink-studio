@@ -1,9 +1,14 @@
 import type { Db } from "@repo/db";
 import { ServiceError } from "@repo/errors";
 import type { Drawing, DrawingKind, LibraryDrawing, Member } from "@repo/types";
+import { generatedAsset, publishAssetJob } from "../assets/assets.service.ts";
 import type { AssetStorage } from "../assets/assets.types.ts";
+import type { Publisher } from "../queue/queue.types.ts";
 import { DRAWING_LIMITS, drawnSourceSchema } from "./drawings.schemas.ts";
-import type { CreateDrawingParams } from "./drawings.types.ts";
+import type {
+	CreateDrawingParams,
+	RequestLiftParams,
+} from "./drawings.types.ts";
 
 export type { CreateDrawingParams };
 
@@ -82,7 +87,36 @@ export class DrawingService {
 	constructor(
 		private readonly db: Db,
 		private readonly storage: AssetStorage,
+		private readonly publisher: Publisher,
 	) {}
+
+	async requestLift(
+		member: Member,
+		params: RequestLiftParams,
+	): Promise<{ assetId: string }> {
+		const organizationId = member.userOrganization.organizationId;
+		const photo = await this.db.assets.byId(
+			organizationId,
+			params.photoAssetId,
+		);
+		if (!photo) throw new ServiceError("not_found", "not_found");
+		if (
+			photo.origin.source !== "uploaded" ||
+			photo.origin.purpose !== "photo"
+		) {
+			throw new ServiceError("invalid_input", "invalid_photo");
+		}
+		const asset = await this.db.transaction(async (tx) =>
+			tx.assets.create(
+				generatedAsset(organizationId, {
+					kind: "lift-ink",
+					photoAssetId: photo.id,
+				}),
+			),
+		);
+		await publishAssetJob(this.publisher, asset);
+		return { assetId: asset.id };
+	}
 
 	async createDrawing(
 		member: Member,
