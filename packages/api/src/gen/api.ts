@@ -137,6 +137,7 @@ export const UploadPurpose = {
   photo: 'photo',
   mask: 'mask',
   'font-file': 'font-file',
+  cover: 'cover',
 } as const;
 
 export interface UploadedAsset {

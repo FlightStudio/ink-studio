@@ -58,6 +58,7 @@ export type LetterResources = {
 	stockFontBaseUrl: string;
 	fonts: Record<string, string>;
 	drawings: Record<string, { maskAssetId: string; aspect: number }>;
+	frontImageAssetId: string | null;
 };
 
 export type SealFont = { ownerName: string; chars: ReadonlySet<string> };

@@ -1,7 +1,7 @@
 import type { LetterContent } from "./letter.ts";
 import type { MergeValues } from "./merge-field.ts";
 
-export type UploadPurpose = "photo" | "mask" | "font-file";
+export type UploadPurpose = "photo" | "mask" | "font-file" | "cover";
 
 export type PrintOutput =
 	| { format: "pdf"; duplex: boolean }

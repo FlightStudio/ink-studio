@@ -26,6 +26,7 @@ export type LetterCardProps = {
 	id: string;
 	title: string;
 	updatedAt: Date;
+	productLabel: string;
 };
 
 const MINUTE_MS = 60_000;
@@ -51,7 +52,12 @@ function editedLabel(updatedAt: Date, now: number): string {
 	return `Edited ${calendar.format(updatedAt)}`;
 }
 
-export function LetterCard({ id, title, updatedAt }: LetterCardProps) {
+export function LetterCard({
+	id,
+	title,
+	updatedAt,
+	productLabel,
+}: LetterCardProps) {
 	const router = useRouter();
 	const [confirming, setConfirming] = useState(false);
 	const [failed, setFailed] = useState(false);
@@ -79,6 +85,9 @@ export function LetterCard({ id, title, updatedAt }: LetterCardProps) {
 			/>
 			<div className="flex items-start justify-between gap-2">
 				<div className="flex min-w-0 flex-col gap-0.5">
+					<p className="text-label tracking-[0.08em] text-ink-muted uppercase">
+						{productLabel}
+					</p>
 					<Link
 						href={href}
 						className="truncate text-ui text-ink hover:underline hover:decoration-rule hover:underline-offset-4"

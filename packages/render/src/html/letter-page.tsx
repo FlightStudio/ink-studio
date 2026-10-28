@@ -7,7 +7,7 @@ import type {
 	PlacedElement,
 } from "@repo/types";
 import { INK_COLORS, PAGE_SPECS, STOCK_FONTS } from "@repo/types";
-import {
+import React, {
 	type CSSProperties,
 	createContext,
 	type ReactElement,
@@ -185,6 +185,7 @@ function FrontSheet({
 }
 
 export function LetterPage(props: LetterPageProps): ReactElement {
+	void React;
 	const { content, resources, mode } = props;
 	const spec = PAGE_SPECS[content.format];
 	const gapIn = pageGapIn(mode);

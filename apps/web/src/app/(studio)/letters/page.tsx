@@ -59,6 +59,7 @@ export default async function LettersPage() {
 								id={letter.id}
 								title={letter.title}
 								updatedAt={letter.updatedAt}
+								productLabel={letter.productLabel}
 							/>
 						))}
 					</ul>

@@ -29,6 +29,7 @@ export const UPLOADS = {
 	},
 	mask: { maxBytes: 8 * MiB, mimeTypes: ["image/png"] },
 	"font-file": { maxBytes: 4 * MiB, mimeTypes: ["font/ttf", "font/otf"] },
+	cover: { maxBytes: 15 * MiB, mimeTypes: ["image/jpeg", "image/png"] },
 } as const satisfies Record<
 	UploadPurpose,
 	{ maxBytes: number; mimeTypes: readonly string[] }
@@ -141,7 +142,10 @@ function asApiErrorCode(error: string): ApiErrorCode {
 
 export function isServable(asset: Asset): boolean {
 	if (asset.processing.status !== "done") return false;
-	if (asset.origin.source === "uploaded" && asset.origin.purpose === "mask") {
+	if (
+		asset.origin.source === "uploaded" &&
+		(asset.origin.purpose === "mask" || asset.origin.purpose === "cover")
+	) {
 		return true;
 	}
 	return (

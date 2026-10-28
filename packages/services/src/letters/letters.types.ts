@@ -10,6 +10,7 @@ export type LetterListItem = {
 	title: string;
 	updatedAt: Date;
 	humanSeal: string | null;
+	productLabel: string;
 };
 
 export type SealFontView = { ownerName: string; chars: string };

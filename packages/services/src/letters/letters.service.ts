@@ -177,6 +177,19 @@ async function knownDrawings(
 	}
 }
 
+async function knownCover(
+	db: Tx,
+	organizationId: string,
+	content: LetterContent,
+): Promise<void> {
+	const assetId = content.doc.attrs.frontImageAssetId;
+	if (assetId === null) return;
+	const asset = await db.assets.byId(organizationId, assetId);
+	if (asset?.origin.source !== "uploaded" || asset.origin.purpose !== "cover") {
+		throw new ServiceError("invalid_input", "invalid_letter");
+	}
+}
+
 const EDITOR_BASES = {
 	assetBaseUrl: "/api/assets/",
 	stockFontBaseUrl: "/fonts/stock/",
@@ -204,11 +217,18 @@ export async function letterResources(
 	for (const font of await referencedFonts(tx, organizationId, content)) {
 		if (font.fontAssetId !== null) fonts[font.id] = font.fontAssetId;
 	}
+	const frontId = content.doc.attrs.frontImageAssetId;
+	const front = frontId ? await tx.assets.byId(organizationId, frontId) : null;
+	const frontImageAssetId =
+		front?.origin.source === "uploaded" && front.origin.purpose === "cover"
+			? front.id
+			: null;
 	return {
 		assetBaseUrl: bases.assetBaseUrl,
 		stockFontBaseUrl: bases.stockFontBaseUrl,
 		fonts,
 		drawings,
+		frontImageAssetId,
 	};
 }
 
@@ -293,6 +313,7 @@ export class LetterService {
 						),
 					),
 				),
+				productLabel: PAGE_SPECS[letter.content.format].label,
 			})),
 		);
 	}
@@ -306,6 +327,7 @@ export class LetterService {
 		const title = validTitle(params.title);
 		const organizationId = member.userOrganization.organizationId;
 		await knownDrawings(this.db, organizationId, content);
+		await knownCover(this.db, organizationId, content);
 		await knownFonts(this.db, member, content);
 		const revision = await this.db.letters.save(organizationId, letterId, {
 			title,
