@@ -3,6 +3,8 @@ import { seedDevIdentity, startTestDb } from "@repo/db/testing";
 import type { LetterContent, Member } from "@repo/types";
 import { v7 as uuidv7 } from "uuid";
 import { afterAll, beforeAll, expect, it } from "vitest";
+import { generatedAsset } from "../assets/assets.service.ts";
+import { FontService } from "../fonts/fonts.service.ts";
 import { LetterService } from "./letters.service.ts";
 
 const ownFontId = "0192e4a0-7b1c-7cc3-9a5e-3f1d2b4c5a10";
@@ -83,6 +85,7 @@ it("a new letter is an untitled empty Caveat letter in ink blue", async () => {
 			fonts: {},
 			drawings: {},
 		},
+		sealFonts: {},
 		editable: true,
 	});
 });
@@ -345,4 +348,159 @@ it("a letter cannot place another organization's drawing", async () => {
 		}),
 	).rejects.toMatchObject({ kind: "invalid_input", code: "invalid_letter" });
 	expect((await stored(ada, id)).revision).toBe(1);
+});
+
+async function teammate(owner: Member, name: string): Promise<Member> {
+	const email = `${name}@example.com`;
+	const { user } = await testDb.db.users.getOrCreate({
+		externalId: `dev:${email}`,
+		email,
+		name,
+	});
+	const membership = await testDb.db.organizationUsers.create({
+		userId: user.id,
+		organizationId: owner.userOrganization.organizationId,
+		role: "member",
+	});
+	return {
+		user,
+		userOrganization: {
+			...membership,
+			organization: owner.userOrganization.organization,
+		},
+	};
+}
+
+async function fontFile(caller: Member): Promise<string> {
+	const asset = await testDb.db.assets.create(
+		generatedAsset(organizationId(caller), {
+			kind: "build-font",
+			fontId: uuidv7(),
+		}),
+	);
+	return asset.id;
+}
+
+async function handwriting(
+	caller: Member,
+	assetId: string | null,
+	chars = "abc",
+) {
+	return testDb.db.fonts.create({
+		organizationId: organizationId(caller),
+		ownerUserId: caller.user.id,
+		ownerName: "Karla",
+		source: { kind: "drawn", glyphs: [] },
+		fontAssetId: assetId,
+		pendingFontAssetId: null,
+		chars,
+	});
+}
+
+function inHand(
+	content: LetterContent,
+	fontId: string,
+	text = "Hello",
+): LetterContent {
+	return {
+		...content,
+		defaults: { ...content.defaults, font: { kind: "own", fontId } },
+		doc: {
+			...content.doc,
+			content: [
+				{
+					type: "paragraph",
+					attrs: { align: "left" },
+					content: [{ type: "text", text }],
+				},
+			],
+		},
+	};
+}
+
+it("a letter cannot use another organization's font", async () => {
+	const ada = await member("ada-foreign-font");
+	const bob = await member("bob-foreign-font");
+	const font = await handwriting(bob, await fontFile(bob));
+	const { id } = await letters.createLetter(ada, {});
+	const { content } = await stored(ada, id);
+	await expect(
+		letters.saveLetter(ada, id, {
+			title: "Borrowed",
+			content: inHand(content, font.id),
+			expectedRevision: 1,
+		}),
+	).rejects.toMatchObject({ kind: "invalid_input", code: "invalid_letter" });
+	expect((await stored(ada, id)).revision).toBe(1);
+});
+
+it("a teammate in the same organization cannot write in Karla's font", async () => {
+	const karla = await member("karla-letter-owner");
+	const sam = await teammate(karla, "sam-letter-owner");
+	const font = await handwriting(karla, await fontFile(karla));
+	const { id } = await letters.createLetter(karla, {});
+	const { content } = await stored(karla, id);
+	await expect(
+		letters.saveLetter(sam, id, {
+			title: "Not mine",
+			content: inHand(content, font.id),
+			expectedRevision: 1,
+		}),
+	).rejects.toMatchObject({ kind: "forbidden", code: "not_owner" });
+	expect((await stored(karla, id)).revision).toBe(1);
+});
+
+it("a teammate opens a letter in Karla's hand read-only", async () => {
+	const karla = await member("karla-readonly");
+	const sam = await teammate(karla, "sam-readonly");
+	const assetId = await fontFile(karla);
+	const font = await handwriting(karla, assetId);
+	const { id } = await letters.createLetter(karla, {});
+	const { content } = await stored(karla, id);
+	await letters.saveLetter(karla, id, {
+		title: "Her hand",
+		content: inHand(content, font.id),
+		expectedRevision: 1,
+	});
+	const seen = await letters.getLetter(sam, id);
+	expect(seen?.editable).toBe(false);
+	expect(seen?.resources.fonts).toEqual({ [font.id]: assetId });
+	expect(seen?.sealFonts).toEqual({
+		[font.id]: { ownerName: "Karla", chars: "abc" },
+	});
+});
+
+it("a letter cannot use a font that has never finished a build", async () => {
+	const karla = await member("karla-unbuilt");
+	const font = await handwriting(karla, null);
+	const { id } = await letters.createLetter(karla, {});
+	const { content } = await stored(karla, id);
+	await expect(
+		letters.saveLetter(karla, id, {
+			title: "Too soon",
+			content: inHand(content, font.id),
+			expectedRevision: 1,
+		}),
+	).rejects.toMatchObject({ kind: "invalid_input", code: "font_not_ready" });
+	expect((await stored(karla, id)).revision).toBe(1);
+});
+
+it("a deleted font still renders in letters that use it", async () => {
+	const karla = await member("karla-deleted-font");
+	const assetId = await fontFile(karla);
+	const font = await handwriting(karla, assetId);
+	const { id } = await letters.createLetter(karla, {});
+	const { content } = await stored(karla, id);
+	await letters.saveLetter(karla, id, {
+		title: "Kept",
+		content: inHand(content, font.id),
+		expectedRevision: 1,
+	});
+	const handwritingFonts = new FontService(testDb.db, {
+		publish: async () => {},
+	});
+	await handwritingFonts.deleteFont(karla, font.id);
+	const seen = await letters.getLetter(karla, id);
+	expect(seen?.resources.fonts).toEqual({ [font.id]: assetId });
+	expect(seen?.editable).toBe(true);
 });

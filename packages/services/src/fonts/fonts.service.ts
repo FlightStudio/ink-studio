@@ -8,6 +8,8 @@ import type {
 	FontSource,
 	Member,
 } from "@repo/types";
+import { missingChars } from "@repo/types";
+import { generatedAsset, publishAssetJob } from "../assets/assets.service.ts";
 import type { Publisher } from "../queue/index.ts";
 import { parseDrawnGlyph, parseOwnerName } from "./fonts.schemas.ts";
 import type { CreateFontParams, SaveGlyphParams } from "./fonts.types.ts";
@@ -57,9 +59,7 @@ export class FontService {
 	constructor(
 		private readonly db: Db,
 		private readonly publisher: Publisher,
-	) {
-		void this.publisher;
-	}
+	) {}
 
 	async createFont(
 		member: Member,
@@ -119,6 +119,35 @@ export class FontService {
 		);
 		if (!font || !isOwnFont(member, font)) return null;
 		return toEditable(font);
+	}
+
+	async requestBuild(
+		member: Member,
+		fontId: string,
+	): Promise<{ assetId: string }> {
+		const organizationId = member.userOrganization.organizationId;
+		const asset = await this.db.transaction(async (tx) => {
+			const font = await tx.fonts.lockById(organizationId, fontId);
+			if (!font) throw new ServiceError("not_found", "not_found");
+			if (!isOwnFont(member, font)) {
+				throw new ServiceError("forbidden", "not_owner");
+			}
+			if (missingChars(font.source.glyphs).length > 0) {
+				throw new ServiceError("invalid_input", "font_incomplete");
+			}
+			const created = await tx.assets.create(
+				generatedAsset(organizationId, { kind: "build-font", fontId: font.id }),
+			);
+			const pending = await tx.fonts.setPending(
+				organizationId,
+				font.id,
+				created.id,
+			);
+			if (!pending) throw new ServiceError("not_found", "not_found");
+			return created;
+		});
+		await publishAssetJob(this.publisher, asset);
+		return { assetId: asset.id };
 	}
 
 	async deleteFont(member: Member, fontId: string): Promise<void> {

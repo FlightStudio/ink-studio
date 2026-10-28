@@ -1,9 +1,12 @@
 import opentype from "opentype.js";
+import sharp from "sharp";
 import { describe, expect, test } from "vitest";
 import {
 	type BuildFontParams,
 	buildFont,
 	type GlyphOutline,
+	OpentypeFontBuilder,
+	type OutlineGlyph,
 } from "./opentype-font.ts";
 
 type ParsedFont = ReturnType<typeof opentype.parse>;
@@ -106,5 +109,116 @@ describe("buildFont", () => {
 		const second = tables(parse(buildFont(params)));
 		expect(first.lookups).toBeDefined();
 		expect(second).toEqual(first);
+	});
+});
+
+function rectangle(
+	x: number,
+	y: number,
+	width: number,
+	height: number,
+	winding: "cw" | "ccw" = "cw",
+): [number, number][] {
+	const points: [number, number][] = [
+		[x, y],
+		[x + width, y],
+		[x + width, y + height],
+		[x, y + height],
+	];
+	return winding === "cw" ? points : [...points].reverse();
+}
+
+async function builtGlyph(glyphs: OutlineGlyph[]) {
+	const built = await new OpentypeFontBuilder().fromStrokeOutlines({
+		familyName: "Stroke Hand",
+		glyphs,
+	});
+	return { built, font: parse(built.bytes) };
+}
+
+describe("fromStrokeOutlines", () => {
+	test("a polygon from the ascender line to the baseline makes a glyph that tall", async () => {
+		const { font } = await builtGlyph([
+			{
+				char: "I",
+				variant: 0,
+				polygons: [rectangle(100, 150, 40, 600)],
+			},
+		]);
+		const box = font.charToGlyph("I").getBoundingBox();
+		expect(box.y1).toBeCloseTo(0, 0);
+		expect(box.y2).toBeCloseTo(600, 0);
+	});
+
+	test("the advance is the ink width plus both side bearings", async () => {
+		const { font } = await builtGlyph([
+			{
+				char: "m",
+				variant: 0,
+				polygons: [rectangle(0, 400, 200, 100)],
+			},
+		]);
+		expect(font.charToGlyph("m").advanceWidth).toBe(320);
+	});
+
+	test("an empty cell makes no glyph, and space exists", async () => {
+		const { built, font } = await builtGlyph([
+			{ char: "a", variant: 0, polygons: [] },
+			{
+				char: "b",
+				variant: 0,
+				polygons: [
+					[
+						[0, 0],
+						[1, 0],
+					],
+				],
+			},
+		]);
+		expect(built.chars).toBe("");
+		expect(glyphNames(font)).toContain("space");
+		expect(font.charToGlyph("a").name).toBe(".notdef");
+		expect(font.charToGlyph("b").name).toBe(".notdef");
+	});
+
+	test("variants become alternates", async () => {
+		const { font } = await builtGlyph(
+			[0, 1, 2].map((variant) => ({
+				char: "e",
+				variant,
+				polygons: [rectangle(80, 400, 40, 80)],
+			})),
+		);
+		expect(glyphNames(font)).toEqual(
+			expect.arrayContaining(["e", "e.alt1", "e.alt2"]),
+		);
+	});
+
+	test("overlapping polygons fill as one shape", async () => {
+		const { font } = await builtGlyph([
+			{
+				char: "x",
+				variant: 0,
+				polygons: [
+					rectangle(200, 300, 300, 300, "cw"),
+					rectangle(350, 150, 300, 300, "ccw"),
+				],
+			},
+		]);
+		const size = 1000;
+		const baseline = 800;
+		const path = font.charToGlyph("x").getPath(0, baseline, size);
+		const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">${path.toSVG(2)}</svg>`;
+		const { data, info } = await sharp(Buffer.from(svg))
+			.ensureAlpha()
+			.raw()
+			.toBuffer({ resolveWithObject: true });
+		const alpha = (x: number, y: number) =>
+			data[(Math.round(y) * info.width + Math.round(x)) * info.channels + 3] ??
+			0;
+		expect(alpha(285, 425)).toBeGreaterThan(200);
+		expect(alpha(135, 575)).toBeGreaterThan(200);
+		expect(alpha(435, 275)).toBeGreaterThan(200);
+		expect(alpha(20, 20)).toBeLessThan(20);
 	});
 });

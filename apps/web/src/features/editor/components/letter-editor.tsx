@@ -14,6 +14,7 @@ import {
 import { letterExtensions } from "@repo/render/schema";
 import type { EditableLetter } from "@repo/services/letters";
 import type {
+	FontOption,
 	FontRef,
 	LetterContent,
 	LetterDoc,
@@ -226,9 +227,14 @@ function visibleSideCentre(): {
 export type LetterEditorProps = {
 	letter: EditableLetter;
 	doodles: LibraryDrawing[];
+	fonts?: FontOption[];
 };
 
-export function LetterEditor({ letter, doodles }: LetterEditorProps) {
+export function LetterEditor({
+	letter,
+	doodles,
+	fonts = [],
+}: LetterEditorProps) {
 	const router = useRouter();
 	const spec = PAGE_SPECS[letter.content.format];
 	const [title, setTitle] = useState(letter.title);
@@ -537,7 +543,11 @@ export function LetterEditor({ letter, doodles }: LetterEditorProps) {
 							resources={resources}
 						/>
 					</div>
-					<HumanSeal content={live} />
+					<HumanSeal
+						content={live}
+						sealFonts={letter.sealFonts}
+						fonts={fonts}
+					/>
 				</div>
 				<footer
 					className="sticky bottom-4 z-10 mt-8 flex max-w-full items-center gap-4 rounded-full bg-paper py-1.5 pr-2 pl-5 shadow-float ring-1 ring-[oklch(0.3_0.03_60/0.06)]"

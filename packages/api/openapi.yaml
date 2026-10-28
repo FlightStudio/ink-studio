@@ -186,6 +186,33 @@ paths:
           $ref: "#/components/responses/UnsupportedMediaType"
         "500":
           $ref: "#/components/responses/InternalError"
+  /api/fonts/{fontId}/builds:
+    parameters:
+      - name: fontId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: requestFontBuild
+      responses:
+        "201":
+          description: The build was requested.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestedBuild"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /api/uploads:
     post:
       operationId: uploadFile
@@ -614,6 +641,14 @@ components:
         assetId:
           type: string
           format: uuid
+    RequestedBuild:
+      type: object
+      additionalProperties: false
+      required: [assetId]
+      properties:
+        assetId:
+          type: string
+          format: uuid
     CreatedDrawing:
       type: object
       additionalProperties: false
@@ -651,6 +686,8 @@ components:
         - invalid_title
         - invalid_owner_name
         - invalid_glyphs
+        - font_incomplete
+        - font_not_ready
         - not_owner
         - stale_revision
         - file_too_large

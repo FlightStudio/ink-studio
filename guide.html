@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, a doodle library, moving a placed doodle, lifting ink from a photo in the worker, and photographing a doodle are ready on your own computer.</p>
-  <div class="progress" aria-hidden="true"><span style="width:72%"></span></div>
-  <p class="log">26 of 36 steps in the repository. Step 22 lets you photograph a doodle, crop and erase it, and save it.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, a doodle library, moving a placed doodle, lifting ink from a photo in the worker, photographing a doodle, and building a drawn handwriting font are ready on your own computer.</p>
+  <div class="progress" aria-hidden="true"><span style="width:75%"></span></div>
+  <p class="log">27 of 36 steps in the repository. Step 25 builds a drawn handwriting font in the worker.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -546,7 +546,30 @@ pnpm --filter @repo/services test --reporter=verbose</pre>
       <p>The names read like “variants beyond the first are optional”, “a cell with no strokes does not count”, “a teammate in the same organization cannot use Karla's font”, and “the characters . and / save like any other”.</p>
       <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>.</p>
     </details>
-    <details id="step-25"><summary><span class="tag later">Later</span> 25. Build a font in the worker</summary><p>A drawn font becomes a real font file; the last good build stays in use.</p></details>
+    <details id="step-25">
+      <summary><span class="tag done">Done</span> 25. Build a font in the worker</summary>
+      <p>A handwriting font drawn one cell at a time can now be built into a real font file. The last good build stays in use until the new one finishes, so a letter does not go blank in the middle of a rebuild. The name inside the file is the font's own id, never the person's name.</p>
+      <ul class="points">
+        <li>Every required letter has to be drawn first. If one is missing, the build is refused with “This handwriting is missing some letters.”</li>
+        <li>Asking for a build keeps the current file and starts a new one beside it. When the worker finishes, that new file becomes the one letters use, and the characters it contains are remembered.</li>
+        <li>If a rebuild fails, the previous file stays in use.</li>
+        <li>Only the owner can write a letter in that hand. A teammate who opens such a letter sees it read-only, and their browser is given the font file so the letters show. Another organization is told the letter could not be read. A font that has never finished a build cannot be used yet: “That handwriting is not ready yet.” Deleting the font does not strip it out of letters that already use it.</li>
+      </ul>
+      <p>There is no drawing screen yet. Step 26 is where the cells are filled in. To try the build on your computer, the worker has to be running, because the website only asks for it. After <code>git pull</code> and <code>pnpm install</code>:</p>
+      <pre>docker compose up -d
+pnpm db:migrate
+pnpm dev</pre>
+      <p>Open <a href="http://127.0.0.1:3000">http://127.0.0.1:3000</a> so the dev sign-in cookie is set. Create a font the way step 24 describes, save every required character into a cell, then:</p>
+      <pre>curl -s -X POST http://127.0.0.1:3000/api/fonts/&lt;that id&gt;/builds \
+  -H 'Origin: http://127.0.0.1:3000'</pre>
+      <p>It answers with an asset id. <code>GET /api/assets/&lt;that id&gt;/status</code> shows <code>done</code> once the worker has written the file, and <code>curl -L http://127.0.0.1:3000/api/assets/&lt;that id&gt;</code> downloads it. People in the same studio can use that address from a letter. Nobody else can.</p>
+      <p>The tests run on throwaway Postgres in Docker:</p>
+      <pre>pnpm --filter @repo/integrations test --reporter=verbose
+pnpm --filter @repo/services test --reporter=verbose
+pnpm --filter worker test --reporter=verbose</pre>
+      <p>The names read like “a polygon from the ascender line to the baseline makes a glyph that tall”, “a build needs every required character”, “a finished build becomes the font in use and records its characters”, and “a teammate opens a letter in Karla's hand read-only”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, 296 tests, including 5 new font-builder tests, 2 new font service tests, 1 new asset test, 5 new letter tests, and 3 worker build tests. Building a font on an iPad is still unchecked, because this step has no drawing screen. There is no iPad in this setup.</p>
+    </details>
     <details id="step-26"><summary><span class="tag later">Later</span> 26. Write with My handwriting</summary><p>Draw the template in the app and write with it.</p></details>
     <details id="step-27">
       <summary><span class="tag done">Done</span> 27. Trace ink into outlines</summary>

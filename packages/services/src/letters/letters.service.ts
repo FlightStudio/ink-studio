@@ -2,6 +2,7 @@ import type { Db, Tx } from "@repo/db";
 import { ServiceError } from "@repo/errors";
 import { parseLetterContent } from "@repo/render/schema";
 import type {
+	Font,
 	FontRef,
 	InkStyle,
 	LetterContent,
@@ -9,6 +10,7 @@ import type {
 	Member,
 	PageFormatId,
 	ProductKind,
+	SealFont,
 } from "@repo/types";
 import { DEFAULT_FORMAT, humanSeal, PAGE_SPECS } from "@repo/types";
 import type {
@@ -68,10 +70,75 @@ function validContent(json: unknown): LetterContent {
 	} catch {
 		throw new ServiceError("invalid_input", "invalid_letter");
 	}
-	if (fontRefs(content).some((font) => font.kind === "own")) {
+	return content;
+}
+
+function ownFontIds(content: LetterContent): string[] {
+	return [
+		...new Set(
+			fontRefs(content).flatMap((font) =>
+				font.kind === "own" ? [font.fontId] : [],
+			),
+		),
+	];
+}
+
+async function referencedFonts(
+	db: Tx,
+	organizationId: string,
+	content: LetterContent,
+): Promise<Font[]> {
+	const ids = ownFontIds(content);
+	if (ids.length === 0) return [];
+	return db.fonts.referenced(organizationId, ids);
+}
+
+async function knownFonts(
+	db: Tx,
+	member: Member,
+	content: LetterContent,
+): Promise<void> {
+	const ids = ownFontIds(content);
+	if (ids.length === 0) return;
+	const found = await referencedFonts(
+		db,
+		member.userOrganization.organizationId,
+		content,
+	);
+	if (found.length !== ids.length) {
 		throw new ServiceError("invalid_input", "invalid_letter");
 	}
-	return content;
+	for (const font of found) {
+		if (font.ownerUserId !== member.user.id) {
+			throw new ServiceError("forbidden", "not_owner");
+		}
+	}
+	for (const font of found) {
+		if (font.fontAssetId === null) {
+			throw new ServiceError("invalid_input", "font_not_ready");
+		}
+	}
+}
+
+function sealRecord(
+	fonts: readonly Font[],
+): Record<string, { ownerName: string; chars: string }> {
+	const record: Record<string, { ownerName: string; chars: string }> = {};
+	for (const font of fonts) {
+		record[font.id] = { ownerName: font.ownerName, chars: font.chars };
+	}
+	return record;
+}
+
+function sealMap(fonts: readonly Font[]): Map<string, SealFont> {
+	const map = new Map<string, SealFont>();
+	for (const font of fonts) {
+		map.set(font.id, {
+			ownerName: font.ownerName,
+			chars: new Set(font.chars),
+		});
+	}
+	return map;
 }
 
 function validTitle(title: string): string {
@@ -118,20 +185,25 @@ export async function letterResources(
 			aspect: drawing.aspect,
 		};
 	}
+	const fonts: LetterResources["fonts"] = {};
+	for (const font of await referencedFonts(tx, organizationId, content)) {
+		if (font.fontAssetId !== null) fonts[font.id] = font.fontAssetId;
+	}
 	return {
 		assetBaseUrl: "/api/assets/",
 		stockFontBaseUrl: "/fonts/stock/",
-		fonts: {},
+		fonts,
 		drawings,
 	};
 }
 
 export async function letterOwnerIds(
-	_tx: Tx,
-	_organizationId: string,
-	_content: LetterContent,
+	tx: Tx,
+	organizationId: string,
+	content: LetterContent,
 ): Promise<Set<string>> {
-	return new Set();
+	const fonts = await referencedFonts(tx, organizationId, content);
+	return new Set(fonts.map((font) => font.ownerUserId));
 }
 
 export class LetterService {
@@ -157,9 +229,10 @@ export class LetterService {
 		const organizationId = member.userOrganization.organizationId;
 		const letter = await this.db.letters.byId(organizationId, letterId);
 		if (!letter) return null;
-		const [resources, ownerIds] = await Promise.all([
+		const [resources, ownerIds, fonts] = await Promise.all([
 			letterResources(this.db, organizationId, letter.content),
 			letterOwnerIds(this.db, organizationId, letter.content),
+			referencedFonts(this.db, organizationId, letter.content),
 		]);
 		return {
 			id: letter.id,
@@ -167,6 +240,7 @@ export class LetterService {
 			content: letter.content,
 			revision: letter.revision,
 			resources,
+			sealFonts: sealRecord(fonts),
 			editable: [...ownerIds].every((id) => id === member.user.id),
 		};
 	}
@@ -175,12 +249,23 @@ export class LetterService {
 		const letters = await this.db.letters.list(
 			member.userOrganization.organizationId,
 		);
-		return letters.map((letter) => ({
-			id: letter.id,
-			title: letter.title,
-			updatedAt: letter.updatedAt,
-			humanSeal: humanSeal(letter.content, new Map()),
-		}));
+		return Promise.all(
+			letters.map(async (letter) => ({
+				id: letter.id,
+				title: letter.title,
+				updatedAt: letter.updatedAt,
+				humanSeal: humanSeal(
+					letter.content,
+					sealMap(
+						await referencedFonts(
+							this.db,
+							member.userOrganization.organizationId,
+							letter.content,
+						),
+					),
+				),
+			})),
+		);
 	}
 
 	async saveLetter(
@@ -192,6 +277,7 @@ export class LetterService {
 		const title = validTitle(params.title);
 		const organizationId = member.userOrganization.organizationId;
 		await knownDrawings(this.db, organizationId, content);
+		await knownFonts(this.db, member, content);
 		const revision = await this.db.letters.save(organizationId, letterId, {
 			title,
 			content,

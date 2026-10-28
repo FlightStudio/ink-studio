@@ -1,8 +1,15 @@
 import type { SaveGlyphRequest } from "@repo/api";
 import type { TestDb } from "@repo/db";
 import { seedDevIdentity, startTestDb } from "@repo/db/testing";
-import { GLYPH_LIMITS, type Member } from "@repo/types";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import {
+	type DrawnGlyph,
+	GLYPH_LIMITS,
+	HANDWRITING_GLYPHS,
+	type Member,
+	type Stroke,
+} from "@repo/types";
+import { afterAll, beforeAll, expect, it, vi } from "vitest";
+import { generatedAsset } from "../assets/assets.service.ts";
 import type { Publisher } from "../queue/index.ts";
 import { FontService } from "./fonts.service.ts";
 
@@ -203,4 +210,57 @@ it("the owner reads back the glyphs she drew, a teammate reads nothing", async (
 		building: false,
 	});
 	expect(await fonts.getFont(sam, id)).toBeNull();
+});
+
+const cellStroke: Stroke = { input: "pen", points: [[100, 200, 0.5, 0]] };
+
+function requiredGlyphs(): DrawnGlyph[] {
+	return HANDWRITING_GLYPHS.filter((entry) => entry.required).map(
+		(entry): DrawnGlyph => ({
+			char: entry.char,
+			variant: 0,
+			strokes: [cellStroke],
+		}),
+	);
+}
+
+it("a build needs every required character", async () => {
+	const karla = await member("karla-incomplete");
+	const publish = vi.fn<Publisher["publish"]>(async () => {});
+	const building = new FontService(testDb.db, { publish });
+	const { id } = await building.createFont(karla, { ownerName: "Karla" });
+	await expect(building.requestBuild(karla, id)).rejects.toMatchObject({
+		kind: "invalid_input",
+		code: "font_incomplete",
+	});
+	expect(publish).not.toHaveBeenCalled();
+});
+
+it("a build request is a pending asset beside the current build", async () => {
+	const karla = await member("karla-build");
+	const organizationId = karla.userOrganization.organizationId;
+	const current = await testDb.db.assets.create(
+		generatedAsset(organizationId, {
+			kind: "build-font",
+			fontId: "0192e4a0-7b1c-7cc3-9a5e-3f1d2b4c5a10",
+		}),
+	);
+	const font = await testDb.db.fonts.create({
+		organizationId,
+		ownerUserId: karla.user.id,
+		ownerName: "Karla",
+		source: { kind: "drawn", glyphs: requiredGlyphs() },
+		fontAssetId: current.id,
+		pendingFontAssetId: null,
+		chars: "a",
+	});
+	const publish = vi.fn<Publisher["publish"]>(async () => {});
+	const building = new FontService(testDb.db, { publish });
+	const { assetId } = await building.requestBuild(karla, font.id);
+	const stored = await testDb.db.fonts.byId(organizationId, font.id);
+	expect(stored?.fontAssetId).toBe(current.id);
+	expect(stored?.pendingFontAssetId).toBe(assetId);
+	expect(publish).toHaveBeenCalledExactlyOnceWith("asset.build-font", {
+		assetId,
+	});
 });

@@ -16,6 +16,7 @@ import {
 	type LetterState,
 	PageFormatId,
 	type RenameDrawingRequest,
+	type RequestedBuild,
 	type RequestedLift,
 	type RequestLiftRequest,
 	type SavedLetter,
@@ -149,6 +150,10 @@ export const requestLiftRequestSchema: z.ZodType<RequestLiftRequest> =
 	});
 
 export const requestedLiftSchema: z.ZodType<RequestedLift> = z.strictObject({
+	assetId: z.uuid(),
+});
+
+export const requestedBuildSchema: z.ZodType<RequestedBuild> = z.strictObject({
 	assetId: z.uuid(),
 });
 

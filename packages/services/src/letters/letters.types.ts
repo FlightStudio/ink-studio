@@ -8,12 +8,15 @@ export type LetterListItem = {
 	humanSeal: string | null;
 };
 
+export type SealFontView = { ownerName: string; chars: string };
+
 export type EditableLetter = {
 	id: string;
 	title: string;
 	content: LetterContent;
 	revision: number;
 	resources: LetterResources;
+	sealFonts: Record<string, SealFontView>;
 	editable: boolean;
 };
 

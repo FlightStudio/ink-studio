@@ -15,4 +15,5 @@ export type {
 	PrintResource,
 	RenderParams,
 	SaveLetterParams,
+	SealFontView,
 } from "./letters.types.ts";

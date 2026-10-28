@@ -4,11 +4,13 @@ import {
 	PubSubPublisher,
 	PubSubSubscriber,
 } from "@repo/integrations/shared/gcp";
+import { OpentypeFontBuilder } from "@repo/integrations/worker/font";
 import { SharpImageProcessor } from "@repo/integrations/worker/image";
 import { AssetService, SWEEP_MESSAGE_TYPE } from "@repo/services/assets";
 import { type MessageProcessor, QueueManager } from "@repo/services/queue";
 import { env } from "./env.ts";
 import { logger } from "./lib/logger.ts";
+import { AssetBuildFontProcessor } from "./processors/asset-build-font.ts";
 import { AssetLiftInkProcessor } from "./processors/asset-lift-ink.ts";
 import { sweepProcessor } from "./processors/sweep.ts";
 
@@ -35,6 +37,12 @@ async function main(): Promise<void> {
 					assets,
 					storage,
 					images: new SharpImageProcessor(),
+				}),
+				new AssetBuildFontProcessor({
+					db,
+					assets,
+					storage,
+					builder: new OpentypeFontBuilder(),
 				}),
 			]
 		: [];

@@ -127,6 +127,8 @@ export const ApiErrorCode = {
   invalid_title: 'invalid_title',
   invalid_owner_name: 'invalid_owner_name',
   invalid_glyphs: 'invalid_glyphs',
+  font_incomplete: 'font_incomplete',
+  font_not_ready: 'font_not_ready',
   not_owner: 'not_owner',
   stale_revision: 'stale_revision',
   file_too_large: 'file_too_large',
@@ -214,6 +216,10 @@ export interface RequestLiftRequest {
 }
 
 export interface RequestedLift {
+  assetId: string;
+}
+
+export interface RequestedBuild {
   assetId: string;
 }
 
@@ -853,6 +859,73 @@ const res = await fetch(getSaveGlyphUrl(fontId),
 
   const data: saveGlyphResponse['data'] = body ? JSON.parse(body) : undefined
   return { data, status: res.status, headers: res.headers } as saveGlyphResponse
+}
+
+
+
+export type requestFontBuildResponse201 = {
+  data: RequestedBuild
+  status: 201
+}
+
+export type requestFontBuildResponse400 = {
+  data: InvalidRequestResponse
+  status: 400
+}
+
+export type requestFontBuildResponse401 = {
+  data: UnauthenticatedResponse
+  status: 401
+}
+
+export type requestFontBuildResponse403 = {
+  data: ForbiddenResponse
+  status: 403
+}
+
+export type requestFontBuildResponse404 = {
+  data: NotFoundResponse
+  status: 404
+}
+
+export type requestFontBuildResponse500 = {
+  data: InternalErrorResponse
+  status: 500
+}
+
+export type requestFontBuildResponseSuccess = (requestFontBuildResponse201) & {
+  headers: Headers;
+};
+export type requestFontBuildResponseError = (requestFontBuildResponse400 | requestFontBuildResponse401 | requestFontBuildResponse403 | requestFontBuildResponse404 | requestFontBuildResponse500) & {
+  headers: Headers;
+};
+
+export type requestFontBuildResponse = (requestFontBuildResponseSuccess | requestFontBuildResponseError)
+
+export const getRequestFontBuildUrl = (fontId: string,) => {
+
+
+
+
+  return `/api/fonts/${fontId}/builds`
+}
+
+export const requestFontBuild = async (fontId: string, options?: RequestInit): Promise<requestFontBuildResponse> => {
+
+  const res = await fetch(getRequestFontBuildUrl(fontId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: requestFontBuildResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as requestFontBuildResponse
 }
 
 

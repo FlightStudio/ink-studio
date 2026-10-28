@@ -17,6 +17,7 @@
 		"@google-cloud/storage": "catalog:",
 		"@repo/errors": "workspace:*",
 		"@repo/services": "workspace:*",
+		"@repo/types": "workspace:*",
 		"@types/opentype.js": "^1.3.10",
 		"opentype.js": "catalog:",
 		"playwright-core": "catalog:",
