@@ -36,6 +36,20 @@ export class AssetBuildFontProcessor implements MessageProcessor {
 		return this.params.storage.get(photo.storageKey);
 	}
 
+	private async fontFileOf(
+		organizationId: string,
+		assetId: string,
+	): Promise<Uint8Array> {
+		const file = await this.params.db.assets.byId(organizationId, assetId);
+		if (
+			file?.origin.source !== "uploaded" ||
+			file.origin.purpose !== "font-file"
+		) {
+			throw new ServiceError("invalid_input", "font_unreadable");
+		}
+		return this.params.storage.get(file.storageKey);
+	}
+
 	async process(message: QueueMessage): Promise<void> {
 		const parsed = assetJobMessageSchema.safeParse(message.data);
 		if (!parsed.success) return;
@@ -58,16 +72,24 @@ export class AssetBuildFontProcessor implements MessageProcessor {
 									font.source.photoAssetId,
 								),
 							})
-						: await this.params.builder.fromStrokeOutlines({
-								familyName,
-								glyphs: font.source.glyphs.map((glyph) => ({
-									char: glyph.char,
-									variant: glyph.variant,
-									polygons: glyph.strokes.map((stroke) =>
-										strokeOutline(stroke, CELL.strokeScale),
+						: font.source.kind === "upload"
+							? await this.params.builder.fromUpload({
+									familyName,
+									file: await this.fontFileOf(
+										font.organizationId,
+										font.source.fileAssetId,
 									),
-								})),
-							});
+								})
+							: await this.params.builder.fromStrokeOutlines({
+									familyName,
+									glyphs: font.source.glyphs.map((glyph) => ({
+										char: glyph.char,
+										variant: glyph.variant,
+										polygons: glyph.strokes.map((stroke) =>
+											strokeOutline(stroke, CELL.strokeScale),
+										),
+									})),
+								});
 				return {
 					bytes: built.bytes,
 					mimeType: "font/otf",

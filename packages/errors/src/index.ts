@@ -26,6 +26,9 @@ export const apiErrorCodes = [
 	"invalid_drawing",
 	"invalid_photo",
 	"template_markers_not_found",
+	"font_unreadable",
+	"font_timeout",
+	"font_missing_glyphs",
 ] as const;
 
 export type ApiErrorCode = (typeof apiErrorCodes)[number];
@@ -60,6 +63,9 @@ export const errorMessages = {
 	invalid_drawing: "That drawing is not valid.",
 	invalid_photo: "Only a photo can be lifted.",
 	template_markers_not_found: "The template's corner marks were not found.",
+	font_unreadable: "That font file could not be read.",
+	font_timeout: "That font took too long to read.",
+	font_missing_glyphs: "That font is missing lowercase letters.",
 } as const satisfies Record<ApiErrorCode, string>;
 
 export type ApiErrorBody = {

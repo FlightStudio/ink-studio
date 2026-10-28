@@ -200,11 +200,76 @@ it("a template photo is built from the photograph", async () => {
 			throw new Error("drawn");
 		},
 		fromTemplatePhoto,
+		fromUpload: async () => {
+			throw new Error("upload");
+		},
 	});
 	await processor.process(message(processor, asset.id));
 	expect(fromTemplatePhoto).toHaveBeenCalledExactlyOnceWith({
 		familyName: `own-${font.id}`,
 		photo,
+	});
+	const stored = await testDb.db.fonts.byId(
+		karla.userOrganization.organizationId,
+		font.id,
+	);
+	expect(stored?.fontAssetId).toBe(asset.id);
+	expect(stored?.chars).toBe("lo");
+});
+
+it("an uploaded file is rebuilt from its bytes", async () => {
+	const karla = await member("karla-upload-font");
+	const fileId = crypto.randomUUID();
+	const storageKey = `organizations/${karla.userOrganization.organizationId}/assets/${fileId}`;
+	const file = new Uint8Array([1, 2, 3, 4]);
+	files.set(storageKey, file);
+	await testDb.db.assets.create({
+		id: fileId,
+		organizationId: karla.userOrganization.organizationId,
+		storageKey,
+		mimeType: "font/ttf",
+		byteSize: file.byteLength,
+		checksum: "e".repeat(64),
+		origin: {
+			source: "uploaded",
+			purpose: "font-file",
+			filename: "hand.ttf",
+			uploadedByUserId: karla.user.id,
+		},
+		processing: { status: "done", attempts: 0 },
+	});
+	const font = await testDb.db.fonts.create({
+		organizationId: karla.userOrganization.organizationId,
+		ownerUserId: karla.user.id,
+		ownerName: "Karla",
+		source: { kind: "upload", fileAssetId: fileId },
+		fontAssetId: null,
+		pendingFontAssetId: null,
+		chars: "",
+	});
+	const asset = await pendingBuild(karla, font.id);
+	await testDb.db.fonts.setPending(
+		karla.userOrganization.organizationId,
+		font.id,
+		asset.id,
+	);
+	const fromUpload = vi.fn<FontBuilder["fromUpload"]>(async () => ({
+		bytes: Uint8Array.from([4]),
+		chars: "lo",
+	}));
+	const processor = processorFor({
+		fromStrokeOutlines: async () => {
+			throw new Error("drawn");
+		},
+		fromTemplatePhoto: async () => {
+			throw new Error("template");
+		},
+		fromUpload,
+	});
+	await processor.process(message(processor, asset.id));
+	expect(fromUpload).toHaveBeenCalledExactlyOnceWith({
+		familyName: `own-${font.id}`,
+		file,
 	});
 	const stored = await testDb.db.fonts.byId(
 		karla.userOrganization.organizationId,
@@ -232,6 +297,9 @@ it("a failed rebuild leaves the last good build in use", async () => {
 			throw new Error("disk");
 		},
 		fromTemplatePhoto: async () => {
+			throw new Error("disk");
+		},
+		fromUpload: async () => {
 			throw new Error("disk");
 		},
 	});

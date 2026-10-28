@@ -74,9 +74,21 @@ export interface TemplatePhotoFontSource {
   photoAssetId: string;
 }
 
+export type UploadFontSourceKind = typeof UploadFontSourceKind[keyof typeof UploadFontSourceKind];
+
+
+export const UploadFontSourceKind = {
+  upload: 'upload',
+} as const;
+
+export interface UploadFontSource {
+  kind: UploadFontSourceKind;
+  fileAssetId: string;
+}
+
 export interface CreateFontRequest {
   ownerName: string;
-  source?: DrawnFontSource | TemplatePhotoFontSource;
+  source?: DrawnFontSource | TemplatePhotoFontSource | UploadFontSource;
 }
 
 export interface CreatedFont {
@@ -163,6 +175,9 @@ export const ApiErrorCode = {
   invalid_drawing: 'invalid_drawing',
   invalid_photo: 'invalid_photo',
   template_markers_not_found: 'template_markers_not_found',
+  font_unreadable: 'font_unreadable',
+  font_timeout: 'font_timeout',
+  font_missing_glyphs: 'font_missing_glyphs',
 } as const;
 
 export interface AssetStatus {

@@ -14,6 +14,28 @@ import { AssetBuildFontProcessor } from "./processors/asset-build-font.ts";
 import { AssetLiftInkProcessor } from "./processors/asset-lift-ink.ts";
 import { sweepProcessor } from "./processors/sweep.ts";
 
+function fontBuilderParams() {
+	const source = import.meta.url.endsWith(".ts");
+	return {
+		thread: source
+			? {
+					url: new URL(
+						"../../../packages/integrations/src/worker/font/parse-thread.ts",
+						import.meta.url,
+					),
+					execArgv: ["--import", "tsx"],
+				}
+			: {
+					url: new URL(
+						import.meta.url.replace(/index(\.m?js)$/, "parse-thread$1"),
+					),
+					execArgv: [],
+				},
+		parseTimeoutMs: 5_000,
+		parseMaxMemoryMb: 256,
+	};
+}
+
 async function main(): Promise<void> {
 	const log = logger.child({ pool: env.WORKER_POOL });
 	const db = createDb(env.DATABASE_URL);
@@ -42,7 +64,7 @@ async function main(): Promise<void> {
 					db,
 					assets,
 					storage,
-					builder: new OpentypeFontBuilder(),
+					builder: new OpentypeFontBuilder(fontBuilderParams()),
 				}),
 			]
 		: [];

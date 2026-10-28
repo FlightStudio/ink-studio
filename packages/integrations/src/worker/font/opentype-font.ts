@@ -1,3 +1,5 @@
+import { Worker } from "node:worker_threads";
+import { ServiceError } from "@repo/errors";
 import { CELL } from "@repo/types";
 import opentype from "opentype.js";
 import { readTemplate } from "./template.ts";
@@ -283,12 +285,32 @@ export type FromTemplatePhotoParams = {
 	familyName: string;
 	photo: Uint8Array;
 };
+export type FromUploadParams = { familyName: string; file: Uint8Array };
 export type BuiltFont = { bytes: Uint8Array; chars: string };
+export type FontBuilderParams = {
+	thread: { url: URL; execArgv: string[] };
+	parseTimeoutMs: number;
+	parseMaxMemoryMb: number;
+};
 
 export interface FontBuilder {
 	fromStrokeOutlines(params: FromStrokeOutlinesParams): Promise<BuiltFont>;
 	fromTemplatePhoto(params: FromTemplatePhotoParams): Promise<BuiltFont>;
+	fromUpload(params: FromUploadParams): Promise<BuiltFont>;
 }
+
+const DEFAULT_BUILDER: FontBuilderParams = {
+	thread: {
+		url: new URL("./parse-thread.ts", import.meta.url),
+		execArgv: ["--import", "tsx"],
+	},
+	parseTimeoutMs: 5_000,
+	parseMaxMemoryMb: 256,
+};
+
+type UploadReply =
+	| { ok: true; bytes: Uint8Array; chars: string }
+	| { ok: false; code: "font_unreadable" | "font_missing_glyphs" };
 
 const SIDE_BEARING = 60;
 
@@ -356,6 +378,8 @@ function contourOf(points: readonly Point[]): Contour {
 }
 
 export class OpentypeFontBuilder implements FontBuilder {
+	constructor(private readonly params: FontBuilderParams = DEFAULT_BUILDER) {}
+
 	async fromStrokeOutlines(
 		params: FromStrokeOutlinesParams,
 	): Promise<BuiltFont> {
@@ -391,6 +415,59 @@ export class OpentypeFontBuilder implements FontBuilder {
 			if (outline) glyphs.push(outline);
 		}
 		return this.assemble(params.familyName, glyphs);
+	}
+
+	async fromUpload(params: FromUploadParams): Promise<BuiltFont> {
+		const worker = new Worker(this.params.thread.url, {
+			execArgv: [...this.params.thread.execArgv],
+			resourceLimits: {
+				maxOldGenerationSizeMb: this.params.parseMaxMemoryMb,
+			},
+		});
+		const file = params.file;
+		const bytes = file.buffer.slice(
+			file.byteOffset,
+			file.byteOffset + file.byteLength,
+		);
+		let settled = false;
+		try {
+			return await new Promise((resolve, reject) => {
+				const timer = setTimeout(() => {
+					if (settled) return;
+					settled = true;
+					reject(new ServiceError("invalid_input", "font_timeout"));
+				}, this.params.parseTimeoutMs);
+				worker.once("message", (reply: UploadReply) => {
+					if (settled) return;
+					settled = true;
+					clearTimeout(timer);
+					if (reply.ok) {
+						resolve({ bytes: reply.bytes, chars: reply.chars });
+						return;
+					}
+					reject(
+						new ServiceError(
+							"invalid_input",
+							reply.code === "font_missing_glyphs"
+								? "font_missing_glyphs"
+								: "font_unreadable",
+						),
+					);
+				});
+				worker.once("error", () => {
+					if (settled) return;
+					settled = true;
+					clearTimeout(timer);
+					reject(new ServiceError("invalid_input", "font_unreadable"));
+				});
+				worker.postMessage({
+					familyName: params.familyName,
+					bytes: new Uint8Array(bytes),
+				});
+			});
+		} finally {
+			await worker.terminate();
+		}
 	}
 
 	private assemble(familyName: string, glyphs: GlyphOutline[]): BuiltFont {

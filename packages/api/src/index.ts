@@ -21,6 +21,7 @@ export type {
 	TemplatePhotoFontSource,
 	UploadedAsset,
 	UploadFileParams,
+	UploadFontSource,
 } from "./gen/api.ts";
 export {
 	AssetProcessingStatus,
@@ -44,6 +45,7 @@ export {
 	saveLetter,
 	TemplatePhotoFontSourceKind,
 	TemplatePhotoFontSourceTemplateVersion,
+	UploadFontSourceKind,
 	UploadPurpose,
 	uploadFile,
 } from "./gen/api.ts";
@@ -72,5 +74,6 @@ export {
 	saveLetterRequestSchema,
 	templatePhotoFontSourceSchema,
 	uploadedAssetSchema,
+	uploadFontSourceSchema,
 	uploadPurposeSchema,
 } from "./zod.ts";

@@ -5,12 +5,14 @@ import { Button } from "@repo/ui/components/ui/button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { FontUploadDialog } from "./font-upload-dialog.tsx";
 
 export function NewFontForm() {
 	const router = useRouter();
 	const [ownerName, setOwnerName] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [saving, setSaving] = useState(false);
+	const [uploadOpen, setUploadOpen] = useState(false);
 
 	async function draw() {
 		const name = ownerName.trim();
@@ -52,7 +54,14 @@ export function NewFontForm() {
 					Photograph the template
 				</Link>
 			</p>
-			<p className="text-ui text-ink-muted">Upload a font file</p>
+			<Button
+				type="button"
+				variant="outline"
+				onClick={() => setUploadOpen(true)}
+			>
+				Upload a font file
+			</Button>
+			<FontUploadDialog open={uploadOpen} onOpenChange={setUploadOpen} />
 		</div>
 	);
 }

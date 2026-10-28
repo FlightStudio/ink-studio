@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, a doodle library, moving a placed doodle, lifting ink from a photo in the worker, photographing a doodle, building a drawn handwriting font, writing a letter in that hand, and making a font from a photo of the printed template are ready on your own computer.</p>
-  <div class="progress" aria-hidden="true"><span style="width:81%"></span></div>
-  <p class="log">29 of 36 steps in the repository. Step 28 builds a font from a photo of the printed template.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, a doodle library, moving a placed doodle, lifting ink from a photo in the worker, photographing a doodle, building a drawn handwriting font, writing a letter in that hand, making a font from a photo of the printed template, and building a font from an uploaded font file are ready on your own computer.</p>
+  <div class="progress" aria-hidden="true"><span style="width:83%"></span></div>
+  <p class="log">30 of 36 steps in the repository. Step 29 builds a font from an uploaded TTF or OTF.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -624,7 +624,26 @@ pnpm --filter worker test --reporter=verbose</pre>
       <p>The names read like “the four markers are found within four pixels”, “a sideways photo without EXIF is read the right way up”, “printed borders and labels leave no ink”, “the o has an open counter”, and “another organization's photo cannot make a template font”.</p>
       <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, 307 tests, including 7 new template tests, 1 new font service test, and 1 new worker test. Printing and photographing the template on an iPad is still unchecked. There is no iPad in this setup.</p>
     </details>
-    <details id="step-29"><summary><span class="tag later">Later</span> 29. Font from an uploaded TTF or OTF</summary><p>Rebuilt from its outlines in a locked-down thread, never served as uploaded.</p></details>
+    <details id="step-29">
+      <summary><span class="tag done">Done</span> 29. Font from an uploaded TTF or OTF</summary>
+      <p>You can upload a font you made somewhere else, such as a Calligraphr export, and write with a new font built from its letter shapes. The file you upload is never the file a letter loads. The worker reads it in a short, memory-limited thread, draws a fresh font from the outlines, and throws the upload away.</p>
+      <ul class="points">
+        <li>Open a letter, open Font, and under My handwriting choose Make a handwriting font. Then choose Upload a font file.</li>
+        <li>Type the name the seal should use, then choose a TTF or OTF. The worker builds the font. When it is ready, the line in the dialog is set in that hand.</li>
+        <li>A file that cannot be read says “That font file could not be read.” A font without lowercase letters says “That font is missing lowercase letters.” A file that takes too long says “That font took too long to read.”</li>
+        <li>A photo, or a file from another studio, cannot be used. The upload itself cannot be opened from the letter; only the rebuilt font can.</li>
+      </ul>
+      <p>The worker has to be running, because the website only asks for the build. After <code>git pull</code> and <code>pnpm install</code>:</p>
+      <pre>docker compose up -d
+pnpm dev</pre>
+      <p>Open <a href="http://127.0.0.1:3000/fonts/new">http://127.0.0.1:3000/fonts/new</a> and choose Upload a font file.</p>
+      <p>The tests run on throwaway Postgres in Docker, and on small fonts built in the test:</p>
+      <pre>pnpm --filter @repo/integrations test --reporter=verbose
+pnpm --filter @repo/services test --reporter=verbose
+pnpm --filter worker test --reporter=verbose</pre>
+      <p>The names read like “an uploaded font is rebuilt at 1000 units with scaled advances”, “curves survive the rebuild”, “nothing from the upload's name table survives”, “a font without lowercase letters is refused”, “a parse that runs too long is stopped”, “only a font file can make an upload font”, and “the uploaded file is never read back”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>. Uploading a font from an iPad is still unchecked. There is no iPad in this setup.</p>
+    </details>
 
     <h3>M8. Proofs and postcards</h3>
     <details id="step-30">
