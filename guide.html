@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, a doodle library, moving a placed doodle, lifting ink from a photo in the worker, photographing a doodle, building a drawn handwriting font, writing a letter in that hand, making a font from a photo of the printed template, building a font from an uploaded font file, exporting a proof, and making a postcard are ready on your own computer.</p>
-  <div class="progress" aria-hidden="true"><span style="width:89%"></span></div>
-  <p class="log">32 of 36 steps in the repository. Step 32 makes postcards.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, a doodle library, moving a placed doodle, lifting ink from a photo in the worker, photographing a doodle, building a drawn handwriting font, writing a letter in that hand, making a font from a photo of the printed template, building a font from an uploaded font file, exporting a proof, making a postcard, and merge fields are ready on your own computer.</p>
+  <div class="progress" aria-hidden="true"><span style="width:92%"></span></div>
+  <p class="log">33 of 36 steps in the repository. Step 33 adds merge fields.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -702,7 +702,29 @@ pnpm --filter web test:e2e</pre>
     </details>
 
     <h3>M9. Merge fields and signature</h3>
-    <details id="step-33"><summary><span class="tag later">Later</span> 33. Merge fields</summary><p>Type @ for first name and last name.</p></details>
+    <details id="step-33">
+      <summary><span class="tag done">Done</span> 33. Merge fields</summary>
+      <p>Type @ and a small menu offers First name and Last name. Pick one and a chip sits in the sentence, in the same ink as the words around it. Backspace removes the whole chip. The page shows the field's name while you write. The preview and the proof print the sample, Alex Rivera. The export checks that the longest name still fits.</p>
+      <ul class="points">
+        <li>In a letter, type @. First name and Last name appear. @fir narrows it to First name. Enter inserts the chip, and the letters @fir are gone.</li>
+        <li>@last shows only Last name. Escape leaves @last as ordinary text.</li>
+        <li>An address such as alex@example.com stays text. The @ has to follow a space or the start of a line.</li>
+        <li>Backspace just after a chip deletes the chip, not one letter of its name.</li>
+        <li>Set the ink, then insert a chip. The chip and the words beside it keep that colour.</li>
+        <li>Insert field in the toolbar opens the same menu at the caret.</li>
+        <li>Print preview shows Alex where the editor shows First name. A proof that fits Alex but not Maximiliana is refused because the words do not fit.</li>
+      </ul>
+      <p>After <code>git pull</code> and <code>pnpm install</code>:</p>
+      <pre>docker compose up -d
+pnpm dev</pre>
+      <p>Open a letter at <a href="http://127.0.0.1:3000/letters">http://127.0.0.1:3000/letters</a>, type @, and pick First name. Print preview shows Alex.</p>
+      <p>The tests run on throwaway Postgres, and the browser journeys drive the editor:</p>
+      <pre>pnpm --filter @repo/render test --reporter=verbose
+pnpm --filter worker test --reporter=verbose
+pnpm --filter web test:e2e</pre>
+      <p>The names read like “a field the catalogue does not have is refused”, “a chip prints the recipient's value”, “a letter that fits with Alex but not with the longest name fails the export”, “@ opens the field menu and a pick inserts a chip”, “the menu filters and Escape leaves the text”, “an @ in an email address stays text”, “backspace after a chip removes the whole chip”, “a chip keeps the ink around it”, and “the preview prints the sample”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, 335 tests, including 2 new render tests and 1 new worker test. <code>pnpm test:e2e</code>, 49 journeys, covers the merge-field menu. Using the menu on an iPad is still unchecked. There is no iPad in this setup.</p>
+    </details>
     <details id="step-34"><summary><span class="tag later">Later</span> 34. Sign the letter</summary><p>Your own signature, after the last line.</p></details>
 
     <h3>M10. Text wrap</h3>

@@ -1,6 +1,7 @@
 import type {
 	LetterContent,
 	LetterResources,
+	MergeValues,
 	ParagraphNode,
 } from "@repo/types";
 import { SAMPLE_MERGE_VALUES } from "@repo/types";
@@ -58,12 +59,15 @@ function withDrawing(content: LetterContent, drawingId: string): LetterContent {
 	};
 }
 
-function render(content: LetterContent): string {
+function render(
+	content: LetterContent,
+	mergeValues: MergeValues = SAMPLE_MERGE_VALUES,
+): string {
 	return renderLetterHtml({
 		letterId: LETTER_ID,
 		content,
 		resources,
-		mergeValues: SAMPLE_MERGE_VALUES,
+		mergeValues,
 	});
 }
 
@@ -75,6 +79,30 @@ function urlsIn(html: string): string[] {
 }
 
 describe("renderLetterHtml", () => {
+	test("a chip prints the recipient's value", () => {
+		const content = withParagraphs(fixtureContent(letterFixture("note")), [
+			{
+				type: "paragraph",
+				attrs: { align: "left" },
+				content: [
+					{ type: "mergeField", attrs: { field: "first_name" } },
+					{ type: "text", text: " " },
+					{ type: "mergeField", attrs: { field: "last_name" } },
+				],
+			},
+		]);
+		const sample = render(content);
+		expect(sample).toContain("Alex");
+		expect(sample).toContain("Rivera");
+		const custom = render(content, {
+			first_name: "<b>Jo</b>",
+			last_name: "Lee",
+		});
+		expect(custom).toContain("&lt;b&gt;Jo&lt;/b&gt;");
+		expect(custom).not.toContain("<b>Jo</b>");
+		expect(custom).toContain("Lee");
+	});
+
 	test("text that looks like markup stays text", () => {
 		const html = render(
 			withParagraphs(fixtureContent(letterFixture("note")), [

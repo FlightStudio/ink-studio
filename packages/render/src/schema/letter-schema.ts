@@ -1,5 +1,5 @@
-import type { Align, InkMark, StockFontId } from "@repo/types";
-import { INK_COLORS, STOCK_FONTS, TEXT_SIZES } from "@repo/types";
+import type { Align, InkMark, MergeFieldKey, StockFontId } from "@repo/types";
+import { INK_COLORS, MERGE_FIELDS, STOCK_FONTS, TEXT_SIZES } from "@repo/types";
 import type { Extensions } from "@tiptap/core";
 import { Extension, Mark, Node } from "@tiptap/core";
 import { history, redo, undo } from "@tiptap/pm/history";
@@ -113,6 +113,35 @@ const Text = Node.create({
 	group: "inline",
 });
 
+const MergeField = Node.create({
+	name: "mergeField",
+	inline: true,
+	group: "inline",
+	atom: true,
+	marks: "ink",
+	addAttributes() {
+		return {
+			field: {
+				default: null,
+				rendered: false,
+				parseHTML: (element) => {
+					const field = element.getAttribute("data-field");
+					return field !== null && Object.hasOwn(MERGE_FIELDS, field)
+						? (field as MergeFieldKey)
+						: null;
+				},
+			},
+		};
+	},
+	parseHTML() {
+		return [{ tag: "span[data-field]" }];
+	},
+	renderHTML({ node }) {
+		const field = node.attrs.field;
+		return ["span", typeof field === "string" ? { "data-field": field } : {}];
+	},
+});
+
 const HardBreak = Node.create({
 	name: "hardBreak",
 	inline: true,
@@ -170,6 +199,7 @@ export const letterExtensions: Extensions = [
 	Paragraph,
 	Text,
 	HardBreak,
+	MergeField,
 	Ink,
 	LetterHistory,
 ];

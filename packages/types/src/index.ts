@@ -42,6 +42,7 @@ export type {
 	LetterContent,
 	LetterDoc,
 	LetterResources,
+	MergeFieldNode,
 	ParagraphNode,
 	PlacedElement,
 	SealFont,

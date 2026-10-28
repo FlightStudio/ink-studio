@@ -145,6 +145,48 @@ it("later edits do not reach the export", async () => {
 	expect(html.includes("Edited sentence")).toBe(false);
 });
 
+it("a letter that fits with Alex but not with the longest name fails the export", async () => {
+	const ada = await member("ada-export-longest");
+	const base = await freshContent(ada);
+	const content: LetterContent = {
+		...base,
+		doc: {
+			...base.doc,
+			content: [
+				{
+					type: "paragraph",
+					attrs: { align: "left" },
+					content: [
+						{ type: "text", text: "Dear " },
+						{ type: "mergeField", attrs: { field: "first_name" } },
+					],
+				},
+			],
+		},
+	};
+	const { assetId } = await exportLetter(ada, content, "Dear friend");
+	const measure = vi.fn<PrintRenderer["measure"]>(async ({ html }) => ({
+		lineTopsIn: [1],
+		textBottomIn: html.includes("Maximiliana") ? 40 : 2,
+		wordsPastLimit: html.includes("Maximiliana") ? 12 : 0,
+	}));
+	const render = vi.fn<PrintRenderer["render"]>(async () =>
+		Uint8Array.from([1]),
+	);
+	const processor = processorFor({ measure, render });
+	await processor.process(message(processor, assetId));
+	expect(measure.mock.calls[0]?.[0].html).toContain("Maximiliana");
+	expect(render).not.toHaveBeenCalled();
+	const stored = await testDb.db.assets.byId(
+		ada.userOrganization.organizationId,
+		assetId,
+	);
+	expect(stored?.processing).toMatchObject({
+		status: "failed",
+		error: "letter_overflow",
+	});
+});
+
 it("text that does not fit fails the export with its reason", async () => {
 	const ada = await member("ada-export-overflow");
 	const { assetId } = await exportLetter(

@@ -1,5 +1,5 @@
-import type { LetterDoc, MergeValues } from "@repo/types";
-import { PAGE_SPECS } from "@repo/types";
+import type { LetterDoc, MergeFieldKey, MergeValues } from "@repo/types";
+import { MERGE_FIELDS, PAGE_SPECS } from "@repo/types";
 import type { DOMOutputSpec, Node } from "@tiptap/pm/model";
 import type { NodeProps } from "@tiptap/static-renderer";
 import {
@@ -9,6 +9,7 @@ import {
 import React, { type ReactElement, type ReactNode } from "react";
 import { letterExtensions } from "../schema/letter-schema.ts";
 import { LetterPage, type LetterPageProps } from "./letter-page.tsx";
+import { MergeChip } from "./merge-chip.tsx";
 
 export type LetterPrintProps = Pick<
 	LetterPageProps,
@@ -30,13 +31,26 @@ function StaticParagraph({
 	);
 }
 
+function StaticMergeField({ node }: NodeProps<Node, ReactNode>): ReactElement {
+	const field = node.attrs.field;
+	if (typeof field !== "string" || !Object.hasOwn(MERGE_FIELDS, field)) {
+		throw new Error("The letter names a field the catalogue does not have.");
+	}
+	return <MergeChip field={field as MergeFieldKey} />;
+}
+
 export function LetterText({ doc }: { doc: LetterDoc }): ReactElement {
 	return (
 		<div className="letter-text">
 			{renderToReactElement({
 				extensions: letterExtensions,
 				content: doc,
-				options: { nodeMapping: { paragraph: StaticParagraph } },
+				options: {
+					nodeMapping: {
+						paragraph: StaticParagraph,
+						mergeField: StaticMergeField,
+					},
+				},
 			})}
 		</div>
 	);

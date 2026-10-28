@@ -5,7 +5,7 @@ packages:
 
 catalog:
   "@base-ui/react": ^1.9.0
-  "@floating-ui/dom": ^1.7.0
+  "@floating-ui/dom": ^1.8.0
   "@google-cloud/pubsub": ^6.2.0
   "@google-cloud/storage": ^8.0.0
   "@t3-oss/env-core": ^0.13.11
