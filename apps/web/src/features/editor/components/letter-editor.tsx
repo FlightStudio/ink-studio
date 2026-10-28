@@ -37,9 +37,10 @@ import {
 } from "react";
 import { LibrarySheet } from "@/features/library/components/library-sheet";
 import { useAutosave } from "@/lib/use-autosave";
-import { placeElement } from "../elements.ts";
+import { placeElement, removeElement, updateElement } from "../elements.ts";
 import { AddSide } from "./add-side.tsx";
 import { EditorToolbar, useCoarsePointer } from "./editor-toolbar.tsx";
+import { ElementHandles, placementSentence } from "./element-handles.tsx";
 import { HumanSeal } from "./human-seal.tsx";
 import { LetterTitle } from "./letter-title.tsx";
 import { OverflowNotice } from "./overflow-notice.tsx";
@@ -238,6 +239,8 @@ export function LetterEditor({ letter, doodles }: LetterEditorProps) {
 	const [flowHeightIn, setFlowHeightIn] = useState(0);
 	const [resources, setResources] = useState<LetterResources>(letter.resources);
 	const [libraryOpen, setLibraryOpen] = useState(false);
+	const [selectedId, setSelectedId] = useState<string | null>(null);
+	const [preview, setPreview] = useState<PlacedElement | null>(null);
 	const pageRef = useRef<HTMLDivElement>(null);
 	const inkReady = useInkReady(letter.content);
 	const desk = useDeskScale(spec.widthIn);
@@ -322,11 +325,19 @@ export function LetterEditor({ letter, doodles }: LetterEditorProps) {
 		const page = pageRef.current;
 		if (!page || !editor || !letter.editable) return;
 		const focusEnd = (event: MouseEvent) => {
-			if (
-				event.target instanceof Node &&
-				editor.view.dom.contains(event.target)
-			)
+			const target = event.target;
+			if (target instanceof Element && target.closest("[data-element-menu]")) {
 				return;
+			}
+			if (target instanceof Element && target.closest(".letter-handles")) {
+				event.preventDefault();
+				editor.commands.focus(undefined, { scrollIntoView: false });
+				return;
+			}
+			if (target instanceof Node && editor.view.dom.contains(target)) {
+				setSelectedId(null);
+				return;
+			}
 			event.preventDefault();
 			editor.commands.focus("end");
 		};
@@ -340,6 +351,21 @@ export function LetterEditor({ letter, doodles }: LetterEditorProps) {
 	const heightIn = Math.max(stackIn, flowHeightIn);
 	const scale = desk.scale ?? 1;
 	const live = { ...letter.content, doc };
+	const shownElements = live.doc.attrs.elements.map((element) =>
+		preview?.id === element.id ? preview : element,
+	);
+	const shown = {
+		...live,
+		doc: {
+			...live.doc,
+			attrs: { ...live.doc.attrs, elements: shownElements },
+		},
+	};
+	const placementWarning = placementSentence(
+		pageState.issues.filter((issue) =>
+			shownElements.some((element) => element.id === issue.elementId),
+		),
+	);
 
 	function placeDrawing(drawing: LibraryDrawing) {
 		if (!editor) return;
@@ -434,11 +460,35 @@ export function LetterEditor({ letter, doodles }: LetterEditorProps) {
 								</style>
 								<LetterPage
 									letterId={letter.id}
-									content={live}
+									content={shown}
 									resources={resources}
 									mode="edit"
 									mergeValues={null}
 									sheets={sheets}
+									handles={
+										editor && letter.editable ? (
+											<ElementHandles
+												elements={shownElements}
+												spec={spec}
+												gapIn={gapIn}
+												scale={scale}
+												issues={pageState.issues}
+												selectedId={selectedId}
+												onSelect={setSelectedId}
+												onPreview={setPreview}
+												onCommit={(id, change) => {
+													editor.view.dispatch(
+														updateElement(editor.state, id, change),
+													);
+												}}
+												onRemove={(id) => {
+													editor.view.dispatch(removeElement(editor.state, id));
+													setSelectedId(null);
+													setPreview(null);
+												}}
+											/>
+										) : undefined
+									}
 									flow={
 										<div
 											className={
@@ -464,6 +514,14 @@ export function LetterEditor({ letter, doodles }: LetterEditorProps) {
 					</div>
 				</div>
 				<div className="mt-6 flex w-full max-w-xl flex-col items-center gap-3">
+					{placementWarning ? (
+						<p
+							className="text-center text-ui"
+							style={{ color: "var(--danger)" }}
+						>
+							{placementWarning}
+						</p>
+					) : null}
 					<OverflowNotice
 						words={pageState.measure.wordsPastLimit}
 						maxPages={spec.maxPages}
