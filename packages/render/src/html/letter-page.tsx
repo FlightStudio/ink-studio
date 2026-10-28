@@ -20,6 +20,7 @@ import {
 	exclusionFloats,
 	pageExclusions,
 	sideTopIn,
+	wrapExclusions,
 	writingSides,
 } from "./geometry.ts";
 import { LETTER_CSS } from "./letter-css.ts";
@@ -192,7 +193,10 @@ export function LetterPage(props: LetterPageProps): ReactElement {
 	const sides = writingSides(spec);
 	const firstSide = sides[0] ?? 0;
 	const column = columnBox(spec, gapIn);
-	const floats = exclusionFloats(column, pageExclusions(spec, gapIn));
+	const floats = exclusionFloats(column, [
+		...pageExclusions(spec, gapIn),
+		...wrapExclusions(spec, content.doc.attrs.elements, gapIn),
+	]);
 	const drawnSides: number[] = [];
 	for (let side = firstSide; side < props.sheets; side += 1) {
 		drawnSides.push(side);

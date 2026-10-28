@@ -1,3 +1,4 @@
+import type { PlacedElement } from "@repo/types";
 import { PAGE_SPECS } from "@repo/types";
 import { describe, expect, it } from "vitest";
 import {
@@ -8,6 +9,7 @@ import {
 	pageExclusions,
 	placementIssues,
 	sidesUsed,
+	wrapExclusions,
 	writingSides,
 } from "./geometry.ts";
 
@@ -268,6 +270,106 @@ describe("exclusionFloats", () => {
 			{ float: "right", clear: "right", widthIn: 2, heightIn: 2 },
 			{ float: "left", clear: "none", widthIn: 0, heightIn: 1 },
 			{ float: "left", clear: "left", widthIn: 1, heightIn: 2 },
+		]);
+	});
+});
+
+function placed(
+	over: Partial<PlacedElement> & Pick<PlacedElement, "xIn" | "yIn">,
+): PlacedElement {
+	return {
+		id: "0190a8d6-5c1e-7b3a-9f00-0000000000d1",
+		kind: "drawing",
+		drawingId: "0190a8d6-5c1e-7b3a-9f00-0000000000d2",
+		side: 0,
+		widthIn: 2,
+		heightIn: 1,
+		rotationDeg: 0,
+		tint: "ink-blue",
+		wrap: true,
+		...over,
+	};
+}
+
+describe("wrapExclusions", () => {
+	it("a doodle in the left half pushes text to its right", () => {
+		const [exclusion] = wrapExclusions(
+			letter,
+			[placed({ xIn: 1, yIn: 2 })],
+			0.5,
+		);
+		expect(exclusion?.wrap).toBe("left");
+		expect(exclusion?.xIn).toBe(0);
+		expect(exclusion?.widthIn).toBeCloseTo(2.37, 5);
+		expect(exclusion?.yIn).toBeCloseTo(1.13, 5);
+		expect(exclusion?.heightIn).toBeCloseTo(1.24, 5);
+	});
+
+	it("a doodle in the right half pushes text to its left", () => {
+		const [exclusion] = wrapExclusions(
+			letter,
+			[placed({ xIn: 5.5, yIn: 2, widthIn: 1.5 })],
+			0.5,
+		);
+		expect(exclusion?.wrap).toBe("right");
+		expect(exclusion?.xIn).toBeCloseTo(4.63, 5);
+		expect(exclusion?.widthIn).toBeCloseTo(2.37, 5);
+		expect(exclusion?.yIn).toBeCloseTo(1.13, 5);
+		expect(exclusion?.heightIn).toBeCloseTo(1.24, 5);
+	});
+
+	it("a doodle that does not wrap adds no exclusion", () => {
+		expect(
+			wrapExclusions(letter, [placed({ xIn: 1, yIn: 2, wrap: false })], 0.5),
+		).toEqual([]);
+	});
+
+	it("a wrapping doodle on side 2 sits in side 2's stretch of the column", () => {
+		const [exclusion] = wrapExclusions(
+			letter,
+			[placed({ xIn: 1, yIn: 2, side: 2 })],
+			0.5,
+		);
+		expect(exclusion?.wrap).toBe("left");
+		expect(exclusion?.xIn).toBe(0);
+		expect(exclusion?.yIn).toBeCloseTo(24.13, 5);
+		expect(exclusion?.heightIn).toBeCloseTo(1.24, 5);
+	});
+
+	it("a wrapping doodle in the bottom margin adds no exclusion", () => {
+		expect(
+			wrapExclusions(
+				letter,
+				[placed({ xIn: 2, yIn: 10.5, widthIn: 1, heightIn: 0.3 })],
+				0.5,
+			),
+		).toEqual([]);
+	});
+
+	it("two overlapping wrapping doodles on one side become one exclusion", () => {
+		expect(
+			wrapExclusions(
+				letter,
+				[
+					placed({ xIn: 1, yIn: 2, heightIn: 1.5 }),
+					placed({
+						id: "0190a8d6-5c1e-7b3a-9f00-0000000000d3",
+						xIn: 1.4,
+						yIn: 2.8,
+						widthIn: 1.6,
+						heightIn: 1.5,
+					}),
+				],
+				0.5,
+			),
+		).toEqual([
+			{
+				xIn: 0,
+				yIn: 1.13,
+				widthIn: 2.37,
+				heightIn: 2.54,
+				wrap: "left",
+			},
 		]);
 	});
 });

@@ -1,4 +1,4 @@
-import type { KeepClearZone, PageSpec } from "@repo/types";
+import type { KeepClearZone, PageSpec, PlacedElement } from "@repo/types";
 
 export type Rect = {
 	xIn: number;
@@ -8,6 +8,7 @@ export type Rect = {
 };
 export type PlacedBox = Rect & { side: number; rotationDeg: number };
 export type Exclusion = Rect & { wrap: "left" | "right" | "both" };
+export const WRAP_PADDING_IN = 0.12;
 export type FloatBox = {
 	float: "left" | "right";
 	clear: "none" | "left" | "right" | "both";
@@ -135,6 +136,77 @@ export function pageExclusions(spec: PageSpec, gapIn: number): Exclusion[] {
 		});
 	}
 	return exclusions;
+}
+
+function pad(rect: Rect): Rect {
+	return {
+		xIn: rect.xIn - WRAP_PADDING_IN,
+		yIn: rect.yIn - WRAP_PADDING_IN,
+		widthIn: rect.widthIn + 2 * WRAP_PADDING_IN,
+		heightIn: rect.heightIn + 2 * WRAP_PADDING_IN,
+	};
+}
+
+function mergeRuns(items: Exclusion[]): Exclusion[] {
+	const sorted = [...items].sort((a, b) => a.yIn - b.yIn);
+	const merged: Exclusion[] = [];
+	for (const item of sorted) {
+		const last = merged.at(-1);
+		if (!last || last.yIn + last.heightIn < item.yIn) {
+			merged.push({ ...item });
+			continue;
+		}
+		const top = Math.min(last.yIn, item.yIn);
+		const bottom = Math.max(last.yIn + last.heightIn, item.yIn + item.heightIn);
+		const left = Math.min(last.xIn, item.xIn);
+		const right = Math.max(last.xIn + last.widthIn, item.xIn + item.widthIn);
+		last.xIn = left;
+		last.yIn = top;
+		last.widthIn = right - left;
+		last.heightIn = bottom - top;
+	}
+	return merged;
+}
+
+export function wrapExclusions(
+	spec: PageSpec,
+	elements: readonly PlacedElement[],
+	gapIn: number,
+): Exclusion[] {
+	const columnWidth = textWidthIn(spec);
+	const groups = new Map<string, Exclusion[]>();
+	for (const element of elements) {
+		if (!element.wrap) continue;
+		const clipped = clipToText(
+			spec,
+			element.side,
+			pad(boundsOf(element)),
+			gapIn,
+		);
+		if (!clipped) continue;
+		const right = clipped.xIn + clipped.widthIn;
+		const onLeft = clipped.xIn <= columnWidth - right;
+		const exclusion: Exclusion = onLeft
+			? {
+					xIn: 0,
+					yIn: clipped.yIn,
+					widthIn: right,
+					heightIn: clipped.heightIn,
+					wrap: "left",
+				}
+			: {
+					xIn: clipped.xIn,
+					yIn: clipped.yIn,
+					widthIn: columnWidth - clipped.xIn,
+					heightIn: clipped.heightIn,
+					wrap: "right",
+				};
+		const key = `${element.side}:${exclusion.wrap}`;
+		const group = groups.get(key) ?? [];
+		group.push(exclusion);
+		groups.set(key, group);
+	}
+	return [...groups.values()].flatMap(mergeRuns);
 }
 
 function turn(rotationDeg: number): { cos: number; sin: number } {

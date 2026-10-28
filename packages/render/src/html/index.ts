@@ -24,6 +24,8 @@ export {
 	placementIssues,
 	sidesUsed,
 	sideTopIn,
+	WRAP_PADDING_IN,
+	wrapExclusions,
 	writingSides,
 } from "./geometry.ts";
 export { outlinePath, STROKE_OPTIONS, strokeOutline } from "./ink.ts";

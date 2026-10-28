@@ -8,12 +8,16 @@ import type { CSSProperties } from "react";
 
 export function ElementMenu({
 	tint,
+	wrap,
 	onTint,
+	onWrap,
 	onRemove,
 	style,
 }: {
 	tint: InkColorId;
+	wrap: boolean;
 	onTint: (tint: InkColorId) => void;
+	onWrap: (wrap: boolean) => void;
 	onRemove: () => void;
 	style?: CSSProperties;
 }) {
@@ -36,6 +40,15 @@ export function ElementMenu({
 					onSelect={() => onTint(id as InkColorId)}
 				/>
 			))}
+			<Button
+				type="button"
+				variant="ghost"
+				size="sm"
+				aria-pressed={wrap}
+				onClick={() => onWrap(!wrap)}
+			>
+				Wrap text
+			</Button>
 			<Button type="button" variant="ghost" size="sm" onClick={onRemove}>
 				Remove
 			</Button>

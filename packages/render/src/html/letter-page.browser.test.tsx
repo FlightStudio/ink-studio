@@ -4,6 +4,7 @@ import type {
 	LetterContent,
 	LetterResources,
 	PageSpec,
+	PlacedElement,
 	StockFontId,
 } from "@repo/types";
 import { PAGE_SPECS, STOCK_FONTS } from "@repo/types";
@@ -16,6 +17,7 @@ import {
 	letterFixture,
 } from "./fixtures/index.ts";
 import {
+	boundsOf,
 	columnBox,
 	type Exclusion,
 	exclusionFloats,
@@ -23,6 +25,7 @@ import {
 	pageExclusions,
 	type Rect,
 	sidesUsed,
+	sideTopIn,
 } from "./geometry.ts";
 import {
 	LetterPage,
@@ -55,6 +58,17 @@ const resources: LetterResources = {
 let browsers: TestBrowsers | undefined;
 const contexts = new Map<string, BrowserContext>();
 const fontBytes = new Map<string, Buffer>();
+
+function resourcesFor(content: LetterContent): LetterResources {
+	const drawings = { ...resources.drawings };
+	for (const element of content.doc.attrs.elements) {
+		drawings[element.drawingId] ??= {
+			maskAssetId: element.drawingId,
+			aspect: element.widthIn / element.heightIn,
+		};
+	}
+	return { ...resources, drawings };
+}
 
 function contextFor(engine: Engine, scale: number): BrowserContext {
 	const context = contexts.get(`${engine}@${scale}`);
@@ -105,7 +119,7 @@ async function load(
 		<LetterPage
 			letterId={LETTER_ID}
 			content={params.content}
-			resources={resources}
+			resources={resourcesFor(params.content)}
 			mode={params.mode}
 			mergeValues={null}
 			sheets={spec.maxPages}
@@ -198,6 +212,44 @@ function beside(box: Rect, exclusion: Rect): boolean {
 		box.yIn < exclusion.yIn + exclusion.heightIn &&
 		exclusion.yIn < box.yIn + box.heightIn
 	);
+}
+
+const DOODLE_ID = "0190a8d6-5c1e-7b3a-9f00-0000000000d1";
+
+function doodleLetter(wrap: boolean): LetterContent {
+	const content = fixtureContent(letterFixture("one-side"));
+	const element: PlacedElement = {
+		id: DOODLE_ID,
+		kind: "drawing",
+		drawingId: DOODLE_ID,
+		side: 0,
+		xIn: 1.2,
+		yIn: 2,
+		widthIn: 2,
+		heightIn: 1.5,
+		rotationDeg: 0,
+		tint: "ink-blue",
+		wrap,
+	};
+	content.doc.attrs.elements = [element];
+	return content;
+}
+
+function columnFootprint(
+	spec: PageSpec,
+	element: PlacedElement,
+	mode: Mode,
+): Rect {
+	const bounds = boundsOf(element);
+	return {
+		xIn: bounds.xIn - spec.marginIn,
+		yIn:
+			bounds.yIn -
+			spec.marginIn +
+			sideTopIn(spec, element.side, pageGapIn(mode)),
+		widthIn: bounds.widthIn,
+		heightIn: bounds.heightIn,
+	};
 }
 
 function bandsOf(spec: PageSpec, mode: Mode): Exclusion[] {
@@ -385,6 +437,31 @@ describe.each(ENGINES)("%s", (engine) => {
 				expect(
 					boxes.filter((box) => overlaps(box, left) || overlaps(box, right)),
 				).toEqual([]);
+			}
+		});
+
+		test("no line crosses a wrapping doodle's footprint", async () => {
+			const content = doodleLetter(true);
+			const spec = PAGE_SPECS[content.format];
+			const element = content.doc.attrs.elements[0];
+			if (!element) throw new Error("the fixture has no doodle");
+			for (const mode of MODES) {
+				const footprint = columnFootprint(spec, element, mode);
+				const boxes = await withPage(context(), { content, mode }, wordBoxes);
+				expect(boxes.some((box) => beside(box, footprint))).toBe(true);
+				expect(boxes.filter((box) => overlaps(box, footprint))).toEqual([]);
+			}
+		});
+
+		test("a doodle that does not wrap floats over the text", async () => {
+			const content = doodleLetter(false);
+			const spec = PAGE_SPECS[content.format];
+			const element = content.doc.attrs.elements[0];
+			if (!element) throw new Error("the fixture has no doodle");
+			for (const mode of MODES) {
+				const footprint = columnFootprint(spec, element, mode);
+				const boxes = await withPage(context(), { content, mode }, wordBoxes);
+				expect(boxes.some((box) => overlaps(box, footprint))).toBe(true);
 			}
 		});
 
