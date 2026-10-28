@@ -1,5 +1,6 @@
 import type { StockFontId } from "./font.ts";
 import type { InkColorId, TextSizePt } from "./ink.ts";
+import type { MergeFieldKey } from "./merge-field.ts";
 import type { PageFormatId } from "./page.ts";
 
 export type Align = "left" | "center" | "right";
@@ -17,7 +18,12 @@ export type InkMark = {
 };
 export type TextNode = { type: "text"; text: string; marks?: InkMark[] };
 export type HardBreakNode = { type: "hardBreak"; marks?: InkMark[] };
-export type InlineNode = TextNode | HardBreakNode;
+export type MergeFieldNode = {
+	type: "mergeField";
+	attrs: { field: MergeFieldKey };
+	marks?: InkMark[];
+};
+export type InlineNode = TextNode | HardBreakNode | MergeFieldNode;
 export type ParagraphNode = {
 	type: "paragraph";
 	attrs: { align: Align };

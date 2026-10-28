@@ -3,6 +3,7 @@
 import {
 	type LetterMeasure,
 	LetterPage,
+	MergeChip,
 	measureInputFor,
 	measureLetter,
 	overflowIn,
@@ -20,12 +21,20 @@ import type {
 	LetterDoc,
 	LetterResources,
 	LibraryDrawing,
+	MergeFieldKey,
 	PageSpec,
 	PlacedElement,
 } from "@repo/types";
-import { PAGE_SPECS } from "@repo/types";
+import { MERGE_FIELDS, PAGE_SPECS } from "@repo/types";
 import { Desk } from "@repo/ui/components/desk";
-import { EditorContent, useEditor } from "@tiptap/react";
+import type { Extensions } from "@tiptap/core";
+import {
+	EditorContent,
+	NodeViewWrapper,
+	type ReactNodeViewProps,
+	ReactNodeViewRenderer,
+	useEditor,
+} from "@tiptap/react";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -33,12 +42,14 @@ import {
 	useCallback,
 	useEffect,
 	useLayoutEffect,
+	useMemo,
 	useRef,
 	useState,
 } from "react";
 import { LibrarySheet } from "@/features/library/components/library-sheet";
 import { useAutosave } from "@/lib/use-autosave";
 import { placeElement, removeElement, updateElement } from "../elements.ts";
+import { mergeFieldSuggestion } from "../merge-field-suggestion.ts";
 import { AddSide } from "./add-side.tsx";
 import { EditorToolbar, useCoarsePointer } from "./editor-toolbar.tsx";
 import { ElementHandles, placementSentence } from "./element-handles.tsx";
@@ -50,6 +61,33 @@ import { OverflowNotice } from "./overflow-notice.tsx";
 import { PrintPreview } from "./print-preview.tsx";
 import { SaveLine } from "./save-line.tsx";
 import { SidesIndicator } from "./sides-indicator.tsx";
+
+function MergeFieldView({ node }: ReactNodeViewProps) {
+	const field = node.attrs.field;
+	if (typeof field !== "string" || !Object.hasOwn(MERGE_FIELDS, field)) {
+		return <NodeViewWrapper as="span" />;
+	}
+	return (
+		<NodeViewWrapper as="span">
+			<MergeChip field={field as MergeFieldKey} />
+		</NodeViewWrapper>
+	);
+}
+
+function editorExtensions(): Extensions {
+	return [
+		...letterExtensions.map((extension) =>
+			extension.name === "mergeField"
+				? extension.extend({
+						addNodeView() {
+							return ReactNodeViewRenderer(MergeFieldView);
+						},
+					})
+				: extension,
+		),
+		mergeFieldSuggestion,
+	];
+}
 
 const PX_PER_IN = 96;
 const PLACED_LONG_SIDE_IN = 2;
@@ -255,8 +293,9 @@ export function LetterEditor({
 	const coarsePointer = useCoarsePointer();
 	const [keyboardClearancePx, setKeyboardClearancePx] = useState(0);
 
+	const extensions = useMemo(() => editorExtensions(), []);
 	const editor = useEditor({
-		extensions: letterExtensions,
+		extensions,
 		content: letter.content.doc,
 		editable: letter.editable,
 		injectCSS: false,

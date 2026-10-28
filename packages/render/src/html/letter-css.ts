@@ -94,4 +94,11 @@ export const LETTER_CSS = `
 .letter-handles > * {
 	pointer-events: auto;
 }
+.merge-chip[data-editing="true"],
+.letter-text .merge-query {
+	text-decoration-line: underline;
+	text-decoration-color: var(--ink-accent);
+	text-underline-offset: 0.15em;
+	text-decoration-thickness: 1px;
+}
 `;

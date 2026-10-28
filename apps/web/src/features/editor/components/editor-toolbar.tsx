@@ -48,6 +48,7 @@ import {
 	AlignCenter,
 	AlignLeft,
 	AlignRight,
+	AtSign,
 	Images,
 	Redo2,
 	Undo2,
@@ -61,6 +62,7 @@ import {
 	useRef,
 	useSyncExternalStore,
 } from "react";
+import { openMergeFieldMenu } from "../merge-field-suggestion.ts";
 
 const COARSE_POINTER = "(pointer: coarse)";
 const KEYBOARD_GAP_PX = 12;
@@ -465,6 +467,22 @@ export function EditorToolbar({
 						</Tooltip>
 					))}
 				</ToggleGroup>
+				<Toolbar.Separator />
+				<Tooltip>
+					<TooltipTrigger
+						render={
+							<Toolbar.Button
+								aria-label="Insert field"
+								onMouseDown={(event) => event.preventDefault()}
+								onClick={() => openMergeFieldMenu(editor)}
+								render={<Button variant="ghost" size="icon" />}
+							/>
+						}
+					>
+						<AtSign />
+					</TooltipTrigger>
+					<TooltipContent side="bottom">Insert field</TooltipContent>
+				</Tooltip>
 				<Toolbar.Separator />
 				<Tooltip>
 					<TooltipTrigger

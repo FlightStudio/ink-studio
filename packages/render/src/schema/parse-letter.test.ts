@@ -255,6 +255,38 @@ describe("parseLetterContent", () => {
 		expect(parsed.doc.attrs.elements[1]?.wrap).toBe(false);
 	});
 
+	it("a field the catalogue does not have is refused", () => {
+		const content = copy();
+		const json = {
+			...content,
+			doc: {
+				...content.doc,
+				content: [
+					{
+						type: "paragraph",
+						attrs: { align: "left" },
+						content: [{ type: "mergeField", attrs: { field: "nickname" } }],
+					},
+				],
+			},
+		};
+		expect(() => parseLetterContent(json)).toThrow();
+		const chip = copy();
+		chip.doc.content = [
+			{
+				type: "paragraph",
+				attrs: { align: "left" },
+				content: [{ type: "mergeField", attrs: { field: "first_name" } }],
+			},
+		];
+		expect(parseLetterContent(chip).doc.content[0]?.content?.[0]).toMatchObject(
+			{
+				type: "mergeField",
+				attrs: { field: "first_name" },
+			},
+		);
+	});
+
 	it("minSides above the spec's maxPages is refused", () => {
 		for (const format of Object.keys(PAGE_SPECS) as PageFormatId[]) {
 			const { maxPages } = PAGE_SPECS[format];

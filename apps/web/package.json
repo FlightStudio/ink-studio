@@ -10,6 +10,7 @@
 		"test:e2e": "vitest run --config vitest.e2e.config.ts"
 	},
 	"dependencies": {
+		"@floating-ui/dom": "catalog:",
 		"@repo/api": "workspace:*",
 		"@repo/db": "workspace:*",
 		"@repo/errors": "workspace:*",
@@ -23,6 +24,7 @@
 		"@tiptap/core": "catalog:",
 		"@tiptap/pm": "catalog:",
 		"@tiptap/react": "catalog:",
+		"@tiptap/suggestion": "catalog:",
 		"lucide-react": "catalog:",
 		"next": "^16.0.0",
 		"react": "catalog:",

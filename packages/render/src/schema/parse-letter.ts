@@ -1,5 +1,11 @@
 import type { LetterContent, LetterDoc } from "@repo/types";
-import { INK_COLORS, PAGE_SPECS, STOCK_FONTS, TEXT_SIZES } from "@repo/types";
+import {
+	INK_COLORS,
+	MERGE_FIELDS,
+	PAGE_SPECS,
+	STOCK_FONTS,
+	TEXT_SIZES,
+} from "@repo/types";
 import { getSchema } from "@tiptap/core";
 import { Node } from "@tiptap/pm/model";
 import { z } from "zod";
@@ -40,6 +46,11 @@ const inlineNode = z.discriminatedUnion("type", [
 		marks: inkMarks,
 	}),
 	z.strictObject({ type: z.literal("hardBreak"), marks: inkMarks }),
+	z.strictObject({
+		type: z.literal("mergeField"),
+		attrs: z.strictObject({ field: keyOf(MERGE_FIELDS) }),
+		marks: inkMarks,
+	}),
 ]);
 
 const paragraphNode = z.strictObject({
