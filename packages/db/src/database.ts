@@ -1,13 +1,16 @@
 import type { Assets } from "./drizzle/assets.ts";
+import type { Fonts } from "./drizzle/fonts.ts";
 import type { LetterChange, Letters } from "./drizzle/letters.ts";
 import type { OrganizationUsers } from "./drizzle/organization-users.ts";
 import type { Organizations } from "./drizzle/organizations.ts";
 import type { Users } from "./drizzle/users.ts";
 
 export type { NewAsset, StoredFile } from "./drizzle/assets.ts";
+export type { NewFont } from "./drizzle/fonts.ts";
 export type { Letter, NewLetter } from "./drizzle/letters.ts";
 export type {
 	Assets,
+	Fonts,
 	LetterChange,
 	Letters,
 	Organizations,
@@ -21,6 +24,7 @@ export type Tx = {
 	organizationUsers: OrganizationUsers;
 	letters: Letters;
 	assets: Assets;
+	fonts: Fonts;
 };
 
 export type Db = Tx & {

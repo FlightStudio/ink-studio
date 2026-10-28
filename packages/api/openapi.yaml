@@ -108,6 +108,84 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalError"
+  /api/fonts:
+    post:
+      operationId: createFont
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFontRequest"
+      responses:
+        "201":
+          description: The font was created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedFont"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /api/fonts/{fontId}:
+    parameters:
+      - name: fontId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      operationId: deleteFont
+      responses:
+        "204":
+          description: The font was deleted.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /api/fonts/{fontId}/glyphs:
+    parameters:
+      - name: fontId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: saveGlyph
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveGlyphRequest"
+      responses:
+        "204":
+          description: The cell was saved.
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /api/uploads:
     post:
       operationId: uploadFile
@@ -255,6 +333,65 @@ components:
           type: integer
         content:
           $ref: "#/components/schemas/LetterContentEnvelope"
+    DrawnFontSource:
+      type: object
+      additionalProperties: false
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          enum:
+            - drawn
+    CreateFontRequest:
+      type: object
+      additionalProperties: false
+      required: [ownerName]
+      properties:
+        ownerName:
+          type: string
+        source:
+          $ref: "#/components/schemas/DrawnFontSource"
+    CreatedFont:
+      type: object
+      additionalProperties: false
+      required: [id]
+      properties:
+        id:
+          type: string
+          format: uuid
+    GlyphStroke:
+      type: object
+      additionalProperties: false
+      required: [input, points]
+      properties:
+        input:
+          type: string
+          enum:
+            - pen
+            - mouse
+            - touch
+        points:
+          type: array
+          items:
+            type: array
+            minItems: 4
+            maxItems: 4
+            items:
+              type: number
+    SaveGlyphRequest:
+      type: object
+      additionalProperties: false
+      required: [char, variant, strokes]
+      properties:
+        char:
+          type: string
+        variant:
+          type: integer
+          minimum: 0
+        strokes:
+          type: array
+          items:
+            $ref: "#/components/schemas/GlyphStroke"
     UploadPurpose:
       type: string
       enum:
@@ -307,6 +444,9 @@ components:
         - no_organization
         - invalid_letter
         - invalid_title
+        - invalid_owner_name
+        - invalid_glyphs
+        - not_owner
         - stale_revision
         - file_too_large
         - unsupported_file

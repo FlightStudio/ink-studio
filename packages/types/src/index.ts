@@ -7,8 +7,21 @@ export type {
 	UploadPurpose,
 } from "./asset.ts";
 export { assetMessageType } from "./asset.ts";
-export type { StockFontId } from "./font.ts";
+export type {
+	EditableFont,
+	Font,
+	FontOption,
+	FontSource,
+	StockFontId,
+} from "./font.ts";
 export { STOCK_FONTS } from "./font.ts";
+export type { DrawnGlyph } from "./handwriting.ts";
+export {
+	CELL,
+	GLYPH_LIMITS,
+	HANDWRITING_GLYPHS,
+	missingChars,
+} from "./handwriting.ts";
 export type { InkColorId, TextSizePt } from "./ink.ts";
 export { INK_COLORS, TEXT_SIZES } from "./ink.ts";
 export type {

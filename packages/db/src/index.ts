@@ -1,10 +1,12 @@
 export type {
 	Assets,
 	Db,
+	Fonts,
 	Letter,
 	LetterChange,
 	Letters,
 	NewAsset,
+	NewFont,
 	NewLetter,
 	Organizations,
 	OrganizationUsers,

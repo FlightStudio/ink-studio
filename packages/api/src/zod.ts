@@ -3,12 +3,17 @@ import { z } from "zod";
 import {
 	AssetProcessingStatus,
 	type AssetStatus,
+	type CreatedFont,
 	type CreatedLetter,
+	type CreateFontRequest,
 	type CreateLetterRequest,
+	DrawnFontSourceKind,
+	GlyphStrokeInput,
 	type LetterContentEnvelope,
 	type LetterState,
 	PageFormatId,
 	type SavedLetter,
+	type SaveGlyphRequest,
 	type SaveLetterRequest,
 	type UploadedAsset,
 	UploadPurpose,
@@ -58,6 +63,39 @@ export const letterStateSchema: z.ZodType<LetterState> = z.strictObject({
 	revision: z.number().int(),
 	content: letterContentEnvelopeSchema,
 });
+
+export const drawnFontSourceSchema = z.strictObject({
+	kind: z.enum(DrawnFontSourceKind),
+});
+
+export const createFontRequestSchema: z.ZodType<CreateFontRequest> =
+	z.strictObject({
+		ownerName: z.string(),
+		source: drawnFontSourceSchema.optional(),
+	});
+
+export const createdFontSchema: z.ZodType<CreatedFont> = z.strictObject({
+	id: z.uuid(),
+});
+
+const glyphPointSchema = z.tuple([
+	z.number(),
+	z.number(),
+	z.number(),
+	z.number(),
+]);
+
+export const saveGlyphRequestSchema: z.ZodType<SaveGlyphRequest> =
+	z.strictObject({
+		char: z.string(),
+		variant: z.number().int().min(0),
+		strokes: z.array(
+			z.strictObject({
+				input: z.enum(GlyphStrokeInput),
+				points: z.array(glyphPointSchema),
+			}),
+		),
+	});
 
 export const uploadPurposeSchema = z.enum(UploadPurpose);
 

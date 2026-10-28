@@ -14,7 +14,8 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | types             | `packages/types/src/asset.ts`                                | `Asset`, its origin and processing, `assetMessageType`             |
 | types             | `packages/types/src/page.ts`                                 | `PAGE_SPECS`, one entry per provider and product                   |
 | types             | `packages/types/src/ink.ts`                                  | `INK_COLORS` and `TEXT_SIZES`                                      |
-| types             | `packages/types/src/font.ts`                                 | `STOCK_FONTS`                                                      |
+| types             | `packages/types/src/font.ts`                                 | `STOCK_FONTS`, and a personal `Font`                               |
+| types             | `packages/types/src/handwriting.ts`                          | `HANDWRITING_GLYPHS`, `CELL`, `GLYPH_LIMITS` and `missingChars`    |
 | types             | `packages/types/src/letter.ts`                               | `LetterContent`, the element union, `LetterResources`, `humanSeal` |
 | types             | `packages/types/src/merge-field.ts`                          | `MERGE_FIELDS` and the sample and longest values                   |
 | types             | `packages/types/src/stroke.ts`                               | `Stroke`, its input and its timed points                           |
@@ -34,10 +35,12 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | errors            | `packages/errors/src/index.ts`                               | `errorMessages` and `ServiceError`                                 |
 | api               | `packages/api/openapi.yaml`                                  | HTTP contract. Client is `packages/api/src/gen/api.ts`             |
 | api               | `packages/api/src/zod.ts`                                    | Request and response schemas typed against the generated types     |
-| db                | `packages/db/src/index.ts`                                   | Identity and letter repositories and migrations                    |
+| db                | `packages/db/src/index.ts`                                   | Identity, letter and font repositories and migrations              |
 | db                | `packages/db/src/drizzle/letters.ts`                         | `Letters`, the revision-checked save and soft delete               |
+| db                | `packages/db/src/drizzle/fonts.ts`                           | `Fonts`, one cell replaced under a row lock                        |
 | db                | `packages/db/src/drizzle/assets.ts`                          | `Assets`, the claim, the job's moves and the stale read            |
 | services          | `packages/services/src/letters/index.ts`                     | `LetterService`, `letterResources`, `letterOwnerIds`               |
+| services          | `packages/services/src/fonts/index.ts`                       | `FontService` and `isOwnFont`                                      |
 | services          | `packages/services/src/assets/index.ts`                      | `AssetService`, `isServable`, `assetReadUrl`                       |
 | services          | `packages/services/src/assets/assets.service.ts`             | `UPLOADS`, the sniff and `READ_URL_EXPIRES_IN_SECONDS`             |
 | services          | `packages/services/src/assets/assets.service.ts`             | `runJob`, `sweep`, `MAX_ATTEMPTS`, `LEASE_MS`, `STALE_PENDING_MS`  |
@@ -75,8 +78,12 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | web               | `apps/web/src/server/handle-json.ts`                         | `handleJson`, the one wrapper around every API route               |
 | web               | `apps/web/src/server/origin.ts`                              | `isPlatformOrigin`, loopback names count as one origin             |
 | web               | `apps/web/src/server/letters.ts`                             | `getLetter` and `listLetters` for pages                            |
+| web               | `apps/web/src/server/fonts.ts`                               | `getFont` and `listFonts` for pages                                |
 | web               | `apps/web/src/app/api/letters/route.ts`                      | Create a letter                                                    |
 | web               | `apps/web/src/app/api/letters/[letterId]/route.ts`           | Read, save and delete one letter                                   |
+| web               | `apps/web/src/app/api/fonts/route.ts`                        | Create a handwriting font                                          |
+| web               | `apps/web/src/app/api/fonts/[fontId]/route.ts`               | Delete one font                                                    |
+| web               | `apps/web/src/app/api/fonts/[fontId]/glyphs/route.ts`        | Save one glyph cell                                                |
 | web               | `apps/web/src/server/services.ts`                            | Builds the db, the storage, the publisher and each service lazily  |
 | web               | `apps/web/src/app/api/uploads/route.ts`                      | Upload one file                                                    |
 | web               | `apps/web/src/app/api/assets/[assetId]/route.ts`             | Redirect to a fresh signed URL                                     |
@@ -172,6 +179,12 @@ Variation lives in GSUB, written through opentype.js's own table writer, which h
 
 Parity. `packages/integrations/src/worker/font/opentype-font.browser.test.ts` measures advances at the print device scale factor in Chromium and WebKit, as differences of widths from the start of the run, because WebKit pads a lone character's range in the middle of a run. Both engines cycle every case. Playwright's WebKit on Linux shapes with HarfBuzz as Chromium does; Safari on the iPad shapes with Core Text, which this test does not reach.
 
+## Handwriting fonts
+
+A handwriting font belongs to the creator who drew it. The `fonts` table stores `owner_user_id` beside `organization_id`. `FontService` in `packages/services/src/fonts/fonts.service.ts` creates a font, replaces one drawn cell, lists the caller's own fonts, reads one font and deletes it. `isOwnFont` is the one ownership rule for every write: another organization is not found, and a teammate in the same organization is refused. `listFonts` returns the caller's own fonts only. `getFont` returns the owner's cells, and nothing for anyone else.
+
+`missingChars` in `packages/types/src/handwriting.ts` is the one rule for which required characters are still missing. It reads `HANDWRITING_GLYPHS` and treats a glyph with no strokes as missing. Strokes are stored in cell units (`CELL`), never screen pixels. `saveGlyph` replaces one cell inside a transaction that locks the row, so two cells saved at once both remain. Nothing here publishes a job. Pages read through `getFont` and `listFonts` in `apps/web/src/server/fonts.ts`.
+
 ## Tracing glyphs
 
 `vectorize` in `packages/integrations/src/worker/font/vectorize.ts` turns a `Mask` from the lift into closed contours with no tracing dependency; potrace is GPL. Contours are in mask pixels with the origin at the mask's top-left corner and y pointing down, so pixel x, y covers the unit square from x, y and is sampled at its centre. Each contour is a list of points with an implied closing edge.
@@ -259,7 +272,7 @@ The worker runs as two pools from one codebase, `apps/worker`. Each process read
 
 `main` in `apps/worker/src/index.ts` builds the db, `GcsAssetStorage`, `PubSubPublisher`, `AssetService` and the pool's processors, starts `PubSubSubscriber`, which checks its subscription exists first, logs `worker listening` with its pool, and runs until `SIGINT` or `SIGTERM`, then stops its timer and closes the subscription, the publisher and the db.
 
-Locally the `pubsub` service in `docker-compose.yml` runs the emulator from `tools/docker/Dockerfile.pubsub`, and its healthcheck passes once the subscriptions exist. `pnpm dev` runs `turbo run dev dev:render`, so the web, the standard pool (`dev`) and the render pool (`dev:render`, which sets `WORKER_POOL` and `PUBSUB_JOBS_SUBSCRIPTION` for the render pool) start together. Both pools read the worker's `.env`, copied from `apps/worker/.env.example`.
+Locally the `pubsub` service in `docker-compose.yml` runs the emulator from `tools/docker/Dockerfile.pubsub`, and its healthcheck passes once the subscriptions exist. `pnpm dev` runs `turbo run dev dev:render`, so the web, the standard pool (`dev`) and the render pool (`dev:render`, which sets `WORKER_POOL` and `PUBSUB_JOBS_SUBSCRIPTION` for the render pool) start together. Both pools read the worker env file copied from `apps/worker/.env.example`.
 
 | Message type | Pool     | Processor                             | Data |
 | ------------ | -------- | ------------------------------------- | ---- |
@@ -286,6 +299,7 @@ The sweep. The `sweep` processor calls `sweep` on `AssetService`, which reads `s
 | organization_users | `packages/db` | Membership and role                                                                     |
 | letters            | `packages/db` | A letter's title, content and revision; stands in for project-post's `product_editions` |
 | assets             | `packages/db` | One file: storage key, sniffed type, size, checksum, origin and processing              |
+| fonts              | `packages/db` | A personal handwriting font and the cells its owner has drawn                           |
 
 ## Where to change things
 

@@ -68,8 +68,8 @@ summary { cursor: pointer; }
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
   <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave and a formatting toolbar are ready on your own computer.</p>
-  <div class="progress" aria-hidden="true"><span style="width:56%"></span></div>
-  <p class="log">20 of 36 steps in the repository. Step 20 removes rulings, grids and specks from lifted ink.</p>
+  <div class="progress" aria-hidden="true"><span style="width:58%"></span></div>
+  <p class="log">21 of 36 steps in the repository. Step 24 stores a creator's handwriting, one cell at a time.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -422,7 +422,35 @@ pnpm --filter @repo/render test --reporter=verbose</pre>
       <p>The names read like “ss01 cycles from the default” and “ss02 starts one step later”.</p>
       <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including 17 new font and page tests across both engines.</p>
     </details>
-    <details id="step-24"><summary><span class="tag later">Later</span> 24. Store handwriting fonts</summary><p>Personal fonts, drawn cell by cell by their owner.</p></details>
+    <details id="step-24">
+      <summary><span class="tag done">Done</span> 24. Store handwriting fonts</summary>
+      <p>A creator can now keep a handwriting font of their own. It belongs to that person, inside their organization, and it is stored one cell at a time: one character, one of its shapes, and the strokes in that shape. There is no drawing screen yet. A later step is where the cells are filled in. The API is here, so a cell can be saved as soon as that screen exists.</p>
+      <ul class="points">
+        <li>The font is named with the name the seal will use, such as Karla. The name is trimmed. An empty name, a name over 40 characters, or a name with a control character is refused with “A name needs 1 to 40 characters and no control characters.”</li>
+        <li>Each cell is stored in its own units, from 0 to 1000, never in screen pixels. A point outside the cell is refused with “That glyph cannot be saved.” So is a cell with more strokes or points than the limit.</li>
+        <li>Lowercase letters and the marks <code>. , ! ? '</code> are required before a font can be built. Capitals, digits and the other punctuation can be missing; Caveat fills those in later. A cell with no strokes still counts as missing. The characters <code>.</code> and <code>/</code> are ordinary cells, so they save like any letter.</li>
+        <li>Only the owner sees the font, changes a cell, or deletes it. A teammate in the same organization does not see it in their list and is refused with “Only the owner can do that.” Another organization is told “That was not found.”</li>
+      </ul>
+      <p>Nothing on the website draws a cell yet. To try the API on your computer, after <code>git pull</code> and <code>pnpm install</code>, apply the new table and start the website:</p>
+      <pre>docker compose up -d
+pnpm db:migrate
+pnpm dev</pre>
+      <p><code>pnpm db:migrate</code> adds the <code>fonts</code> table. In a second terminal, create a font. The website is signed in as the seeded dev user:</p>
+      <pre>curl -s -X POST http://127.0.0.1:3000/api/fonts \
+  -H 'Origin: http://127.0.0.1:3000' -H 'Content-Type: application/json' \
+  -d '{"ownerName":"Karla"}'</pre>
+      <p>It answers with the new font's id, for example <code>{"id":"01a17f61-…"}</code>. Save a period into one cell:</p>
+      <pre>curl -s -o /dev/null -w '%{http_code}' -X PUT http://127.0.0.1:3000/api/fonts/&lt;that id&gt;/glyphs \
+  -H 'Origin: http://127.0.0.1:3000' -H 'Content-Type: application/json' \
+  -d '{"char":".","variant":0,"strokes":[{"input":"pen","points":[[400,700,0.5,0]]}]}'</pre>
+      <p>That answers <code>204</code>. The row is in <code>pnpm db:studio</code> under <code>fonts</code>, and its source holds that one cell. Delete it with <code>DELETE /api/fonts/&lt;that id&gt;</code>, again with the <code>Origin</code> header.</p>
+      <p>The tests run on throwaway Postgres in Docker:</p>
+      <pre>pnpm --filter @repo/types test --reporter=verbose
+pnpm --filter @repo/db test --reporter=verbose
+pnpm --filter @repo/services test --reporter=verbose</pre>
+      <p>The names read like “variants beyond the first are optional”, “a cell with no strokes does not count”, “a teammate in the same organization cannot use Karla's font”, and “the characters . and / save like any other”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>.</p>
+    </details>
     <details id="step-25"><summary><span class="tag later">Later</span> 25. Build a font in the worker</summary><p>A drawn font becomes a real font file; the last good build stays in use.</p></details>
     <details id="step-26"><summary><span class="tag later">Later</span> 26. Write with My handwriting</summary><p>Draw the template in the app and write with it.</p></details>
     <details id="step-27">
