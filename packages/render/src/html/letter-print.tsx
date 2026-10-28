@@ -6,7 +6,7 @@ import {
 	domOutputSpecToReactElement,
 	renderToReactElement,
 } from "@tiptap/static-renderer/pm/react";
-import type { ReactElement, ReactNode } from "react";
+import React, { type ReactElement, type ReactNode } from "react";
 import { letterExtensions } from "../schema/letter-schema.ts";
 import { LetterPage, type LetterPageProps } from "./letter-page.tsx";
 
@@ -43,6 +43,7 @@ export function LetterText({ doc }: { doc: LetterDoc }): ReactElement {
 }
 
 export function LetterPrint(props: LetterPrintProps): ReactElement {
+	void React;
 	const spec = PAGE_SPECS[props.content.format];
 	return (
 		<LetterPage

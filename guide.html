@@ -698,7 +698,7 @@ pnpm dev</pre>
 pnpm --filter worker test --reporter=verbose
 pnpm --filter web test:e2e</pre>
       <p>The names read like “a cover takes JPEG and PNG, not WebP, and can be read back”, “a postcard's front image must be the organization's cover”, “a postcard exports one PNG per side”, “a postcard side has its own download name”, “a postcard's back renders as a 2738×1838 PNG with no ink in the address block”, “a new postcard shows a front to fill and a back to write on”, and “a postcard proof downloads two PNGs”.</p>
-      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, 332 tests, including 3 new service tests and 2 new worker tests, one of them in Chromium. Making a postcard on an iPad is still unchecked. There is no iPad in this setup.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, 332 tests, including 3 new service tests and 2 new worker tests, one of them in Chromium. <code>pnpm test:e2e</code> covers the new postcard journeys. Making a postcard on an iPad is still unchecked. There is no iPad in this setup.</p>
     </details>
 
     <h3>M9. Merge fields and signature</h3>

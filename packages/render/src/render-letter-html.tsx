@@ -1,8 +1,10 @@
 import { PAGE_SPECS } from "@repo/types";
+import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { LetterPrint, type LetterPrintProps } from "./html/letter-print.tsx";
 
 export function renderLetterHtml(params: LetterPrintProps): string {
+	void React;
 	const spec = PAGE_SPECS[params.content.format];
 	const body = renderToStaticMarkup(<LetterPrint {...params} />);
 	const page = `@page { size: ${spec.widthIn}in ${spec.heightIn}in; margin: 0 } html, body { margin: 0; padding: 0 }`;

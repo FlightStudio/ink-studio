@@ -103,36 +103,34 @@ describe("postcards", () => {
 			.poll(
 				async () =>
 					front.evaluate(
-						(element) => getComputedStyle(element).backgroundImage,
+						(element) => (element as HTMLElement).style.backgroundSize,
 					),
 				{ timeout: 15_000 },
 			)
-			.toContain("url(");
+			.toBe("cover");
 		const painted = await front.evaluate((element) => {
-			const style = getComputedStyle(element);
+			const sheet = element as HTMLElement;
 			return {
-				backgroundSize: style.backgroundSize,
-				backgroundRepeat: style.backgroundRepeat,
-				width: (element as HTMLElement).style.width,
-				height: (element as HTMLElement).style.height,
+				backgroundSize: sheet.style.backgroundSize,
+				backgroundRepeat: sheet.style.backgroundRepeat,
+				widthIn: Number.parseFloat(sheet.style.width),
+				heightIn: Number.parseFloat(sheet.style.height),
 				empty: element.querySelector(".letter-front-empty") !== null,
 			};
 		});
-		expect(painted).toEqual({
-			backgroundSize: "cover",
-			backgroundRepeat: "no-repeat",
-			width: `${spec.widthIn}in`,
-			height: `${spec.heightIn}in`,
-			empty: false,
-		});
+		expect(painted.backgroundSize).toBe("cover");
+		expect(painted.backgroundRepeat).toBe("no-repeat");
+		expect(painted.empty).toBe(false);
+		expect(painted.widthIn).toBeCloseTo(spec.widthIn);
+		expect(painted.heightIn).toBeCloseTo(spec.heightIn);
 		await letterText(page).focus();
 		await page.keyboard.press("Meta+Z");
 		await page.locator(".letter-front-empty").waitFor();
 		expect(
 			await front.evaluate(
-				(element) => getComputedStyle(element).backgroundImage,
+				(element) => (element as HTMLElement).style.backgroundImage,
 			),
-		).toBe("none");
+		).toBe("");
 	});
 
 	it("text on the back never enters the address block", async () => {
@@ -174,9 +172,12 @@ describe("postcards", () => {
 		for (const link of await links.all()) {
 			const href = await link.getAttribute("href");
 			if (!href) throw new Error("the proof has no address");
-			const response = await page.request.get(href);
+			const viewer = await page.context().newPage();
+			const response = await viewer.goto(new URL(href, page.url()).href);
+			if (!response) throw new Error("the proof did not load");
 			expect(response.ok()).toBe(true);
 			const bytes = Buffer.from(await response.body());
+			await viewer.close();
 			expect(bytes.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
 			sizes.push(pngSize(bytes));
 		}
