@@ -1,5 +1,5 @@
 import type { Font, FontSource } from "@repo/types";
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { v7 as uuidv7 } from "uuid";
 import type { Query } from "./query.ts";
 import { fonts } from "./schema/fonts.ts";
@@ -24,6 +24,18 @@ export type Fonts = {
 		id: string,
 		source: FontSource,
 	) => Promise<boolean>;
+	setPending: (
+		organizationId: string,
+		id: string,
+		assetId: string,
+	) => Promise<boolean>;
+	finishBuild: (
+		organizationId: string,
+		id: string,
+		assetId: string,
+		chars: string,
+	) => Promise<boolean>;
+	referenced: (organizationId: string, ids: string[]) => Promise<Font[]>;
 	softDelete: (organizationId: string, id: string) => Promise<boolean>;
 };
 
@@ -111,6 +123,55 @@ export function createFonts(db: Query): Fonts {
 				.where(live(organizationId, id))
 				.returning({ id: fonts.id });
 			return updated.length > 0;
+		},
+		async setPending(organizationId, id, assetId) {
+			const updated = await db
+				.update(fonts)
+				.set({ pendingFontAssetId: assetId, updatedAt: sql`now()` })
+				.where(live(organizationId, id))
+				.returning({ id: fonts.id });
+			return updated.length > 0;
+		},
+		async finishBuild(organizationId, id, assetId, chars) {
+			const rows = await db
+				.select()
+				.from(fonts)
+				.where(and(eq(fonts.organizationId, organizationId), eq(fonts.id, id)))
+				.for("update")
+				.limit(1);
+			const row = rows[0];
+			if (!row) return false;
+			const current = toFont(row);
+			if (
+				current.pendingFontAssetId !== assetId &&
+				current.fontAssetId !== null
+			) {
+				return true;
+			}
+			const updated = await db
+				.update(fonts)
+				.set({
+					fontAssetId: assetId,
+					pendingFontAssetId:
+						current.pendingFontAssetId === assetId
+							? null
+							: current.pendingFontAssetId,
+					chars,
+					updatedAt: sql`now()`,
+				})
+				.where(and(eq(fonts.organizationId, organizationId), eq(fonts.id, id)))
+				.returning({ id: fonts.id });
+			return updated.length > 0;
+		},
+		async referenced(organizationId, ids) {
+			if (ids.length === 0) return [];
+			const rows = await db
+				.select()
+				.from(fonts)
+				.where(
+					and(eq(fonts.organizationId, organizationId), inArray(fonts.id, ids)),
+				);
+			return rows.map(toFont);
 		},
 		async softDelete(organizationId, id) {
 			const deleted = await db

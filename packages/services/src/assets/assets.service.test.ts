@@ -522,6 +522,16 @@ it("onComplete commits with the asset or not at all", async () => {
 	).not.toBeNull();
 });
 
+it("a job of another kind is a broken state", async () => {
+	const ada = await member("ada-wrong-kind");
+	const asset = await generated(ada);
+	const produce = vi.fn(async () => produced());
+	await expect(
+		assets.runJob({ assetId: asset.id, kind: "build-font", produce }),
+	).rejects.toThrow(`asset ${asset.id} is not a build-font job`);
+	expect(produce).not.toHaveBeenCalled();
+});
+
 it("the sweep republishes stale work only", async () => {
 	const ada = await member("ada-sweep");
 	const stalePending = await generated(ada);

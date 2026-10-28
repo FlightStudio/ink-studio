@@ -1,6 +1,8 @@
 export type UploadPurpose = "photo" | "mask" | "font-file";
 
-export type AssetJob = { kind: "lift-ink"; photoAssetId: string };
+export type AssetJob =
+	| { kind: "lift-ink"; photoAssetId: string }
+	| { kind: "build-font"; fontId: string };
 
 export function assetMessageType<K extends AssetJob["kind"]>(
 	kind: K,

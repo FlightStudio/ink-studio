@@ -17,6 +17,7 @@
 		"@repo/errors": "workspace:*",
 		"@repo/integrations": "workspace:*",
 		"@repo/logger": "workspace:*",
+		"@repo/render": "workspace:*",
 		"@repo/services": "workspace:*",
 		"@repo/types": "workspace:*",
 		"@t3-oss/env-core": "catalog:",
@@ -26,6 +27,8 @@
 	"devDependencies": {
 		"@repo/typescript-config": "workspace:*",
 		"@types/node": "catalog:",
+		"@types/opentype.js": "^1.3.10",
+		"opentype.js": "catalog:",
 		"tsdown": "^0.23.2",
 		"tsx": "catalog:",
 		"typescript": "catalog:",

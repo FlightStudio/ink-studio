@@ -144,7 +144,9 @@ export function isServable(asset: Asset): boolean {
 		return true;
 	}
 	return (
-		asset.origin.source === "generated" && asset.origin.job.kind === "lift-ink"
+		asset.origin.source === "generated" &&
+		(asset.origin.job.kind === "lift-ink" ||
+			asset.origin.job.kind === "build-font")
 	);
 }
 
@@ -275,7 +277,10 @@ export class AssetService {
 		if (!asset) return;
 		const attempts = asset.processing.attempts;
 		const job = jobOf(asset, params.kind);
-		if (!job || attempts > MAX_ATTEMPTS) {
+		if (!job) {
+			throw new Error(`asset ${asset.id} is not a ${params.kind} job`);
+		}
+		if (attempts > MAX_ATTEMPTS) {
 			await this.db.assets.fail(asset.id, "processing_failed");
 			return;
 		}

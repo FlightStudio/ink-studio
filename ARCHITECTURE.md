@@ -120,12 +120,13 @@ Ink Studio v2 is the editor for physical letters and postcards. This file names 
 | web               | `apps/web/src/features/editor/components/sides-indicator.tsx`      | `SidesIndicator`, how many allowed sides the letter uses           |
 | web               | `apps/web/src/features/editor/components/overflow-notice.tsx`      | `OverflowNotice`, words that will not fit                          |
 | web               | `apps/web/src/features/editor/components/add-side.tsx`             | `AddSide`, one step that raises `minSides`                         |
-| web               | `apps/web/src/features/editor/components/human-seal.tsx`           | `HumanSeal`, the seal from `humanSeal` with no own fonts yet       |
+| web               | `apps/web/src/features/editor/components/human-seal.tsx`           | `HumanSeal`, the seal from `humanSeal` and the letter's own fonts  |
 | web               | `apps/web/src/features/editor/components/print-preview.tsx`        | `PrintPreview`, the print page in a same-origin frame              |
 | worker            | `apps/worker/src/index.ts`                                         | `main`, one pool per process, picked by `WORKER_POOL`              |
 | worker            | `apps/worker/src/env.ts`                                           | The worker's validated environment                                 |
 | worker            | `apps/worker/src/processors/sweep.ts`                              | `sweepProcessor`, the `sweep` message                              |
 | worker            | `apps/worker/src/processors/asset-lift-ink.ts`                     | `AssetLiftInkProcessor` for the lift-ink message                   |
+| worker            | `apps/worker/src/processors/asset-build-font.ts`                   | `AssetBuildFontProcessor` for a drawn handwriting font             |
 | worker            | `apps/worker/package.json`                                         | `dev` runs the standard pool, `dev:render` the render pool         |
 | tools             | `tools/check-comments.ts`                                          | No-comment check                                                   |
 | tools             | `tools/check-architecture.ts`                                      | This map stays honest                                              |
@@ -315,10 +316,11 @@ The worker runs as two pools from one codebase, `apps/worker`. Each process read
 
 Locally the `pubsub` service in `docker-compose.yml` runs the emulator from `tools/docker/Dockerfile.pubsub`, and its healthcheck passes once the subscriptions exist. `pnpm dev` runs `turbo run dev dev:render`, so the web, the standard pool (`dev`) and the render pool (`dev:render`, which sets `WORKER_POOL` and `PUBSUB_JOBS_SUBSCRIPTION` for the render pool) start together. Both pools read the worker's env file, copied from `apps/worker/.env.example`.
 
-| Message type | Pool     | Processor                                      | Data          |
-| ------------ | -------- | ---------------------------------------------- | ------------- |
-| `sweep`      | standard | `apps/worker/src/processors/sweep.ts`          | `{}`          |
-| lift-ink     | standard | `apps/worker/src/processors/asset-lift-ink.ts` | `{ assetId }` |
+| Message type | Pool     | Processor                                        | Data          |
+| ------------ | -------- | ------------------------------------------------ | ------------- |
+| `sweep`      | standard | `apps/worker/src/processors/sweep.ts`            | `{}`          |
+| lift-ink     | standard | `apps/worker/src/processors/asset-lift-ink.ts`   | `{ assetId }` |
+| build-font   | standard | `apps/worker/src/processors/asset-build-font.ts` | `{ assetId }` |
 
 ### One lifecycle for every generated file
 
@@ -329,6 +331,8 @@ A generated asset carries the job that produces it in its origin. A feature serv
 The error rule. A `ServiceError` of kind `invalid_input` is an input failure: the asset fails at once with that code, such as `photo_unreadable`, and the message is acked, because the same input fails again. Every other error is transient: `release` puts the asset back to pending with the error's text and the error is rethrown, so the message is nacked and redelivered. The transient failure on attempt `MAX_ATTEMPTS` fails the asset with `processing_failed` and acks instead, and a claim that finds the attempts already spent fails it the same way. `complete`, `release` and `fail` move only a running asset, so a late worker cannot undo a finished one.
 
 One processor per kind, typed by `assetMessageType`. Each job kind gets one processor in `apps/worker/src/processors`, whose `type` is `assetMessageType` of that kind; it parses the message and calls `runJob` with a producer built on the worker-only provider. Services never hold a worker-only provider. `AssetLiftInkProcessor` reads the photo and calls `liftInk` on `SharpImageProcessor`. `sharp` stays external to the worker bundle. A finished lift-ink asset is servable, the same way a mask is; a raw photo is not. `requestLift` inserts that pending asset and publishes the lift-ink message only after the insert commits.
+
+A drawn font builds the same way. `requestBuild` inserts a pending build-font asset, records it as `pendingFontAssetId`, and publishes only after that commits. The last finished build stays in `fontAssetId` until the new one is done. When the job finishes, that pending asset becomes `fontAssetId` and the file's characters are stored beside it. An older build that finishes after a newer one was requested leaves the current build in place. Only the owner writes with a font. People in the same organization receive its file through `@font-face` so a letter in that hand can be read. No other organization ever does. A finished build-font file is servable the same way a mask is.
 
 The sweep. The `sweep` processor calls `sweep` on `AssetService`, which reads `stale` work and republishes every pending asset untouched for `STALE_PENDING_MS` and every running asset past its lease, so a publish lost after a commit or a worker that died mid-job is picked up again. Only the standard pool takes `sweep` and only it publishes the timer: when `SWEEP_EVERY_MS` is set, `main` publishes `sweep` on that interval, and the render pool, whose subscription never receives `sweep`, publishes nothing. `pnpm jobs:sweep` runs `tools/dev/sweep.ts`, which publishes one `sweep` by hand.
 

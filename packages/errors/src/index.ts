@@ -11,6 +11,8 @@ export const apiErrorCodes = [
 	"invalid_title",
 	"invalid_owner_name",
 	"invalid_glyphs",
+	"font_incomplete",
+	"font_not_ready",
 	"not_owner",
 	"stale_revision",
 	"file_too_large",
@@ -41,6 +43,8 @@ export const errorMessages = {
 	invalid_owner_name:
 		"A name needs 1 to 40 characters and no control characters.",
 	invalid_glyphs: "That glyph cannot be saved.",
+	font_incomplete: "This handwriting is missing some letters.",
+	font_not_ready: "That handwriting is not ready yet.",
 	not_owner: "Only the owner can do that.",
 	stale_revision: "This letter changed in another tab.",
 	file_too_large: "That file is too large.",

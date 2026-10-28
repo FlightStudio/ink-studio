@@ -1,3 +1,4 @@
+import { CELL } from "@repo/types";
 import opentype from "opentype.js";
 
 export type PathSegment =
@@ -265,4 +266,100 @@ export function buildFont(params: BuildFontParams): Uint8Array {
 	});
 	if (gsub !== null) Object.assign(font.tables, { gsub });
 	return new Uint8Array(font.toArrayBuffer());
+}
+
+export type OutlineGlyph = {
+	char: string;
+	variant: number;
+	polygons: [number, number][][];
+};
+export type FromStrokeOutlinesParams = {
+	familyName: string;
+	glyphs: OutlineGlyph[];
+};
+export type BuiltFont = { bytes: Uint8Array; chars: string };
+
+export interface FontBuilder {
+	fromStrokeOutlines(params: FromStrokeOutlinesParams): Promise<BuiltFont>;
+}
+
+const SIDE_BEARING = 60;
+
+type Point = [number, number];
+
+function signedArea(points: readonly Point[]): number {
+	let sum = 0;
+	for (let index = 0; index < points.length; index += 1) {
+		const current = points[index];
+		const next = points[(index + 1) % points.length];
+		if (!current || !next) continue;
+		sum += current[0] * next[1] - next[0] * current[1];
+	}
+	return sum;
+}
+
+function fontPoint(point: Point): Point {
+	return [point[0], CELL.baseline - point[1]];
+}
+
+function sameWay(points: readonly Point[]): Point[] {
+	const mapped = points.map(fontPoint);
+	if (mapped.length < 3) return mapped;
+	return signedArea(mapped) < 0 ? [...mapped].reverse() : mapped;
+}
+
+function contourOf(points: readonly Point[]): Contour {
+	const first = points[0];
+	if (!first) return [];
+	const contour: Contour = [["M", first[0], first[1]]];
+	for (let index = 0; index < points.length; index += 1) {
+		const current = points[index];
+		const next = points[(index + 1) % points.length];
+		if (!current || !next) continue;
+		contour.push([
+			"Q",
+			(current[0] + next[0]) / 2,
+			(current[1] + next[1]) / 2,
+			next[0],
+			next[1],
+		]);
+	}
+	return contour;
+}
+
+export class OpentypeFontBuilder implements FontBuilder {
+	async fromStrokeOutlines(
+		params: FromStrokeOutlinesParams,
+	): Promise<BuiltFont> {
+		const glyphs: GlyphOutline[] = [];
+		const chars: string[] = [];
+		for (const glyph of params.glyphs) {
+			const polygons = glyph.polygons
+				.map(sameWay)
+				.filter((points) => points.length >= 3);
+			if (polygons.length === 0) continue;
+			const xs = polygons.flat().map((point) => point[0]);
+			const minX = Math.min(...xs);
+			const maxX = Math.max(...xs);
+			const shift = SIDE_BEARING - minX;
+			glyphs.push({
+				char: glyph.char,
+				variant: glyph.variant,
+				advanceWidth: maxX - minX + SIDE_BEARING * 2,
+				contours: polygons.map((points) =>
+					contourOf(points.map((point) => [point[0] + shift, point[1]])),
+				),
+			});
+			if (!chars.includes(glyph.char)) chars.push(glyph.char);
+		}
+		return {
+			bytes: buildFont({
+				familyName: params.familyName,
+				ascender: CELL.baseline - CELL.ascender,
+				descender: CELL.baseline - CELL.descender,
+				glyphs,
+			}),
+			chars: chars.join(""),
+		};
+	}
 }
