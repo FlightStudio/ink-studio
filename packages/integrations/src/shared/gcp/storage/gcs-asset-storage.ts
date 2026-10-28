@@ -34,13 +34,24 @@ export class GcsAssetStorage implements AssetStorage {
 	}
 
 	async get(key: string): Promise<Uint8Array> {
+		if (this.emulatorBaseUrl) {
+			const response = await fetch(this.mediaUrl(key));
+			if (!response.ok) {
+				throw new Error(`storage read failed (${response.status})`);
+			}
+			return new Uint8Array(await response.arrayBuffer());
+		}
 		const [contents] = await this.bucket.file(key).download();
 		return new Uint8Array(contents);
 	}
 
+	private mediaUrl(key: string): string {
+		return `${this.emulatorBaseUrl}/download/storage/v1/b/${encodeURIComponent(this.bucket.name)}/o/${encodeURIComponent(key)}?alt=media`;
+	}
+
 	async signedReadUrl(params: SignedReadUrlParams): Promise<string> {
 		if (this.emulatorBaseUrl) {
-			return `${this.emulatorBaseUrl}/download/storage/v1/b/${encodeURIComponent(this.bucket.name)}/o/${encodeURIComponent(params.key)}?alt=media`;
+			return this.mediaUrl(params.key);
 		}
 		const [url] = await this.bucket.file(params.key).getSignedUrl({
 			version: "v4",

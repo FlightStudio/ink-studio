@@ -13,7 +13,14 @@ export type Harness = {
 	db: Db;
 	letters: LetterService;
 	seedIdentity: () => Promise<Member>;
-	open: (member: Member, path: string) => Promise<Page>;
+	open: (
+		member: Member,
+		path: string,
+		options?: {
+			viewport?: { width: number; height: number };
+			hasTouch?: boolean;
+		},
+	) => Promise<Page>;
 	newLetter: (member: Member) => Promise<string>;
 	stop: () => Promise<void>;
 };
@@ -37,9 +44,10 @@ export async function startHarness(): Promise<Harness> {
 				email: `e2e-${randomUUID()}@inkstudio.local`,
 				organizationName: "E2E studio",
 			}),
-		async open(member, path) {
+		async open(member, path, options) {
 			const context = await browsers.chromium.newContext({
-				viewport: { width: 1440, height: 900 },
+				viewport: options?.viewport ?? { width: 1440, height: 900 },
+				hasTouch: options?.hasTouch,
 			});
 			contexts.push(context);
 			await context.addCookies([

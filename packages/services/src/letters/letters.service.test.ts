@@ -1,6 +1,7 @@
 import type { TestDb } from "@repo/db";
 import { seedDevIdentity, startTestDb } from "@repo/db/testing";
 import type { LetterContent, Member } from "@repo/types";
+import { v7 as uuidv7 } from "uuid";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { LetterService } from "./letters.service.ts";
 
@@ -276,5 +277,72 @@ it("an own font that does not exist is refused", async () => {
 			}),
 		).rejects.toMatchObject({ kind: "invalid_input", code: "invalid_letter" });
 	}
+	expect((await stored(ada, id)).revision).toBe(1);
+});
+
+it("a letter cannot place another organization's drawing", async () => {
+	const ada = await member("ada-foreign-drawing");
+	const bob = await member("bob-foreign-drawing");
+	const maskId = uuidv7();
+	await testDb.db.assets.create({
+		id: maskId,
+		organizationId: organizationId(bob),
+		storageKey: `organizations/${organizationId(bob)}/assets/${maskId}`,
+		mimeType: "image/png",
+		byteSize: 33,
+		checksum: "b".repeat(64),
+		origin: {
+			source: "uploaded",
+			purpose: "mask",
+			filename: "bob.png",
+			uploadedByUserId: bob.user.id,
+		},
+		processing: { status: "done", attempts: 0 },
+	});
+	const drawing = await testDb.db.drawings.create({
+		organizationId: organizationId(bob),
+		ownerUserId: bob.user.id,
+		kind: "doodle",
+		name: "Bob's star",
+		source: {
+			kind: "drawn",
+			box: { widthPx: 10, heightPx: 10 },
+			strokes: [],
+		},
+		maskAssetId: maskId,
+		aspect: 1,
+	});
+	const { id } = await letters.createLetter(ada, {});
+	const { content, title } = await stored(ada, id);
+	await expect(
+		letters.saveLetter(ada, id, {
+			title,
+			expectedRevision: 1,
+			content: {
+				...content,
+				doc: {
+					...content.doc,
+					attrs: {
+						...content.doc.attrs,
+						elements: [
+							{
+								id: uuidv7(),
+								kind: "drawing",
+								drawingId: drawing.id,
+								side: 0,
+								xIn: 1,
+								yIn: 1,
+								widthIn: 1,
+								heightIn: 1,
+								rotationDeg: 0,
+								tint: "ink-blue",
+								wrap: false,
+							},
+						],
+					},
+				},
+			},
+		}),
+	).rejects.toMatchObject({ kind: "invalid_input", code: "invalid_letter" });
 	expect((await stored(ada, id)).revision).toBe(1);
 });

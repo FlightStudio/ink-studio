@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 const lanHost = process.env.DEV_LAN_HOST?.trim();
 
 const nextConfig: NextConfig = {
+	devIndicators: { position: "top-right" },
+	serverExternalPackages: ["@google-cloud/storage"],
 	allowedDevOrigins: [
 		"127.0.0.1",
 		"host.docker.internal",

@@ -41,7 +41,14 @@ import {
 import type { Mark } from "@tiptap/pm/model";
 import type { EditorState, Transaction } from "@tiptap/pm/state";
 import { useEditorState } from "@tiptap/react";
-import { AlignCenter, AlignLeft, AlignRight, Redo2, Undo2 } from "lucide-react";
+import {
+	AlignCenter,
+	AlignLeft,
+	AlignRight,
+	Images,
+	Redo2,
+	Undo2,
+} from "lucide-react";
 import {
 	type CSSProperties,
 	type ReactNode,
@@ -244,6 +251,7 @@ export type EditorToolbarProps = {
 	defaults: InkStyle;
 	coarsePointer: boolean;
 	onKeyboardClearance: (heightPx: number) => void;
+	onLibrary: () => void;
 };
 
 export function EditorToolbar({
@@ -251,6 +259,7 @@ export function EditorToolbar({
 	defaults,
 	coarsePointer,
 	onKeyboardClearance,
+	onLibrary,
 }: EditorToolbarProps) {
 	const ref = useRef<HTMLDivElement>(null);
 	const style = useEditorState({
@@ -389,6 +398,21 @@ export function EditorToolbar({
 						</Tooltip>
 					))}
 				</ToggleGroup>
+				<Toolbar.Separator />
+				<Tooltip>
+					<TooltipTrigger
+						render={
+							<Toolbar.Button
+								aria-label="Library"
+								onClick={onLibrary}
+								render={<Button variant="ghost" size="icon" />}
+							/>
+						}
+					>
+						<Images />
+					</TooltipTrigger>
+					<TooltipContent side="bottom">Library</TooltipContent>
+				</Tooltip>
 			</FloatingToolbar>
 		</TooltipProvider>
 	);

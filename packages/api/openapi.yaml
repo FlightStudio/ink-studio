@@ -273,6 +273,78 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalError"
+  /api/drawings:
+    post:
+      operationId: createDrawing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDrawingRequest"
+      responses:
+        "201":
+          description: The drawing was saved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedDrawing"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /api/drawings/{drawingId}:
+    parameters:
+      - name: drawingId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      operationId: renameDrawing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RenameDrawingRequest"
+      responses:
+        "204":
+          description: The drawing was renamed.
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      operationId: deleteDrawing
+      responses:
+        "204":
+          description: The drawing was deleted.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
 components:
   schemas:
     PageFormatId:
@@ -424,6 +496,95 @@ components:
           allOf:
             - $ref: "#/components/schemas/ApiErrorCode"
           nullable: true
+    DrawingKind:
+      type: string
+      enum:
+        - doodle
+        - signature
+    StrokeInput:
+      type: string
+      enum:
+        - pen
+        - mouse
+        - touch
+    Stroke:
+      type: object
+      additionalProperties: false
+      required: [input, points]
+      properties:
+        input:
+          $ref: "#/components/schemas/StrokeInput"
+        points:
+          type: array
+          items:
+            type: array
+            minItems: 4
+            maxItems: 4
+            items:
+              type: number
+    DrawnSource:
+      type: object
+      additionalProperties: false
+      required: [kind, box, strokes]
+      properties:
+        kind:
+          type: string
+          enum: [drawn]
+        box:
+          type: object
+          additionalProperties: false
+          required: [widthPx, heightPx]
+          properties:
+            widthPx:
+              type: number
+            heightPx:
+              type: number
+        strokes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Stroke"
+    PhotoSource:
+      type: object
+      additionalProperties: false
+      required: [kind, photoAssetId]
+      properties:
+        kind:
+          type: string
+          enum: [photo]
+        photoAssetId:
+          type: string
+          format: uuid
+    CreateDrawingRequest:
+      type: object
+      additionalProperties: false
+      required: [kind, name, maskAssetId, source]
+      properties:
+        kind:
+          $ref: "#/components/schemas/DrawingKind"
+        name:
+          type: string
+        maskAssetId:
+          type: string
+          format: uuid
+        source:
+          oneOf:
+            - $ref: "#/components/schemas/DrawnSource"
+            - $ref: "#/components/schemas/PhotoSource"
+    CreatedDrawing:
+      type: object
+      additionalProperties: false
+      required: [id]
+      properties:
+        id:
+          type: string
+          format: uuid
+    RenameDrawingRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
     Health:
       type: object
       additionalProperties: false
@@ -455,6 +616,8 @@ components:
         - photo_unreadable
         - photo_too_large
         - no_ink_found
+        - invalid_mask
+        - invalid_drawing
     ApiError:
       type: object
       additionalProperties: false

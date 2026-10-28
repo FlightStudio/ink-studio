@@ -86,16 +86,43 @@ function validTitle(title: string): string {
 	return trimmed;
 }
 
+async function knownDrawings(
+	db: Tx,
+	organizationId: string,
+	content: LetterContent,
+): Promise<void> {
+	const ids = [
+		...new Set(content.doc.attrs.elements.map((element) => element.drawingId)),
+	];
+	if (ids.length === 0) return;
+	const found = await db.drawings.referenced(organizationId, ids);
+	if (found.length !== ids.length) {
+		throw new ServiceError("invalid_input", "invalid_letter");
+	}
+}
+
 export async function letterResources(
-	_tx: Tx,
-	_organizationId: string,
-	_content: LetterContent,
+	tx: Tx,
+	organizationId: string,
+	content: LetterContent,
 ): Promise<LetterResources> {
+	const ids = [
+		...new Set(content.doc.attrs.elements.map((element) => element.drawingId)),
+	];
+	const found =
+		ids.length === 0 ? [] : await tx.drawings.referenced(organizationId, ids);
+	const drawings: LetterResources["drawings"] = {};
+	for (const drawing of found) {
+		drawings[drawing.id] = {
+			maskAssetId: drawing.maskAssetId,
+			aspect: drawing.aspect,
+		};
+	}
 	return {
 		assetBaseUrl: "/api/assets/",
 		stockFontBaseUrl: "/fonts/stock/",
 		fonts: {},
-		drawings: {},
+		drawings,
 	};
 }
 
@@ -164,6 +191,7 @@ export class LetterService {
 		const content = validContent(params.content);
 		const title = validTitle(params.title);
 		const organizationId = member.userOrganization.organizationId;
+		await knownDrawings(this.db, organizationId, content);
 		const revision = await this.db.letters.save(organizationId, letterId, {
 			title,
 			content,

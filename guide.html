@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal and a print preview are ready on your own computer.</p>
-  <div class="progress" aria-hidden="true"><span style="width:61%"></span></div>
-  <p class="log">22 of 36 steps in the repository. Step 24 stores a creator's handwriting, one cell at a time.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, and a doodle library are ready on your own computer.</p>
+  <div class="progress" aria-hidden="true"><span style="width:64%"></span></div>
+  <p class="log">23 of 36 steps in the repository. Step 17 saves a drawn doodle and taps it onto the letter.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -378,7 +378,29 @@ pnpm --filter @repo/render test --reporter=verbose</pre>
       <p>The names read like “after a pen has drawn, touches are palms, and a mouse still draws” and “a pen's pressure shapes its outline and a mouse's does not”.</p>
       <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, including 7 pointer tests and 3 stroke tests, and drawing with a mouse, a simulated pen and a simulated finger on <code>/styleguide</code>.</p>
     </details>
-    <details id="step-17"><summary><span class="tag later">Later</span> 17. Doodle library, tap onto the letter</summary><p>Drawn doodles saved per organization and placed on the page in one undoable step.</p></details>
+    <details id="step-17">
+      <summary><span class="tag done">Done</span> 17. Save a drawn doodle and tap it onto the letter</summary>
+      <p>A studio now keeps a library of doodles. Open a letter, press Library, draw on the sheet, and save. The doodle appears in the list. Tap it and it lands in the centre of the part of the page you can see. Undo takes it back, the same way it takes back a word.</p>
+      <ul class="points">
+        <li>On a wide screen the library comes in from the right. Under 900 px it comes up from the bottom, which is how a phone holds it.</li>
+        <li>An empty library offers Draw and Photograph. Draw is this step. Photograph waits for a later one.</li>
+        <li>Save doodle stores the lines and a transparent PNG of the ink. The name starts as Doodle, and you can rename or delete it afterwards.</li>
+        <li>A doodle belongs to the studio, so a teammate can place it. A signature, when that arrives, stays with the person who drew it.</li>
+        <li>Deleting a doodle takes it out of the library. A letter that already uses it still shows it.</li>
+      </ul>
+      <p>To try it on your computer, after <code>git pull</code> and <code>pnpm install</code>, start the containers, apply the new table, and start the website:</p>
+      <pre>docker compose up -d
+pnpm db:migrate
+pnpm dev</pre>
+      <p>Open <a href="http://127.0.0.1:3000">http://127.0.0.1:3000</a>, open a letter, press Library, press Draw, draw a line, and press Save doodle. Tap Doodle. It sits on the page. Undo removes it. The row is in <code>pnpm db:studio</code> under <code>drawings</code>.</p>
+      <p>The service tests run on throwaway Postgres in Docker. The page journey drives a real browser against your running <code>pnpm dev</code>:</p>
+      <pre>pnpm --filter @repo/db test --reporter=verbose
+pnpm --filter @repo/services test --reporter=verbose
+pnpm --filter web test --reporter=verbose
+pnpm --filter web test:e2e</pre>
+      <p>The names read like “the aspect comes from the PNG”, “a teammate sees Karla's doodles but not her signatures”, “placing an element and undoing removes it”, and “tapping a doodle places it on the current side and closes the library”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, and all 24 journeys in <code>pnpm test:e2e</code>, the 3 new library ones and the 21 from earlier steps, against a dev server. Drawing with a pencil on an iPad is still unchecked. There is no iPad in this setup.</p>
+    </details>
     <details id="step-18"><summary><span class="tag later">Later</span> 18. Move, resize, rotate, recolour doodles</summary><p>Every gesture is one undo step.</p></details>
 
     <h3>M6. Photo ink lift</h3>

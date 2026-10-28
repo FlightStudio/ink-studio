@@ -47,6 +47,25 @@ afterAll(async () => {
 	await container?.stop();
 });
 
+it("reads an object back while STORAGE_EMULATOR_HOST is set", async () => {
+	const key = "organizations/org-1/assets/emulator-host";
+	const bytes = new Uint8Array([9, 8, 7, 6]);
+	const previous = process.env.STORAGE_EMULATOR_HOST;
+	process.env.STORAGE_EMULATOR_HOST = emulatorBaseUrl;
+	try {
+		const withHost = new GcsAssetStorage({
+			bucket,
+			projectId,
+			emulatorBaseUrl,
+		});
+		await withHost.put({ key, bytes, contentType: "image/png" });
+		expect(await withHost.get(key)).toEqual(bytes);
+	} finally {
+		if (previous === undefined) delete process.env.STORAGE_EMULATOR_HOST;
+		else process.env.STORAGE_EMULATOR_HOST = previous;
+	}
+});
+
 it("a stored object reads back byte for byte", async () => {
 	const key = "organizations/org-1/assets/asset-1";
 	const bytes = new Uint8Array(randomBytes(70_000));

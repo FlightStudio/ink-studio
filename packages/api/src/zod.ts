@@ -3,18 +3,23 @@ import { z } from "zod";
 import {
 	AssetProcessingStatus,
 	type AssetStatus,
+	type CreateDrawingRequest,
+	type CreatedDrawing,
 	type CreatedFont,
 	type CreatedLetter,
 	type CreateFontRequest,
 	type CreateLetterRequest,
+	DrawingKind,
 	DrawnFontSourceKind,
 	GlyphStrokeInput,
 	type LetterContentEnvelope,
 	type LetterState,
 	PageFormatId,
+	type RenameDrawingRequest,
 	type SavedLetter,
 	type SaveGlyphRequest,
 	type SaveLetterRequest,
+	StrokeInput,
 	type UploadedAsset,
 	UploadPurpose,
 } from "./gen/api.ts";
@@ -109,3 +114,38 @@ export const assetStatusSchema: z.ZodType<AssetStatus> = z.strictObject({
 	status: assetProcessingStatusSchema,
 	error: apiErrorCodeSchema.nullable(),
 });
+
+const strokeSchema = z.strictObject({
+	input: z.enum(StrokeInput),
+	points: z.array(z.array(z.number()).length(4)),
+});
+
+export const createDrawingRequestSchema: z.ZodType<CreateDrawingRequest> =
+	z.strictObject({
+		kind: z.enum(DrawingKind),
+		name: z.string(),
+		maskAssetId: z.uuid(),
+		source: z.discriminatedUnion("kind", [
+			z.strictObject({
+				kind: z.literal("drawn"),
+				box: z.strictObject({
+					widthPx: z.number(),
+					heightPx: z.number(),
+				}),
+				strokes: z.array(strokeSchema),
+			}),
+			z.strictObject({
+				kind: z.literal("photo"),
+				photoAssetId: z.uuid(),
+			}),
+		]),
+	});
+
+export const createdDrawingSchema: z.ZodType<CreatedDrawing> = z.strictObject({
+	id: z.uuid(),
+});
+
+export const renameDrawingRequestSchema: z.ZodType<RenameDrawingRequest> =
+	z.strictObject({
+		name: z.string(),
+	});

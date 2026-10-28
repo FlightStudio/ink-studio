@@ -29,6 +29,13 @@
 			"when": 1793146339619,
 			"tag": "0003_handwriting_fonts",
 			"breakpoints": true
+		},
+		{
+			"idx": 4,
+			"version": "7",
+			"when": 1793148271934,
+			"tag": "0004_big_namor",
+			"breakpoints": true
 		}
 	]
 }
