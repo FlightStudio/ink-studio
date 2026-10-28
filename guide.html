@@ -67,9 +67,9 @@ summary { cursor: pointer; }
 <header>
   <p class="kicker">Ink Studio v2</p>
   <h1>Build guide</h1>
-  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, and a doodle library are ready on your own computer.</p>
-  <div class="progress" aria-hidden="true"><span style="width:64%"></span></div>
-  <p class="log">23 of 36 steps in the repository. Step 17 saves a drawn doodle and taps it onto the letter.</p>
+  <p class="lede">This page is the map. It updates after each plan step. Postgres, the website, the stationery style guide, the page geometry, the letter document, the shared letter page, letter storage, file uploads, and the editor with autosave, a formatting toolbar, side counts, overflow, the seal, a print preview, a doodle library, and moving a placed doodle are ready on your own computer.</p>
+  <div class="progress" aria-hidden="true"><span style="width:67%"></span></div>
+  <p class="log">24 of 36 steps in the repository. Step 18 moves, resizes, rotates and recolours a placed doodle.</p>
 </header>
 <main>
   <section class="panel" id="your-machine">
@@ -401,7 +401,25 @@ pnpm --filter web test:e2e</pre>
       <p>The names read like “the aspect comes from the PNG”, “a teammate sees Karla's doodles but not her signatures”, “placing an element and undoing removes it”, and “tapping a doodle places it on the current side and closes the library”.</p>
       <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, 263 tests, including 12 drawing service tests, and the 3 library journeys in <code>library.e2e.ts</code> against a dev server. Drawing with a pencil on an iPad is still unchecked. There is no iPad in this setup.</p>
     </details>
-    <details id="step-18"><summary><span class="tag later">Later</span> 18. Move, resize, rotate, recolour doodles</summary><p>Every gesture is one undo step.</p></details>
+    <details id="step-18">
+      <summary><span class="tag done">Done</span> 18. Move, resize, rotate, recolour doodles</summary>
+      <p>A doodle on the letter can be moved, resized, turned and recoloured. Each gesture is one undo, the same undo as a word.</p>
+      <ul class="points">
+        <li>Drag the doodle to move it, including onto the next side. Drag a corner to resize it; the shape stays the same and it will not shrink below a quarter inch. The handle above it turns it, and it gently snaps when it is within four degrees of upright or sideways.</li>
+        <li>Select it and the five inks appear, plus Remove. Delete and Backspace also take it off the letter.</li>
+        <li>Oxblood paints it <code>rgb(107, 31, 42)</code>. Undo brings the previous ink back.</li>
+        <li>If it sits in the barcode corner, the outline turns red and the page says “Keep this corner clear for the postal barcode.”</li>
+      </ul>
+      <p>To try it on your computer, after <code>git pull</code> and <code>pnpm install</code>, start the containers and the website:</p>
+      <pre>docker compose up -d
+pnpm dev</pre>
+      <p>Open <a href="http://127.0.0.1:3000">http://127.0.0.1:3000</a>, open a letter, press Library, draw a doodle and tap it onto the page. Drag it. Drag a corner. Turn it. Pick Oxblood. Undo after each one. Drag it into the hatched corner at the top right of the first side and read the warning.</p>
+      <p>The page journey drives a real browser against your running <code>pnpm dev</code>:</p>
+      <pre>pnpm --filter web test --reporter=verbose
+pnpm --filter web test:e2e</pre>
+      <p>The names read like “dragging the bottom-right handle keeps the ratio and the top-left corner”, “one undo moves a moved doodle back”, and “recolour paints the doodle in the picked ink, and undo restores it”.</p>
+      <p>Checked: <code>pnpm lint</code>, <code>pnpm typecheck</code>, and <code>pnpm test</code>, and the 4 element journeys in <code>elements.e2e.ts</code> against a dev server. A finger on an iPad is still unchecked. There is no iPad in this setup.</p>
+    </details>
 
     <h3>M6. Photo ink lift</h3>
     <details id="step-19">
