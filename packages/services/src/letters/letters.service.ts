@@ -15,7 +15,12 @@ import type {
 	PrintOutput,
 	ProductKind,
 } from "@repo/types";
-import { DEFAULT_FORMAT, PAGE_SPECS, SAMPLE_MERGE_VALUES } from "@repo/types";
+import {
+	DEFAULT_FORMAT,
+	missingLowercase,
+	PAGE_SPECS,
+	SAMPLE_MERGE_VALUES,
+} from "@repo/types";
 import { z } from "zod";
 import { generatedAsset, publishAssetJob } from "../assets/assets.service.ts";
 import type { Publisher } from "../queue/queue.types.ts";
@@ -361,6 +366,27 @@ export async function letterOwnerIds(
 	return owners;
 }
 
+async function creatableFont(
+	db: Tx,
+	member: Member,
+	fontId: string,
+): Promise<void> {
+	const found = await db.fonts.referenced(
+		member.userOrganization.organizationId,
+		[fontId],
+	);
+	const font = found[0];
+	if (found.length !== 1 || !font || font.deletedAt !== null) {
+		throw new ServiceError("invalid_input", "invalid_letter");
+	}
+	if (font.ownerUserId !== member.user.id) {
+		throw new ServiceError("forbidden", "not_owner");
+	}
+	if (font.fontAssetId === null || missingLowercase(font.chars).length > 0) {
+		throw new ServiceError("invalid_input", "font_not_ready");
+	}
+}
+
 function proofOutputs(content: LetterContent): PrintOutput[] {
 	const spec = PAGE_SPECS[content.format];
 	if (spec.output === "pdf") {
@@ -383,10 +409,18 @@ export class LetterService {
 		params: CreateLetterParams,
 	): Promise<{ id: string }> {
 		const format = params.format ?? DEFAULT_FORMAT;
+		const content = newLetterContent(format);
+		if (params.fontId) {
+			await creatableFont(this.db, member, params.fontId);
+			content.defaults = {
+				...content.defaults,
+				font: { kind: "own", fontId: params.fontId },
+			};
+		}
 		const letter = await this.db.letters.create({
 			organizationId: member.userOrganization.organizationId,
 			title: UNTITLED[PAGE_SPECS[format].product],
-			content: newLetterContent(format),
+			content,
 		});
 		return { id: letter.id };
 	}

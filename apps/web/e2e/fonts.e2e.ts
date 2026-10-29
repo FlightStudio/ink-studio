@@ -186,6 +186,34 @@ async function fingerStroke(cdp: CDPSession, at: { x: number; y: number }) {
 }
 
 describe("handwriting fonts", () => {
+	it("a missing font is the studio's own not-found page", async () => {
+		const member = await harness.seedIdentity();
+		const page = await harness.open(member, "/fonts");
+		const response = await page.goto(
+			page
+				.url()
+				.replace("/fonts", "/fonts/0192e4a0-7b1c-7cc3-9a5e-3f1d2b4c5a99"),
+		);
+		expect(response?.status()).toBe(404);
+		await page
+			.getByRole("heading", { name: "This handwriting is not here" })
+			.waitFor();
+		expect(await page.locator(".studio").count()).toBe(1);
+		const draw = await page.goto(
+			page
+				.url()
+				.replace(
+					/\/fonts\/[^/]+$/,
+					"/fonts/0192e4a0-7b1c-7cc3-9a5e-3f1d2b4c5a98/draw",
+				),
+		);
+		expect(draw?.status()).toBe(404);
+		await page
+			.getByRole("heading", { name: "This handwriting is not here" })
+			.waitFor();
+		expect(await page.locator(".studio").count()).toBe(1);
+	});
+
 	it("the toolbar offers to make a handwriting font when there is none", async () => {
 		const member = await harness.seedIdentity();
 		const { page, id } = await openLetter(member);

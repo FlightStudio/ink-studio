@@ -6,7 +6,7 @@ import type {
 	PlacedElement,
 	UploadPurpose,
 } from "@repo/types";
-import { SAMPLE_MERGE_VALUES } from "@repo/types";
+import { LOWERCASE_LETTERS, SAMPLE_MERGE_VALUES } from "@repo/types";
 import { v7 as uuidv7 } from "uuid";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { generatedAsset } from "../assets/assets.service.ts";
@@ -549,6 +549,46 @@ it("a teammate opens a letter in Karla's hand read-only", async () => {
 	expect(seen?.sealFonts).toEqual({
 		[font.id]: { ownerName: "Karla", chars: "abc" },
 	});
+});
+
+it("a new letter can start in the caller's own finished font", async () => {
+	const karla = await member("karla-create-font");
+	const font = await handwriting(
+		karla,
+		await fontFile(karla),
+		LOWERCASE_LETTERS.join(""),
+	);
+	const { id } = await letters.createLetter(karla, { fontId: font.id });
+	const stored = await letters.getLetter(karla, id);
+	expect(stored?.content.defaults.font).toEqual({
+		kind: "own",
+		fontId: font.id,
+	});
+	expect(stored?.content.doc.content).toEqual([
+		{ type: "paragraph", attrs: { align: "left" } },
+	]);
+});
+
+it("a new letter cannot start in a teammate's font or one that is not ready", async () => {
+	const karla = await member("karla-create-foreign");
+	const sam = await teammate(karla, "sam-create-foreign");
+	const hers = await handwriting(
+		karla,
+		await fontFile(karla),
+		LOWERCASE_LETTERS.join(""),
+	);
+	const unbuilt = await handwriting(karla, null, LOWERCASE_LETTERS.join(""));
+	await expect(
+		letters.createLetter(sam, { fontId: hers.id }),
+	).rejects.toMatchObject({ kind: "forbidden", code: "not_owner" });
+	await expect(
+		letters.createLetter(karla, { fontId: unbuilt.id }),
+	).rejects.toMatchObject({ kind: "invalid_input", code: "font_not_ready" });
+	await expect(
+		letters.createLetter(karla, {
+			fontId: "0192e4a0-7b1c-7cc3-9a5e-3f1d2b4c5a99",
+		}),
+	).rejects.toMatchObject({ kind: "invalid_input", code: "invalid_letter" });
 });
 
 it("a letter cannot use a font that has never finished a build", async () => {

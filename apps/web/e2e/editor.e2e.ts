@@ -359,6 +359,22 @@ describe("the editor", () => {
 		await page.getByRole("heading", { name: "Letters" }).waitFor();
 	});
 
+	it("a missing letter is the studio's own not-found page", async () => {
+		const page = await harness.open(member, "/letters");
+		const response = await page.goto(
+			page
+				.url()
+				.replace("/letters", "/letters/0192e4a0-7b1c-7cc3-9a5e-3f1d2b4c5a99"),
+		);
+		expect(response?.status()).toBe(404);
+		await page
+			.getByRole("heading", { name: "This letter is not here" })
+			.waitFor();
+		expect(await page.locator(".studio").count()).toBe(1);
+		await page.getByRole("link", { name: "Back to letters" }).click();
+		await page.waitForURL(/\/letters$/);
+	});
+
 	it("an unknown address shows the studio's own page with a way back", async () => {
 		const page = await harness.open(member, "/letters");
 		const response = await page.goto(page.url().replace("/letters", "/nope"));

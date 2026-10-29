@@ -20,6 +20,8 @@ export interface LetterContentEnvelope {
 
 export interface CreateLetterRequest {
   format?: PageFormatId;
+  /** An own font to use as the new letter's default ink. */
+  fontId?: string;
 }
 
 export interface CreatedLetter {

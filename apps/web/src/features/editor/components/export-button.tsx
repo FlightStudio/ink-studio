@@ -38,7 +38,6 @@ export function ExportButton({
 	const [state, setState] = useState<ExportState>({ phase: "idle" });
 	const [open, setOpen] = useState(false);
 	const [exported, setExported] = useState<number | null>(null);
-	const userOpened = useRef(false);
 	const stopWatching = useRef<() => void>(() => {});
 
 	useEffect(() => () => stopWatching.current(), []);
@@ -92,10 +91,6 @@ export function ExportButton({
 		if (state.phase !== "working") stopWatching.current();
 	}, [state.phase]);
 
-	useEffect(() => {
-		if (state.phase === "ready" || state.phase === "failed") setOpen(true);
-	}, [state.phase]);
-
 	const busy =
 		state.phase === "saving" ||
 		state.phase === "starting" ||
@@ -109,7 +104,6 @@ export function ExportButton({
 		<Popover
 			open={open}
 			onOpenChange={(next) => {
-				userOpened.current = next;
 				setOpen(next);
 				if (!next || busy) return;
 				if (state.phase === "ready" && exported === revision) return;
@@ -128,7 +122,7 @@ export function ExportButton({
 				{busy ? (
 					<span
 						aria-hidden
-						className="size-1.5 animate-pulse rounded-full bg-ink-accent"
+						className="size-1.5 motion-safe:animate-pulse rounded-full bg-ink-accent"
 					/>
 				) : null}
 				Export proof
@@ -136,7 +130,6 @@ export function ExportButton({
 			<PopoverContent
 				align="end"
 				sideOffset={8}
-				initialFocus={() => userOpened.current}
 				className="w-80 gap-3 rounded-2xl bg-paper p-4 text-ui text-ink shadow-float ring-[oklch(0.3_0.03_60/0.06)]"
 			>
 				<div aria-live="polite" className="flex flex-col items-start gap-3">

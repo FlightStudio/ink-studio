@@ -483,6 +483,10 @@ components:
       properties:
         format:
           $ref: "#/components/schemas/PageFormatId"
+        fontId:
+          type: string
+          format: uuid
+          description: An own font to use as the new letter's default ink.
     CreatedLetter:
       type: object
       additionalProperties: false

@@ -3,7 +3,10 @@ export type AssetReading = {
 	error: string | null;
 };
 
-export type AssetWatchState = AssetReading & { slow: boolean };
+export type AssetWatchState = AssetReading & {
+	slow: boolean;
+	unreachable: boolean;
+};
 
 export const SLOW_AFTER_MS = 60_000;
 
@@ -45,8 +48,12 @@ export function watchAsset({
 		clearTimeout(slowTimer);
 	}
 
-	function emit(reading: AssetReading) {
-		state = { ...reading, slow: slow && !isSettled(reading) };
+	function emit(reading: AssetReading, unreachable = false) {
+		state = {
+			...reading,
+			slow: slow && !isSettled(reading) && !unreachable,
+			unreachable,
+		};
 		onChange(state);
 	}
 
@@ -59,13 +66,15 @@ export function watchAsset({
 	async function tick() {
 		const reading = await read().catch(() => null);
 		if (stopped) return;
-		if (
-			reading &&
-			(reading.status !== state?.status || reading.error !== state.error)
-		) {
+		if (!reading) {
+			emit({ status: "failed", error: null }, true);
+			stop();
+			return;
+		}
+		if (reading.status !== state?.status || reading.error !== state.error) {
 			emit(reading);
 		}
-		if (reading && isSettled(reading)) {
+		if (isSettled(reading)) {
 			stop();
 			return;
 		}

@@ -22,6 +22,10 @@ The dev server listens on every interface, port 3000.
 3. From step 13, also set `STORAGE_EMULATOR_HOST` to `http://<DEV_LAN_HOST>:4443` so asset redirects reach the iPad.
 4. Run `pnpm dev` and open `http://<DEV_LAN_HOST>:3000` on the iPad, on the same network.
 
+## Render a proof on this computer
+
+`docker compose up -d` starts a Playwright browser server on `127.0.0.1:3001`. Copy `apps/worker/.env.example` to `apps/worker/.env` and set `BROWSER_WS_ENDPOINT` to `ws://127.0.0.1:3001/` so the render pool connects to that server. Leave `BROWSER_WS_ENDPOINT` unset and the render pool launches Chromium itself.
+
 ## Run the web journeys
 
 `pnpm test:e2e` drives the running dev server from a Playwright container, which reaches this computer as `localhost`. It is not part of `pnpm test`.

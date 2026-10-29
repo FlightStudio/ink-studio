@@ -11,7 +11,7 @@ import {
 
 const working = workingOn(["a", "b"]);
 
-const quiet = { error: null, slow: false };
+const quiet = { error: null, slow: false, unreachable: false };
 
 it("words past the last side stop the export and say what to do", () => {
 	expect(
@@ -93,6 +93,7 @@ it("one failed proof fails the export with its message", () => {
 			status: "failed",
 			error: "letter_overflow",
 			slow: false,
+			unreachable: false,
 		}),
 	).toEqual({ phase: "failed", message: errorMessages.letter_overflow });
 	expect(
@@ -100,6 +101,15 @@ it("one failed proof fails the export with its message", () => {
 			status: "failed",
 			error: "nonsense",
 			slow: false,
+			unreachable: false,
+		}),
+	).toEqual({ phase: "failed", message: errorMessages.processing_failed });
+	expect(
+		afterReading(working, "a", {
+			status: "failed",
+			error: null,
+			slow: false,
+			unreachable: true,
 		}),
 	).toEqual({ phase: "failed", message: errorMessages.processing_failed });
 });
