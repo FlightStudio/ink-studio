@@ -79,6 +79,7 @@ type InkAttrs = InkMark["attrs"];
 
 type ResolvedStyle = {
 	font: FontRef | null;
+	fontFromMarks: boolean;
 	sizePt: TextSizePt | null;
 	color: InkColorId | null;
 	align: Align | null;
@@ -131,11 +132,19 @@ function resolvedStyle(state: EditorState, defaults: InkStyle): ResolvedStyle {
 	if (inks.length === 0) {
 		inks.push(inkOf(state.storedMarks ?? selection.$from.marks()));
 	}
+	const keys = inks.map((ink) => (ink.font ? fontKey(ink.font) : ""));
+	const uniform = keys.every((key) => key === keys[0]);
+	const marked =
+		uniform && keys[0] ? (inks.find((ink) => ink.font)?.font ?? null) : null;
+	const fontFromMarks = !uniform || Boolean(keys[0]);
 	return {
-		font: agreed(
-			inks.map((ink) => ink.font ?? defaults.font),
-			fontKey,
-		),
+		font: fontFromMarks
+			? marked
+			: agreed(
+					inks.map((ink) => ink.font ?? defaults.font),
+					fontKey,
+				),
+		fontFromMarks,
 		sizePt: agreed(
 			inks.map((ink) => ink.sizePt ?? defaults.sizePt),
 			String,
@@ -272,6 +281,10 @@ export type EditorToolbarProps = {
 	onKeyboardClearance: (heightPx: number) => void;
 	onLibrary: () => void;
 	onOwnFont?: (fontId: string) => void;
+	offerUndo?: boolean;
+	offerRedo?: boolean;
+	onUndoOffer?: () => void;
+	onRedoOffer?: () => void;
 };
 
 function fontFromKey(key: string): FontRef | null {
@@ -305,6 +318,10 @@ export function EditorToolbar({
 	onKeyboardClearance,
 	onLibrary,
 	onOwnFont,
+	offerUndo = false,
+	offerRedo = false,
+	onUndoOffer,
+	onRedoOffer,
 }: EditorToolbarProps) {
 	const router = useRouter();
 	const inkGroup = useId();
@@ -325,7 +342,8 @@ export function EditorToolbar({
 		})),
 		...menu.links.map((link) => ({ value: link.value, label: link.label })),
 	];
-	const font = style.font ? fontKey(style.font) : null;
+	const shownFont = style.fontFromMarks ? style.font : defaults.font;
+	const font = shownFont ? fontKey(shownFont) : null;
 	const fontLabel =
 		items.find((item) => item.value === font)?.label ?? "Mixed fonts";
 
@@ -341,15 +359,21 @@ export function EditorToolbar({
 				<Toolbar.Group aria-label="History" className="flex">
 					<HistoryButton
 						label="Undo"
-						disabled={!style.canUndo}
-						onClick={() => runHistory(editor, undo)}
+						disabled={!style.canUndo && !offerUndo}
+						onClick={() => {
+							if (style.canUndo) runHistory(editor, undo);
+							else onUndoOffer?.();
+						}}
 					>
 						<Undo2 />
 					</HistoryButton>
 					<HistoryButton
 						label="Redo"
-						disabled={!style.canRedo}
-						onClick={() => runHistory(editor, redo)}
+						disabled={!style.canRedo && !offerRedo}
+						onClick={() => {
+							if (style.canRedo) runHistory(editor, redo);
+							else onRedoOffer?.();
+						}}
 					>
 						<Redo2 />
 					</HistoryButton>

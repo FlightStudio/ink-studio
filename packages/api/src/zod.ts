@@ -55,6 +55,7 @@ export const letterContentEnvelopeSchema: z.ZodType<LetterContentEnvelope> =
 export const createLetterRequestSchema: z.ZodType<CreateLetterRequest> =
 	z.strictObject({
 		format: pageFormatIdSchema.optional(),
+		fontId: z.uuid().optional(),
 	});
 
 export const createdLetterSchema: z.ZodType<CreatedLetter> = z.strictObject({

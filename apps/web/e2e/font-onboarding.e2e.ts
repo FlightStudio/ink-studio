@@ -525,7 +525,7 @@ describe("making a handwriting font", () => {
 		await page.getByRole("button", { name: "Photograph again" }).waitFor();
 	});
 
-	it("a ready font says what Caveat fills in and opens a new letter with the offer", async () => {
+	it("a ready font says what Caveat fills in and opens a new letter in that hand", async () => {
 		const member = await seedNamed("Karla");
 		const fontId = await seedFont(member, drawn(REQUIRED));
 		await seedBuild(member, fontId, { built: REQUIRED.join("") });
@@ -544,8 +544,14 @@ describe("making a handwriting font", () => {
 		await page.waitForURL(
 			(url) =>
 				/^\/letters\/[^/]+$/.test(url.pathname) &&
-				url.searchParams.get("font") === fontId,
+				!url.searchParams.has("font"),
 		);
+		const openedId = new URL(page.url()).pathname.split("/").pop() ?? "";
+		const opened = await harness.letters.getLetter(member, openedId);
+		expect(opened?.content.defaults.font).toEqual({ kind: "own", fontId });
+		expect(
+			await page.getByText("Use Karla's handwriting for this letter?").count(),
+		).toBe(0);
 		const letterId = await harness.newLetter(member);
 		const back = await harness.open(
 			member,

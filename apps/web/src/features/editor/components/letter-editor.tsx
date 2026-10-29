@@ -19,6 +19,7 @@ import type {
 	FontOption,
 	FontRef,
 	InkColorId,
+	InkStyle,
 	LetterContent,
 	LetterDoc,
 	LetterResources,
@@ -154,6 +155,12 @@ function isBlank(doc: LetterDoc): boolean {
 	const [first, ...rest] = doc.content;
 	return rest.length === 0 && (first?.content ?? []).length === 0;
 }
+
+type BlankFontStep = {
+	pending: "undo" | "redo";
+	original: InkStyle;
+	chosen: InkStyle;
+};
 
 function useInkReady(content: LetterContent): boolean {
 	const [ready, setReady] = useState(false);
@@ -427,6 +434,13 @@ export function LetterEditor({
 	const coarsePointer = useCoarsePointer();
 	const [keyboardClearancePx, setKeyboardClearancePx] = useState(0);
 	const [offer, setOffer] = useState(fontOffer);
+	const [defaults, setDefaults] = useState(letter.content.defaults);
+	const defaultsRef = useRef(letter.content.defaults);
+	const blankFont = useRef<BlankFontStep | null>(null);
+	const [blankFontPending, setBlankFontPending] = useState<
+		"undo" | "redo" | null
+	>(null);
+	const offerKeys = useRef<(event: KeyboardEvent) => boolean>(() => false);
 	const toolbarPlacement = letter.editable
 		? coarsePointer
 			? "bottom"
@@ -455,6 +469,7 @@ export function LetterEditor({
 			},
 			scrollMargin: scrollClearance,
 			scrollThreshold: scrollClearance,
+			handleKeyDown: (_view, event) => offerKeys.current(event),
 		},
 	});
 
@@ -466,12 +481,53 @@ export function LetterEditor({
 			title,
 			content: {
 				...letter.content,
+				defaults: defaultsRef.current,
 				doc: (editor?.getJSON() as LetterDoc | undefined) ?? letter.content.doc,
 			},
 		}),
 		onNewerVersion: () => router.refresh(),
 	});
 	const { edited } = autosave;
+
+	const moveBlankFont = useCallback(
+		(direction: "undo" | "redo") => {
+			const step = blankFont.current;
+			if (!step || step.pending !== direction) return;
+			const next = direction === "undo" ? step.original : step.chosen;
+			const pending = direction === "undo" ? "redo" : "undo";
+			defaultsRef.current = next;
+			blankFont.current = { ...step, pending };
+			setDefaults(next);
+			setBlankFontPending(pending);
+			edited();
+			editor?.commands.focus();
+		},
+		[edited, editor],
+	);
+
+	useLayoutEffect(() => {
+		offerKeys.current = (event) => {
+			if (!editor) return false;
+			const mod = event.metaKey || event.ctrlKey;
+			if (!mod || event.altKey) return false;
+			const key = event.key.toLowerCase();
+			const wantsRedo = key === "y" || (key === "z" && event.shiftKey);
+			const wantsUndo = key === "z" && !event.shiftKey;
+			if (!wantsUndo && !wantsRedo) return false;
+			if (wantsUndo && undo(editor.state)) return false;
+			if (wantsRedo && redo(editor.state)) return false;
+			const step = blankFont.current;
+			if (wantsUndo && step?.pending === "undo") {
+				moveBlankFont("undo");
+				return true;
+			}
+			if (wantsRedo && step?.pending === "redo") {
+				moveBlankFont("redo");
+				return true;
+			}
+			return false;
+		};
+	}, [editor, moveBlankFont]);
 
 	const [empty, setEmpty] = useState(() => isBlank(letter.content.doc));
 
@@ -588,7 +644,7 @@ export function LetterEditor({
 		if (revealSheet(page, revealSide)) setRevealSide(null);
 	}, [revealSide, sheets]);
 
-	const live = { ...letter.content, doc };
+	const live = { ...letter.content, defaults, doc };
 	const shownElements = live.doc.attrs.elements.map((element) =>
 		preview?.id === element.id ? preview : element,
 	);
@@ -738,9 +794,13 @@ export function LetterEditor({
 						ref={toolbarRef}
 						editor={editor}
 						letterId={letter.id}
-						defaults={letter.content.defaults}
+						defaults={defaults}
 						fonts={fonts}
 						coarsePointer={coarsePointer}
+						offerUndo={blankFontPending === "undo"}
+						offerRedo={blankFontPending === "redo"}
+						onUndoOffer={() => moveBlankFont("undo")}
+						onRedoOffer={() => moveBlankFont("redo")}
 						onKeyboardClearance={setKeyboardClearancePx}
 						onLibrary={() => {
 							setLibraryTab("doodle");
@@ -755,9 +815,18 @@ export function LetterEditor({
 						onDismiss={closeOffer}
 						onUse={() => {
 							registerOwnFont(offer.id);
-							editor.view.dispatch(
-								writeLetterIn(editor.state, { kind: "own", fontId: offer.id }),
-							);
+							const font = { kind: "own", fontId: offer.id } as const;
+							if (isBlank(editor.getJSON() as LetterDoc)) {
+								const original = defaultsRef.current;
+								const chosen = { ...original, font };
+								defaultsRef.current = chosen;
+								blankFont.current = { pending: "undo", original, chosen };
+								setDefaults(chosen);
+								setBlankFontPending("undo");
+								edited();
+							} else {
+								editor.view.dispatch(writeLetterIn(editor.state, font));
+							}
 							editor.view.focus();
 							closeOffer();
 						}}

@@ -672,6 +672,7 @@ pnpm --filter worker test --reporter=verbose</pre>
       <p>The render worker has to be running. After <code>git pull</code> and <code>pnpm install</code>:</p>
       <pre>docker compose up -d
 pnpm dev</pre>
+      <p><code>docker compose</code> starts a Playwright browser server at <code>ws://127.0.0.1:3001/</code>. Set <code>BROWSER_WS_ENDPOINT</code> to that address in <code>apps/worker/.env</code> (it is commented in <code>apps/worker/.env.example</code>) so the render pool connects to it. Leave the variable unset and the pool launches Chromium on this computer instead.</p>
       <p>Open a letter at <a href="http://127.0.0.1:3000/letters">http://127.0.0.1:3000/letters</a> and choose Export proof.</p>
       <p>The tests run on throwaway Postgres, and one of them uses Chromium in Docker:</p>
       <pre>pnpm --filter @repo/services test --reporter=verbose

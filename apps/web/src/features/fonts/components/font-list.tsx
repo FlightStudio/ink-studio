@@ -26,7 +26,10 @@ export type FontListProps = { fonts: FontOption[] };
 
 function BuildWatch({ assetId }: { assetId: string }) {
 	const router = useRouter();
-	useAssetWatch(assetId, () => router.refresh());
+	useAssetWatch(assetId, (state) => {
+		if (state.unreachable) return;
+		router.refresh();
+	});
 	return null;
 }
 

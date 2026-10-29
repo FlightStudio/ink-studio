@@ -41,6 +41,7 @@ export function workingOn(ids: readonly string[]): ExportState {
 			status: "pending",
 			error: null,
 			slow: false,
+			unreachable: false,
 		})),
 	};
 }

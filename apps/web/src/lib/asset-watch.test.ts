@@ -71,6 +71,7 @@ describe("watchAsset", () => {
 			status: "failed",
 			error: "font_unreadable",
 			slow: false,
+			unreachable: false,
 		});
 		await vi.advanceTimersByTimeAsync(5000);
 		expect(read).toHaveBeenCalledTimes(1);
@@ -92,20 +93,38 @@ describe("watchAsset", () => {
 		await vi.advanceTimersByTimeAsync(SLOW_AFTER_MS - 1);
 		expect(states.at(-1)?.slow).toBe(false);
 		await vi.advanceTimersByTimeAsync(1);
-		expect(states.at(-1)).toEqual({ ...running, slow: true });
+		expect(states.at(-1)).toEqual({
+			...running,
+			slow: true,
+			unreachable: false,
+		});
 		const reads = read.mock.calls.length;
 		await vi.advanceTimersByTimeAsync(3000);
 		expect(read.mock.calls.length).toBe(reads + 1);
 	});
 
-	test("a lost reading or a thrown one keeps the watch going", async () => {
-		const read = reader([null, new Error("offline"), done]);
-		const onChange = vi.fn();
-		watchAsset({ read, onChange });
+	test("a lost reading or a thrown one stops the watch", async () => {
+		const lost = reader([null, done]);
+		const onLost = vi.fn();
+		watchAsset({ read: lost, onChange: onLost });
 		await vi.advanceTimersByTimeAsync(0);
-		expect(onChange).not.toHaveBeenCalled();
-		await vi.advanceTimersByTimeAsync(500 + 750);
-		expect(onChange).toHaveBeenLastCalledWith({ ...done, slow: false });
+		expect(onLost).toHaveBeenCalledTimes(1);
+		expect(onLost).toHaveBeenCalledWith({
+			status: "failed",
+			error: null,
+			slow: false,
+			unreachable: true,
+		});
+		await vi.advanceTimersByTimeAsync(10_000);
+		expect(lost).toHaveBeenCalledTimes(1);
+
+		const thrown = reader([new Error("offline"), done]);
+		const onThrown = vi.fn();
+		watchAsset({ read: thrown, onChange: onThrown });
+		await vi.advanceTimersByTimeAsync(0);
+		expect(onThrown).toHaveBeenCalledTimes(1);
+		await vi.advanceTimersByTimeAsync(10_000);
+		expect(thrown).toHaveBeenCalledTimes(1);
 	});
 
 	test("stop ends the reads and drops a reading still on its way", async () => {

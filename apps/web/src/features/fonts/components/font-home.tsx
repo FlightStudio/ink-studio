@@ -92,7 +92,10 @@ function FontView({
 	const name = `${font.ownerName}'s handwriting`;
 	const watch = useAssetWatch(
 		font.status === "building" ? font.pendingAssetId : null,
-		() => router.refresh(),
+		(state) => {
+			if (state.unreachable) return;
+			router.refresh();
+		},
 	);
 
 	useEffect(() => {
@@ -133,13 +136,13 @@ function FontView({
 	async function writeLetter() {
 		setOpening(true);
 		setLetterError(null);
-		const created = await createLetter({}).catch(() => null);
+		const created = await createLetter({ fontId: font.id }).catch(() => null);
 		if (created?.status !== 201) {
 			setOpening(false);
 			setLetterError(LETTER_FAILED);
 			return;
 		}
-		router.push(letterWithFont(created.data.id, font.id));
+		router.push(`/letters/${created.data.id}`);
 	}
 
 	function action(kind: FontAction, missing: readonly string[]): ReactNode {
