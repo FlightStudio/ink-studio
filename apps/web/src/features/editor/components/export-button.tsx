@@ -1,140 +1,233 @@
 "use client";
 
-import { getAssetStatus, requestExport } from "@repo/api";
-import { type ApiErrorCode, errorMessages } from "@repo/errors";
+import { requestExport } from "@repo/api";
+import type { PageSpec } from "@repo/types";
 import { StatusPill } from "@repo/ui/components/status-pill";
-import { Button } from "@repo/ui/components/ui/button";
-import { useEffect, useRef, useState } from "react";
-
-type Proof = {
-	id: string;
-	status: "pending" | "running" | "done" | "failed";
-	message: string | null;
-};
+import { Button, buttonVariants } from "@repo/ui/components/ui/button";
+import {
+	Popover,
+	PopoverContent,
+	PopoverDescription,
+	PopoverTitle,
+	PopoverTrigger,
+} from "@repo/ui/components/ui/popover";
+import { ExternalLink } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { watchAssetStatus } from "@/lib/use-asset-watch";
+import {
+	afterReading,
+	type ExportState,
+	failureMessage,
+	proofLabels,
+	workingOn,
+} from "../export-progress.ts";
 
 export type ExportButtonProps = {
 	letterId: string;
 	revision: number | null;
+	spec: PageSpec;
+	blocker: string | null;
 };
 
-export function ExportButton({ letterId, revision }: ExportButtonProps) {
-	const timer = useRef<ReturnType<typeof setInterval> | null>(null);
-	const [busy, setBusy] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const [proofs, setProofs] = useState<Proof[]>([]);
+export function ExportButton({
+	letterId,
+	revision,
+	spec,
+	blocker,
+}: ExportButtonProps) {
+	const [state, setState] = useState<ExportState>({ phase: "idle" });
+	const [open, setOpen] = useState(false);
+	const [exported, setExported] = useState<number | null>(null);
+	const userOpened = useRef(false);
+	const stopWatching = useRef<() => void>(() => {});
 
-	useEffect(
-		() => () => {
-			if (timer.current) clearInterval(timer.current);
-		},
-		[],
-	);
+	useEffect(() => () => stopWatching.current(), []);
 
-	function watch(ids: string[]) {
-		const tick = async () => {
-			const next = await Promise.all(
-				ids.map(async (id) => {
-					const status = await getAssetStatus(id);
-					if (status.status !== 200) {
-						return {
-							id,
-							status: "pending" as const,
-							message: null,
-						};
-					}
-					const failed = status.data.status === "failed";
-					return {
-						id,
-						status: status.data.status,
-						message: failed ? failureCopy(status.data.error) : null,
-					};
-				}),
-			);
-			setProofs(next);
-			if (
-				next.every(
-					(proof) => proof.status === "done" || proof.status === "failed",
-				)
-			) {
-				if (timer.current) clearInterval(timer.current);
-				timer.current = null;
-				setBusy(false);
-			}
+	const watch = useCallback((ids: readonly string[]) => {
+		stopWatching.current();
+		const stops = ids.map((id) =>
+			watchAssetStatus(id, (reading) =>
+				setState((previous) => afterReading(previous, id, reading)),
+			),
+		);
+		stopWatching.current = () => {
+			for (const stop of stops) stop();
 		};
-		if (timer.current) clearInterval(timer.current);
-		void tick();
-		timer.current = setInterval(() => void tick(), 500);
-	}
+	}, []);
 
-	async function exportProof() {
-		if (revision === null || busy) return;
-		setError(null);
-		setBusy(true);
-		const created = await requestExport(letterId, { revision });
-		if (created.status !== 201) {
-			setBusy(false);
-			setError(
-				"message" in created.data
-					? created.data.message
-					: "That proof could not be started.",
-			);
+	const start = useCallback(async () => {
+		stopWatching.current();
+		if (blocker) {
+			setState({ phase: "blocked", reason: blocker });
 			return;
 		}
-		setProofs(
-			created.data.assetIds.map((id) => ({
-				id,
-				status: "pending",
-				message: null,
-			})),
+		if (revision === null) {
+			setState({ phase: "saving" });
+			return;
+		}
+		setState({ phase: "starting" });
+		setExported(revision);
+		const created = await requestExport(letterId, { revision }).catch(
+			() => null,
 		);
+		if (created?.status !== 201) {
+			setState({
+				phase: "failed",
+				message:
+					created && "message" in created.data
+						? created.data.message
+						: failureMessage(null),
+			});
+			return;
+		}
+		setState(workingOn(created.data.assetIds));
 		watch(created.data.assetIds);
-	}
+	}, [blocker, letterId, revision, watch]);
+
+	useEffect(() => {
+		if (state.phase === "saving" && revision !== null) void start();
+	}, [state.phase, revision, start]);
+
+	useEffect(() => {
+		if (state.phase !== "working") stopWatching.current();
+	}, [state.phase]);
+
+	useEffect(() => {
+		if (state.phase === "ready" || state.phase === "failed") setOpen(true);
+	}, [state.phase]);
+
+	const busy =
+		state.phase === "saving" ||
+		state.phase === "starting" ||
+		state.phase === "working";
+	const slow =
+		state.phase === "working" && state.proofs.some((proof) => proof.slow);
+	const labels =
+		state.phase === "ready" ? proofLabels(spec, state.proofs.length) : [];
 
 	return (
-		<div className="ml-auto flex flex-col items-end gap-2">
-			<Button
-				type="button"
-				variant="outline"
-				disabled={revision === null || busy}
-				onClick={() => void exportProof()}
-			>
-				Export proof
-			</Button>
-			{error ? (
-				<p className="text-ui" style={{ color: "var(--danger)" }}>
-					{error}
-				</p>
-			) : null}
-			{proofs.map((proof) =>
-				proof.status === "done" ? (
-					<a
-						key={proof.id}
-						href={`/api/assets/${proof.id}`}
-						className="text-ui text-ink underline"
-					>
-						Download the proof
-					</a>
-				) : proof.status === "failed" ? (
-					<p
-						key={proof.id}
-						className="text-ui"
-						style={{ color: "var(--danger)" }}
-					>
-						{proof.message}
-					</p>
-				) : (
-					<StatusPill
-						key={proof.id}
-						status={proof.status}
-						label="Making the proof"
+		<Popover
+			open={open}
+			onOpenChange={(next) => {
+				userOpened.current = next;
+				setOpen(next);
+				if (!next || busy) return;
+				if (state.phase === "ready" && exported === revision) return;
+				void start();
+			}}
+		>
+			<PopoverTrigger
+				render={
+					<Button
+						variant="outline"
+						className="rounded-full bg-paper px-3.5"
+						data-busy={busy || undefined}
 					/>
-				),
-			)}
-		</div>
+				}
+			>
+				{busy ? (
+					<span
+						aria-hidden
+						className="size-1.5 animate-pulse rounded-full bg-ink-accent"
+					/>
+				) : null}
+				Export proof
+			</PopoverTrigger>
+			<PopoverContent
+				align="end"
+				sideOffset={8}
+				initialFocus={() => userOpened.current}
+				className="w-80 gap-3 rounded-2xl bg-paper p-4 text-ui text-ink shadow-float ring-[oklch(0.3_0.03_60/0.06)]"
+			>
+				<div aria-live="polite" className="flex flex-col items-start gap-3">
+					{state.phase === "blocked" ? (
+						<>
+							<PopoverTitle className="text-ui font-medium">
+								Not ready to export
+							</PopoverTitle>
+							<PopoverDescription className="text-ink-muted">
+								{state.reason}
+							</PopoverDescription>
+						</>
+					) : null}
+					{state.phase === "saving" ? (
+						<StatusPill status="pending" label="Saving your letter first" />
+					) : null}
+					{state.phase === "starting" || state.phase === "working" ? (
+						<>
+							<StatusPill status="running" label="Making the proof" />
+							{slow ? (
+								<div className="flex w-full items-center justify-between gap-3">
+									<p className="text-ink-muted">
+										This is taking longer than usual.
+									</p>
+									<Button
+										variant="outline"
+										size="sm"
+										className="rounded-full"
+										onClick={() => void start()}
+									>
+										Try again
+									</Button>
+								</div>
+							) : (
+								<p className="text-ink-muted">
+									Usually under a minute. You can keep writing.
+								</p>
+							)}
+						</>
+					) : null}
+					{state.phase === "ready" ? (
+						<>
+							<PopoverTitle className="text-ui font-medium">
+								Your proof is ready
+							</PopoverTitle>
+							<div className="flex flex-wrap gap-2">
+								{state.proofs.map((proof, index) => (
+									<a
+										key={proof.id}
+										href={`/api/assets/${proof.id}`}
+										target="_blank"
+										rel="noopener"
+										className={buttonVariants({
+											variant: "outline",
+											className: "rounded-full",
+										})}
+									>
+										{labels[index]}
+										<ExternalLink />
+									</a>
+								))}
+							</div>
+							{exported !== revision ? (
+								<p className="text-ink-muted">
+									The letter changed since.{" "}
+									<button
+										type="button"
+										className="text-ink underline decoration-rule underline-offset-4 hover:decoration-ink"
+										onClick={() => void start()}
+									>
+										Export again
+									</button>
+								</p>
+							) : null}
+						</>
+					) : null}
+					{state.phase === "failed" ? (
+						<div className="flex w-full items-start justify-between gap-3">
+							<p style={{ color: "var(--danger)" }}>{state.message}</p>
+							<Button
+								variant="outline"
+								size="sm"
+								className="rounded-full"
+								onClick={() => void start()}
+							>
+								Try again
+							</Button>
+						</div>
+					) : null}
+				</div>
+			</PopoverContent>
+		</Popover>
 	);
-}
-
-function failureCopy(code: string | null): string {
-	if (code && code in errorMessages) return errorMessages[code as ApiErrorCode];
-	return errorMessages.processing_failed;
 }

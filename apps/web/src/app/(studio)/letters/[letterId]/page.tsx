@@ -1,3 +1,5 @@
+import { isUsableFont } from "@repo/types";
+import { buttonVariants } from "@repo/ui/components/ui/button";
 import Link from "next/link";
 import { DeskMessage } from "@/features/editor/components/desk-message";
 import { LetterEditor } from "@/features/editor/components/letter-editor";
@@ -5,14 +7,20 @@ import { listDoodles, listSignatures } from "@/server/drawings";
 import { listFonts } from "@/server/fonts";
 import { getLetter } from "@/server/letters";
 
-type Props = { params: Promise<{ letterId: string }> };
+type Props = {
+	params: Promise<{ letterId: string }>;
+	searchParams: Promise<{ font?: string | string[] }>;
+};
 
 export async function generateMetadata({ params }: Props) {
 	const letter = await getLetter((await params).letterId);
 	return { title: `${letter?.title ?? "Letter"} · Ink Studio` };
 }
 
-export default async function LetterEditorPage({ params }: Props) {
+export default async function LetterEditorPage({
+	params,
+	searchParams,
+}: Props) {
 	const letter = await getLetter((await params).letterId);
 	if (!letter) {
 		return (
@@ -21,7 +29,11 @@ export default async function LetterEditorPage({ params }: Props) {
 				actions={
 					<Link
 						href="/letters"
-						className="rounded-full bg-paper px-4 py-2 text-ui shadow-float transition-shadow duration-(--duration-quick) hover:shadow-none focus-visible:outline-2 focus-visible:outline-ring"
+						className={buttonVariants({
+							size: "lg",
+							className:
+								"rounded-full px-4 shadow-float pointer-coarse:min-h-11",
+						})}
 					>
 						Back to letters
 					</Link>
@@ -31,9 +43,15 @@ export default async function LetterEditorPage({ params }: Props) {
 			</DeskMessage>
 		);
 	}
-	const doodles = letter.editable ? await listDoodles() : [];
-	const signatures = letter.editable ? await listSignatures() : [];
-	const fonts = await listFonts();
+	const [doodles, signatures, fonts] = await Promise.all([
+		letter.editable ? listDoodles() : [],
+		letter.editable ? listSignatures() : [],
+		listFonts(),
+	]);
+	const offered = (await searchParams).font;
+	const fontOffer = letter.editable
+		? (fonts.find((font) => font.id === offered && isUsableFont(font)) ?? null)
+		: null;
 	return (
 		<LetterEditor
 			key={`${letter.id}:${letter.revision}`}
@@ -41,6 +59,7 @@ export default async function LetterEditorPage({ params }: Props) {
 			doodles={doodles}
 			signatures={signatures}
 			fonts={fonts}
+			fontOffer={fontOffer}
 		/>
 	);
 }

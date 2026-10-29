@@ -1,27 +1,37 @@
+import { STOCK_FAMILY, StockFace } from "./stock-face.tsx";
+
 export type FontPreviewProps = {
 	fontId: string;
-	assetId: string | null;
+	assetId: string;
 	text: string;
+	className?: string;
 };
 
-export function FontPreview({ fontId, assetId, text }: FontPreviewProps) {
-	if (!assetId) {
-		return (
-			<p data-font-preview="" className="text-ui text-ink-muted">
-				Nothing built yet.
-			</p>
-		);
-	}
-	const family = `own-${fontId}`;
+export function fontFamilyOf(fontId: string): string {
+	return `own-${fontId}`;
+}
+
+export function FontPreview({
+	fontId,
+	assetId,
+	text,
+	className,
+}: FontPreviewProps) {
+	const family = fontFamilyOf(fontId);
 	return (
-		<div data-font-preview="" data-built={assetId}>
-			<style>{`@font-face { font-family: "${family}"; src: url("/api/assets/${assetId}"); font-display: block; }`}</style>
+		<>
+			<StockFace />
+			<style href={`own-font-${assetId}`} precedence="default">
+				{`@font-face{font-family:"${family}";src:url("/api/assets/${assetId}");font-display:block}`}
+			</style>
 			<p
-				className="text-title text-ink"
-				style={{ fontFamily: `"${family}", "stock-caveat"` }}
+				data-font-preview=""
+				data-built={assetId}
+				className={className}
+				style={{ fontFamily: `"${family}", "${STOCK_FAMILY}", cursive` }}
 			>
 				{text}
 			</p>
-		</div>
+		</>
 	);
 }

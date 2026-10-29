@@ -1,17 +1,15 @@
 import type { StrokeInput } from "@repo/types";
 import { describe, expect, it } from "vitest";
 import {
+	drawsWith,
+	EMPTY_POINTER_SESSION,
 	type PointerSample,
 	type PointerSessionEvent,
 	type PointerSessionState,
 	pointerSession,
 } from "./pointer-session.ts";
 
-const empty: PointerSessionState = {
-	strokes: [],
-	active: null,
-	penSeen: false,
-};
+const empty: PointerSessionState = EMPTY_POINTER_SESSION;
 
 function sample(
 	pointerId: number,
@@ -176,5 +174,63 @@ describe("pointerSession", () => {
 		expect(undone.strokes).toEqual(drawn.strokes.slice(0, 2));
 		expect(cleared.strokes).toEqual([]);
 		expect(cleared.active).toBeNull();
+	});
+
+	it("redo puts back what undo took, last undone first", () => {
+		const drawn = run(empty, [
+			...line(1, "mouse", 0),
+			...line(2, "mouse", 100),
+			...line(3, "mouse", 200),
+		]);
+		const undone = run(drawn, [{ type: "undo" }, { type: "undo" }]);
+		const redone = pointerSession(undone, { type: "redo" });
+		expect(undone.strokes).toEqual(drawn.strokes.slice(0, 1));
+		expect(undone.undone).toHaveLength(2);
+		expect(redone.strokes).toEqual(drawn.strokes.slice(0, 2));
+		expect(run(redone, [{ type: "redo" }]).strokes).toEqual(drawn.strokes);
+	});
+
+	it("a new stroke ends what redo can bring back", () => {
+		const drawn = run(empty, [
+			...line(1, "mouse", 0),
+			...line(2, "mouse", 100),
+		]);
+		const undone = pointerSession(drawn, { type: "undo" });
+		const fresh = run(undone, line(3, "mouse", 200));
+		expect(fresh.undone).toEqual([]);
+		expect(pointerSession(fresh, { type: "redo" })).toBe(fresh);
+	});
+
+	it("redo with nothing undone and undo with nothing drawn change nothing", () => {
+		expect(pointerSession(empty, { type: "redo" })).toBe(empty);
+		expect(pointerSession(empty, { type: "undo" })).toBe(empty);
+	});
+
+	it("clear also forgets what redo could bring back", () => {
+		const drawn = run(empty, [
+			...line(1, "mouse", 0),
+			...line(2, "mouse", 100),
+		]);
+		const cleared = run(drawn, [{ type: "undo" }, { type: "clear" }]);
+		expect(cleared.strokes).toEqual([]);
+		expect(cleared.undone).toEqual([]);
+	});
+});
+
+describe("drawsWith", () => {
+	it("a pen, a finger and the main mouse button draw", () => {
+		expect(drawsWith({ pointerType: "pen", button: 0 }, false)).toBe(true);
+		expect(drawsWith({ pointerType: "touch", button: 0 }, false)).toBe(true);
+		expect(drawsWith({ pointerType: "mouse", button: 0 }, false)).toBe(true);
+	});
+
+	it("another mouse button does not draw", () => {
+		expect(drawsWith({ pointerType: "mouse", button: 2 }, false)).toBe(false);
+	});
+
+	it("pen only leaves fingers to scroll while a pen and a mouse still draw", () => {
+		expect(drawsWith({ pointerType: "touch", button: 0 }, true)).toBe(false);
+		expect(drawsWith({ pointerType: "pen", button: 0 }, true)).toBe(true);
+		expect(drawsWith({ pointerType: "mouse", button: 0 }, true)).toBe(true);
 	});
 });

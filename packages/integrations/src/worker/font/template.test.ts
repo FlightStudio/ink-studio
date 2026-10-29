@@ -7,7 +7,7 @@ import { OpentypeFontBuilder } from "./opentype-font.ts";
 import { findTemplateMarkers, readTemplate } from "./template.ts";
 
 const PPI = 120;
-const { page, marker, grid, printColors } = HANDWRITING_TEMPLATE;
+const { page, marker, grid, label, printColors } = HANDWRITING_TEMPLATE;
 
 type Point = [number, number];
 
@@ -41,18 +41,31 @@ function slotBox(char: string, variant: number) {
 	throw new Error(`no cell for ${char}`);
 }
 
-function markerSquare(xIn: number, yIn: number, notch: boolean): string {
+type SheetOptions = {
+	corners: boolean;
+	ink: boolean;
+	tiltDeg?: number;
+	labelColor?: string;
+	throughLabel?: boolean;
+};
+
+function markerSquare(
+	xIn: number,
+	yIn: number,
+	notch: boolean,
+	tiltDeg = 0,
+): string {
 	const x = xIn * PPI;
 	const y = yIn * PPI;
 	const size = marker.sizeIn * PPI;
 	const bite = marker.notchIn * PPI;
 	if (!notch) {
-		return `<rect x="${x}" y="${y}" width="${size}" height="${size}" fill="${printColors.marker}"/>`;
+		return `<rect x="${x}" y="${y}" width="${size}" height="${size}" fill="${printColors.marker}" transform="rotate(${tiltDeg} ${x + size / 2} ${y + size / 2})"/>`;
 	}
 	return `<path fill="${printColors.marker}" fill-rule="evenodd" d="M ${x} ${y} h ${size} v ${size} h ${-size} z M ${x + size - bite} ${y + size - bite} h ${bite} v ${bite} h ${-bite} z"/>`;
 }
 
-function sheet(options: { corners: boolean; ink: boolean }): string {
+function sheet(options: SheetOptions): string {
 	const width = page.widthIn * PPI;
 	const height = page.heightIn * PPI;
 	const cells: string[] = [];
@@ -76,21 +89,28 @@ function sheet(options: { corners: boolean; ink: boolean }): string {
 					`<line x1="${box.x + 2}" y1="${y}" x2="${box.x + box.width - 2}" y2="${y}" stroke="${printColors.guide}" stroke-width="1"/>`,
 				);
 			}
-			const label = glyph.char
+			const text = `${glyph.char}${variant === 0 ? "" : variant + 1}`
 				.replaceAll("&", "&amp;")
 				.replaceAll("<", "&lt;")
 				.replaceAll(">", "&gt;");
+			const size = (label.sizePt / 72) * PPI;
 			cells.push(
-				`<text x="${box.x + 4}" y="${box.y + 12}" fill="${printColors.label}" font-size="10">${label}</text>`,
+				`<text x="${box.x + label.xIn * PPI}" y="${box.y + label.yIn * PPI + size * 0.8}" fill="${options.labelColor ?? printColors.label}" font-size="${size}">${text}</text>`,
 			);
 			index += 1;
 		}
 	}
+	const a = slotBox("a", 1);
 	const l = slotBox("l", 0);
 	const o = slotBox("o", 0);
+	const k = slotBox("k", 0);
 	const ink = options.ink
-		? `<rect x="${l.x + l.width * 0.46}" y="${l.y + l.height * 0.2}" width="${PPI * 0.035}" height="${l.height * 0.55}" fill="#111"/>
+		? `<rect x="${a.x + a.width * 0.46}" y="${a.y + a.height * 0.45}" width="${PPI * 0.035}" height="${a.height * 0.3}" fill="#111"/>
+			<rect x="${l.x + l.width * 0.46}" y="${l.y + l.height * 0.2}" width="${PPI * 0.035}" height="${l.height * 0.55}" fill="#111"/>
 			<path fill="#111" fill-rule="evenodd" d="M ${o.x + o.width / 2} ${o.y + o.height / 2} m -18 0 a 18 18 0 1 0 36 0 a 18 18 0 1 0 -36 0 z M ${o.x + o.width / 2} ${o.y + o.height / 2} m -8 0 a 8 8 0 1 0 16 0 a 8 8 0 1 0 -16 0 z"/>`
+		: "";
+	const through = options.throughLabel
+		? `<rect x="${k.x + label.xIn * PPI}" y="${k.y + label.yIn * PPI}" width="${PPI * 0.035}" height="${k.height * 0.7}" fill="#111"/>`
 		: "";
 	const corners = options.corners
 		? [
@@ -109,6 +129,7 @@ function sheet(options: { corners: boolean; ink: boolean }): string {
 					marker.insetIn,
 					page.heightIn - marker.insetIn - marker.sizeIn,
 					false,
+					options.tiltDeg,
 				),
 			].join("")
 		: markerSquare(marker.insetIn, marker.insetIn, true) +
@@ -128,10 +149,11 @@ function sheet(options: { corners: boolean; ink: boolean }): string {
 		${cells.join("")}
 		${corners}
 		${ink}
+		${through}
 	</svg>`;
 }
 
-async function render(options: { corners: boolean; ink: boolean }) {
+async function render(options: SheetOptions) {
 	return sharp(Buffer.from(sheet(options)))
 		.png()
 		.toBuffer();
@@ -214,6 +236,7 @@ describe("readTemplate", () => {
 			cell.mask.alpha.some((value) => value >= 128),
 		);
 		expect(written.map((cell) => [cell.char, cell.variant])).toEqual([
+			["a", 1],
 			["l", 0],
 			["o", 0],
 		]);
@@ -227,7 +250,81 @@ describe("readTemplate", () => {
 		const written = cells.filter((cell) =>
 			cell.mask.alpha.some((value) => value >= 128),
 		);
-		expect(written.map((cell) => cell.char)).toEqual(["l", "o"]);
+		expect(written.map((cell) => cell.char)).toEqual(["a", "l", "o"]);
+	});
+
+	test("a straight photo is read the right way up", async () => {
+		const straight = new Uint8Array(await render({ corners: true, ink: true }));
+		const cells = await readTemplate(straight);
+		const written = cells.filter((cell) =>
+			cell.mask.alpha.some((value) => value >= 128),
+		);
+		expect(written.map((cell) => cell.char)).toEqual(["a", "l", "o"]);
+	});
+
+	test("a straight photo with one plain marker slightly askew is read the right way up", async () => {
+		const askew = new Uint8Array(
+			await render({ corners: true, ink: true, tiltDeg: 6 }),
+		);
+		const cells = await readTemplate(askew);
+		const written = cells.filter((cell) =>
+			cell.mask.alpha.some((value) => value >= 128),
+		);
+		expect(written.map((cell) => cell.char)).toEqual(["a", "l", "o"]);
+	});
+
+	test("labels printed dark are not read as handwriting", async () => {
+		const warped = await distort(
+			await render({ corners: true, ink: true, labelColor: "#2f4a55" }),
+		);
+		const cells = await readTemplate(warped.bytes);
+		const written = cells.filter((cell) =>
+			cell.mask.alpha.some((value) => value >= 128),
+		);
+		expect(written.map((cell) => [cell.char, cell.variant])).toEqual([
+			["a", 1],
+			["l", 0],
+			["o", 0],
+		]);
+	});
+
+	test("a stroke that starts in the label corner is kept whole", async () => {
+		const warped = await distort(
+			await render({
+				corners: true,
+				ink: true,
+				labelColor: "#2f4a55",
+				throughLabel: true,
+			}),
+		);
+		const cells = await readTemplate(warped.bytes);
+		const k = cells.find((cell) => cell.char === "k");
+		if (!k) throw new Error("no k cell");
+		const zoneRows = Math.floor(
+			((label.zoneHeightIn - grid.cellInsetIn) /
+				(grid.cellHeightIn - grid.cellInsetIn * 2)) *
+				k.mask.heightPx,
+		);
+		const top = k.mask.alpha.subarray(0, zoneRows * k.mask.widthPx);
+		expect(top.some((value) => value >= 128)).toBe(true);
+	});
+
+	test("a font from a sheet with dark labels has no speck beside the letter", async () => {
+		const warped = await distort(
+			await render({ corners: true, ink: true, labelColor: "#2f4a55" }),
+		);
+		const built = await new OpentypeFontBuilder().fromTemplatePhoto({
+			familyName: "Template Hand",
+			photo: warped.bytes,
+		});
+		expect(built.chars).toBe("alo");
+		const font = opentype.parse(
+			built.bytes.buffer.slice(
+				built.bytes.byteOffset,
+				built.bytes.byteOffset + built.bytes.byteLength,
+			),
+		);
+		expect(font.charToGlyph("l").advanceWidth).toBeLessThan(0.2 * 1000);
 	});
 
 	test("printed borders and labels leave no ink", async () => {
@@ -242,6 +339,49 @@ describe("readTemplate", () => {
 			),
 		);
 		expect(font.charToGlyph("l").advanceWidth).toBeLessThan(0.2 * 1000);
+	});
+
+	test("a blank first variant does not fail the build", async () => {
+		const built = await new OpentypeFontBuilder().fromTemplatePhoto({
+			familyName: "Template Hand",
+			photo,
+		});
+		expect(built.chars).toBe("alo");
+		const font = opentype.parse(
+			built.bytes.buffer.slice(
+				built.bytes.byteOffset,
+				built.bytes.byteOffset + built.bytes.byteLength,
+			),
+		);
+		expect(font.charToGlyph("a").name).toBe("a");
+		expect(font.charToGlyph("a").getBoundingBox().y2).toBeGreaterThan(100);
+	});
+
+	test("a round o on the template builds round", async () => {
+		const built = await new OpentypeFontBuilder().fromTemplatePhoto({
+			familyName: "Template Hand",
+			photo,
+		});
+		const font = opentype.parse(
+			built.bytes.buffer.slice(
+				built.bytes.byteOffset,
+				built.bytes.byteOffset + built.bytes.byteLength,
+			),
+		);
+		const box = font.charToGlyph("o").getBoundingBox();
+		const ratio = (box.x2 - box.x1) / (box.y2 - box.y1);
+		expect(ratio).toBeGreaterThan(0.95);
+		expect(ratio).toBeLessThan(1.05);
+	});
+
+	test("a template with no handwriting on it is refused", async () => {
+		const blank = new Uint8Array(await render({ corners: true, ink: false }));
+		await expect(
+			new OpentypeFontBuilder().fromTemplatePhoto({
+				familyName: "Template Hand",
+				photo: blank,
+			}),
+		).rejects.toMatchObject({ kind: "invalid_input", code: "no_ink_found" });
 	});
 
 	test("a photo missing a corner is refused", async () => {

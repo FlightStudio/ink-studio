@@ -1,6 +1,14 @@
 import { HANDWRITING_GLYPHS, HANDWRITING_TEMPLATE } from "@repo/types";
+import { glyphLabel } from "../glyph-sections.ts";
 
-const { page, marker, grid, printColors } = HANDWRITING_TEMPLATE;
+const { page, marker, grid, label, printColors } = HANDWRITING_TEMPLATE;
+
+const GUIDES = [
+	{ at: 0.2, color: printColors.guide },
+	{ at: 0.45, color: printColors.guide },
+	{ at: 0.7, color: printColors.border, baseline: true },
+	{ at: 0.9, color: printColors.guide },
+] as const;
 
 function Marker({
 	xIn,
@@ -11,30 +19,30 @@ function Marker({
 	yIn: number;
 	notch?: boolean;
 }) {
+	const size = marker.sizeIn;
+	const cut = size - marker.notchIn;
 	return (
-		<div
+		<svg
+			aria-hidden
+			data-template-marker=""
+			viewBox={`0 0 ${size} ${size}`}
 			style={{
 				position: "absolute",
 				left: `${xIn}in`,
 				top: `${yIn}in`,
-				width: `${marker.sizeIn}in`,
-				height: `${marker.sizeIn}in`,
-				background: printColors.marker,
+				width: `${size}in`,
+				height: `${size}in`,
 			}}
 		>
-			{notch ? (
-				<div
-					style={{
-						position: "absolute",
-						right: 0,
-						bottom: 0,
-						width: `${marker.notchIn}in`,
-						height: `${marker.notchIn}in`,
-						background: "white",
-					}}
-				/>
-			) : null}
-		</div>
+			<path
+				d={
+					notch
+						? `M0 0H${size}V${cut}H${cut}V${size}H0Z`
+						: `M0 0H${size}V${size}H0Z`
+				}
+				fill={printColors.marker}
+			/>
+		</svg>
 	);
 }
 
@@ -76,6 +84,7 @@ export function TemplateSheet() {
 				return (
 					<div
 						key={`${cell.char}-${cell.variant}`}
+						data-template-cell={glyphLabel(cell.char, cell.variant)}
 						style={{
 							position: "absolute",
 							left: `${x}in`,
@@ -86,29 +95,30 @@ export function TemplateSheet() {
 							overflow: "hidden",
 						}}
 					>
-						{[0.2, 0.45, 0.7, 0.9].map((line) => (
+						{GUIDES.map((guide) => (
 							<div
-								key={line}
+								key={guide.at}
+								data-baseline={"baseline" in guide ? "" : undefined}
 								style={{
 									position: "absolute",
 									left: "0.04in",
 									right: "0.04in",
-									top: `${grid.cellHeightIn * line}in`,
-									borderTop: `1px solid ${printColors.guide}`,
+									top: `${grid.cellHeightIn * guide.at}in`,
+									borderTop: `1px solid ${guide.color}`,
 								}}
 							/>
 						))}
 						<span
 							style={{
 								position: "absolute",
-								left: "0.04in",
-								top: "0.02in",
-								fontSize: "9pt",
+								left: `${label.xIn}in`,
+								top: `${label.yIn}in`,
+								fontSize: `${label.sizePt}pt`,
 								lineHeight: 1,
 								color: printColors.label,
 							}}
 						>
-							{cell.char}
+							{glyphLabel(cell.char, cell.variant)}
 						</span>
 					</div>
 				);

@@ -1,4 +1,5 @@
 import type { DrawnGlyph, Stroke } from "@repo/types";
+import { v7 as uuidv7 } from "uuid";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { startTestDb, type TestDb } from "../testing/start-test-db.ts";
 
@@ -50,10 +51,59 @@ it("a new font is an empty drawing owned by its creator", async () => {
 	expect(font.pendingFontAssetId).toBeNull();
 	expect(font.chars).toBe("");
 	expect(font.deletedAt).toBeNull();
-	expect(await testDb.db.fonts.byId(organizationId, font.id)).toEqual(font);
+	expect(await testDb.db.fonts.byId(organizationId, font.id)).toEqual({
+		...font,
+		pendingBuild: null,
+	});
 	expect(
 		await testDb.db.fonts.listByOwner(organizationId, ownerUserId),
-	).toEqual([font]);
+	).toEqual([{ ...font, pendingBuild: null }]);
+});
+
+it("a font reads the processing of its pending build", async () => {
+	const { organizationId, ownerUserId } = await studio("Building letters");
+	const font = await testDb.db.fonts.create({
+		organizationId,
+		ownerUserId,
+		ownerName: "Karla",
+		source: { kind: "drawn", glyphs: [cell("a", 0)] },
+		fontAssetId: null,
+		pendingFontAssetId: null,
+		chars: "",
+	});
+	const assetId = uuidv7();
+	await testDb.db.assets.create({
+		id: assetId,
+		organizationId,
+		storageKey: `organizations/${organizationId}/assets/${assetId}`,
+		mimeType: "application/octet-stream",
+		byteSize: null,
+		checksum: null,
+		origin: {
+			source: "generated",
+			job: { kind: "build-font", fontId: font.id },
+		},
+		processing: { status: "pending", attempts: 0, lastError: null },
+	});
+	await testDb.db.fonts.setPending(organizationId, font.id, assetId);
+	expect(
+		(await testDb.db.fonts.byId(organizationId, font.id))?.pendingBuild,
+	).toEqual({ status: "pending", attempts: 0, lastError: null });
+	await testDb.db.assets.claim(assetId, new Date(0));
+	await testDb.db.assets.fail(assetId, "template_markers_not_found");
+	const failed = {
+		status: "failed",
+		attempts: 1,
+		error: "template_markers_not_found",
+	};
+	expect(
+		(await testDb.db.fonts.byId(organizationId, font.id))?.pendingBuild,
+	).toEqual(failed);
+	expect(
+		(await testDb.db.fonts.listByOwner(organizationId, ownerUserId)).map(
+			(listed) => listed.pendingBuild,
+		),
+	).toEqual([failed]);
 });
 
 it("replacing one cell keeps the other, including while the row is locked", async () => {

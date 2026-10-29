@@ -1,6 +1,8 @@
 "use client";
 
 import { deleteLetter } from "@repo/api";
+import type { LetterPreview } from "@repo/types";
+import { PAGE_SPECS } from "@repo/types";
 import { Button } from "@repo/ui/components/ui/button";
 import {
 	Dialog,
@@ -21,13 +23,20 @@ import { Ellipsis, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { LetterThumbnail } from "./letter-thumbnail.tsx";
 
 export type LetterCardProps = {
 	id: string;
 	title: string;
 	updatedAt: Date;
 	productLabel: string;
+	preview: LetterPreview;
+	onDeleted: (id: string) => void;
 };
+
+const TALLEST = Math.max(
+	...Object.values(PAGE_SPECS).map((spec) => spec.heightIn / spec.widthIn),
+);
 
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
@@ -57,6 +66,8 @@ export function LetterCard({
 	title,
 	updatedAt,
 	productLabel,
+	preview,
+	onDeleted,
 }: LetterCardProps) {
 	const router = useRouter();
 	const [confirming, setConfirming] = useState(false);
@@ -69,6 +80,7 @@ export function LetterCard({
 		startDeleting(async () => {
 			const response = await deleteLetter(id).catch(() => null);
 			if (response?.status === 204 || response?.status === 404) {
+				onDeleted(id);
 				router.refresh();
 				return;
 			}
@@ -78,11 +90,15 @@ export function LetterCard({
 
 	return (
 		<li data-letter-id={id} className="group flex flex-col gap-3">
-			<Link
-				href={href}
-				aria-label={`Open ${title}`}
-				className="block aspect-[8.5/11] rounded-[3px] bg-paper bg-(image:--letter-paper-texture) bg-size-[125px] bg-repeat shadow-sheet transition-[translate,box-shadow] duration-(--duration-settle) ease-settle outline-offset-4 group-hover:-translate-y-1 focus-visible:outline-2 focus-visible:outline-ring"
-			/>
+			<div className="flex items-end" style={{ aspectRatio: `1 / ${TALLEST}` }}>
+				<Link
+					href={href}
+					aria-label={`Open ${title}`}
+					className="block w-full rounded-[3px] shadow-sheet transition-[translate,box-shadow] duration-(--duration-settle) ease-settle outline-offset-4 group-hover:-translate-y-1 focus-visible:outline-2 focus-visible:outline-ring"
+				>
+					<LetterThumbnail letterId={id} preview={preview} />
+				</Link>
+			</div>
 			<div className="flex items-start justify-between gap-2">
 				<div className="flex min-w-0 flex-col gap-0.5">
 					<p className="text-label tracking-[0.08em] text-ink-muted uppercase">

@@ -1,15 +1,5 @@
-import type {
-	LetterDoc,
-	MergeFieldKey,
-	MergeValues,
-	SignatureNode,
-} from "@repo/types";
-import {
-	INK_COLORS,
-	MERGE_FIELDS,
-	PAGE_SPECS,
-	SIGNATURE_WIDTHS,
-} from "@repo/types";
+import type { LetterDoc, MergeFieldKey, MergeValues } from "@repo/types";
+import { MERGE_FIELDS, PAGE_SPECS } from "@repo/types";
 import type { DOMOutputSpec, Node } from "@tiptap/pm/model";
 import type { NodeProps } from "@tiptap/static-renderer";
 import {
@@ -20,12 +10,11 @@ import React, { type ReactElement, type ReactNode } from "react";
 import { letterExtensions } from "../schema/letter-schema.ts";
 import { LetterPage, type LetterPageProps } from "./letter-page.tsx";
 import { MergeChip } from "./merge-chip.tsx";
-import { SignatureMark } from "./signature-mark.tsx";
 
 export type LetterPrintProps = Pick<
 	LetterPageProps,
 	"letterId" | "content" | "resources"
-> & { mergeValues: MergeValues };
+> & { mergeValues: MergeValues; sheets?: number };
 
 function endsWithoutLine(node: Node): boolean {
 	return node.childCount === 0 || node.lastChild?.type.name === "hardBreak";
@@ -40,30 +29,6 @@ function StaticParagraph({
 	return render(
 		endsWithoutLine(node) ? [children, <br key="trailing-break" />] : children,
 	);
-}
-
-function signatureAttrs(node: Node): SignatureNode["attrs"] {
-	const { drawingId, widthIn, align, color } = node.attrs;
-	const width = SIGNATURE_WIDTHS.find((value) => value === widthIn);
-	if (
-		typeof drawingId !== "string" ||
-		width === undefined ||
-		(align !== "left" && align !== "center" && align !== "right") ||
-		typeof color !== "string" ||
-		!Object.hasOwn(INK_COLORS, color)
-	) {
-		throw new Error("The letter's signature is not one the catalogue allows.");
-	}
-	return {
-		drawingId,
-		widthIn: width,
-		align,
-		color: color as SignatureNode["attrs"]["color"],
-	};
-}
-
-function StaticSignature({ node }: NodeProps<Node, ReactNode>): ReactElement {
-	return <SignatureMark {...signatureAttrs(node)} />;
 }
 
 function StaticMergeField({ node }: NodeProps<Node, ReactNode>): ReactElement {
@@ -84,7 +49,6 @@ export function LetterText({ doc }: { doc: LetterDoc }): ReactElement {
 					nodeMapping: {
 						paragraph: StaticParagraph,
 						mergeField: StaticMergeField,
-						signature: StaticSignature,
 					},
 				},
 			})}
@@ -94,7 +58,6 @@ export function LetterText({ doc }: { doc: LetterDoc }): ReactElement {
 
 export function LetterPrint(props: LetterPrintProps): ReactElement {
 	void React;
-	const spec = PAGE_SPECS[props.content.format];
 	return (
 		<LetterPage
 			letterId={props.letterId}
@@ -102,7 +65,7 @@ export function LetterPrint(props: LetterPrintProps): ReactElement {
 			resources={props.resources}
 			mergeValues={props.mergeValues}
 			mode="print"
-			sheets={spec.maxPages}
+			sheets={props.sheets ?? PAGE_SPECS[props.content.format].maxPages}
 			flow={<LetterText doc={props.content.doc} />}
 		/>
 	);

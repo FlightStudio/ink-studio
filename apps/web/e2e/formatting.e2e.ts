@@ -163,6 +163,91 @@ describe("formatting from the toolbar", () => {
 			.toEqual([{ type: "text", text: "Dear Alex" }]);
 	});
 
+	it("the inks are one radio group: one tab stop, and arrows move the choice", async () => {
+		const page = await harness.open(member, `/letters/${letterId}`);
+		await letterText(page).click();
+		const inks = page.getByRole("radiogroup", { name: "Ink" });
+		const names = await inks
+			.getByRole("radio")
+			.evaluateAll((radios) =>
+				radios.map((radio) => (radio as HTMLInputElement).name),
+			);
+		expect(new Set(names).size).toBe(1);
+		expect(names[0]).not.toBe("");
+		await inks.getByRole("radio", { name: "Ink blue" }).focus();
+		await page.keyboard.press("ArrowRight");
+		const sepia = inks.getByRole("radio", { name: "Sepia" });
+		await expect.poll(() => sepia.isChecked()).toBe(true);
+		expect(
+			await sepia.evaluate((radio) => document.activeElement === radio),
+		).toBe(true);
+		await page.keyboard.press("Tab");
+		expect(
+			await page.evaluate(
+				() =>
+					(document.activeElement as HTMLInputElement | null)?.type === "radio",
+			),
+		).toBe(false);
+	});
+
+	it("inks and sizes name themselves on hover", async () => {
+		const page = await harness.open(member, `/letters/${letterId}`);
+		await letterText(page).waitFor();
+		await page
+			.locator('[data-slot="swatch"]')
+			.filter({ hasText: "Forest" })
+			.hover();
+		await page
+			.locator('[data-slot="tooltip-content"]')
+			.filter({ hasText: "Forest" })
+			.waitFor();
+		await page.getByRole("button", { name: "24 pt" }).hover();
+		await page
+			.locator('[data-slot="tooltip-content"]')
+			.filter({ hasText: "Text size 24 pt" })
+			.waitFor();
+	});
+
+	it("a long font name is never cut off in the toolbar", async () => {
+		const page = await harness.open(member, `/letters/${letterId}`);
+		await letterText(page).click();
+		await pickFont(page, "Homemade Apple");
+		const value = page
+			.getByRole("combobox", { name: "Font" })
+			.locator('[data-slot="select-value"]');
+		await expect.poll(() => value.textContent()).toBe("Homemade Apple");
+		expect(
+			await value.evaluate((node) => node.scrollWidth <= node.clientWidth),
+		).toBe(true);
+	});
+
+	it("at phone width every tool stays on screen", async () => {
+		const page = await harness.open(member, `/letters/${letterId}`, {
+			viewport: { width: 390, height: 844 },
+			hasTouch: true,
+		});
+		await letterText(page).waitFor();
+		const toolbar = page.getByRole("toolbar", { name: "Formatting" });
+		await toolbar.waitFor();
+		expect(
+			await toolbar.evaluate((node) => node.scrollWidth <= node.clientWidth),
+		).toBe(true);
+		const tools = await toolbar
+			.locator("button, [data-slot='swatch']")
+			.evaluateAll((nodes) =>
+				nodes.map((node) => {
+					const box = node.getBoundingClientRect();
+					return { left: box.left, right: box.right, height: box.height };
+				}),
+			);
+		expect(tools.length).toBeGreaterThan(10);
+		for (const tool of tools) {
+			expect(tool.left).toBeGreaterThanOrEqual(0);
+			expect(tool.right).toBeLessThanOrEqual(390);
+			expect(tool.height).toBeGreaterThanOrEqual(44);
+		}
+	});
+
 	it("align centers the paragraph", async () => {
 		const page = await harness.open(member, `/letters/${letterId}`);
 		await typeAndSettle(page, letterId, "With love,");

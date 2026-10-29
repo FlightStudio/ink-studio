@@ -1,12 +1,30 @@
 import { Desk } from "@repo/ui/components/desk";
+import { ChevronLeft } from "lucide-react";
+import Link from "next/link";
 import { DeskMessage } from "@/features/editor/components/desk-message";
-import { TemplateActions } from "@/features/fonts/components/template-actions";
-import { TemplateSheet } from "@/features/fonts/components/template-sheet";
+import { TemplatePreview } from "@/features/fonts/components/template-preview";
+import { TemplateSteps } from "@/features/fonts/components/template-steps";
+import { newFont } from "@/features/fonts/font-links";
+import { defaultSealName } from "@/features/fonts/font-status";
 import { getSession } from "@/server/auth";
+import { type FontSearchParams, letterFrom, single } from "../params.ts";
 
-export const metadata = { title: "Template · Ink Studio" };
+export const metadata = { title: "Write on paper · Ink Studio" };
 
-export default async function TemplateFontPage() {
+const PRINT_CSS = `
+@page { size: 8.5in 11in; margin: 0; }
+@media print {
+	body *:not(:has(.template-sheet), .template-sheet, .template-sheet *) { display: none !important; }
+	*:has(.template-sheet) { margin: 0 !important; padding: 0 !important; border: 0 !important; width: auto !important; height: auto !important; min-height: 0 !important; max-width: none !important; transform: none !important; box-shadow: none !important; background: white !important; }
+	*:has(.template-sheet)::before { display: none !important; }
+}
+`;
+
+export default async function TemplateFontPage({
+	searchParams,
+}: {
+	searchParams: FontSearchParams;
+}) {
 	const session = await getSession();
 	if (!session?.userOrganization) {
 		return (
@@ -15,34 +33,30 @@ export default async function TemplateFontPage() {
 			</DeskMessage>
 		);
 	}
+	const query = await searchParams;
+	const from = letterFrom(query.from);
+	const defaultName = defaultSealName(single(query.name), session.user.name);
 	return (
-		<Desk className="px-6 py-10 sm:px-12 xl:px-20 xl:py-14">
-			<style>{`
-				@page { size: 8.5in 11in; margin: 0; }
-				@media print {
-					body * { visibility: hidden; }
-					.template-sheet, .template-sheet * { visibility: visible; }
-					.template-sheet { position: absolute !important; left: 0; top: 0; }
-				}
-			`}</style>
-			<div className="mx-auto mb-8 flex w-full max-w-[8.5in] flex-col gap-4">
-				<header>
-					<p className="text-label tracking-[0.08em] text-ink-muted uppercase">
-						My handwriting
+		<Desk className="px-4 py-10 sm:px-12 xl:px-20 xl:py-14">
+			<style>{PRINT_CSS}</style>
+			<div className="mx-auto mb-12 flex w-full max-w-[8.5in] flex-col gap-10">
+				<header className="flex flex-col gap-3">
+					<Link
+						href={newFont(from)}
+						className="-ml-1 inline-flex w-fit items-center gap-1 rounded-full py-1 pr-2 text-ui text-ink-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-ring"
+					>
+						<ChevronLeft className="size-4" />
+						Make your handwriting
+					</Link>
+					<h1 className="font-display text-display">Write on paper</h1>
+					<p className="max-w-prose text-ui text-ink-muted">
+						Your font keeps the real ink of your own pen. It takes about 15
+						minutes.
 					</p>
-					<h1 className="mt-3 font-display text-display">
-						Photograph the template
-					</h1>
 				</header>
-				<p className="text-ui text-ink-muted">
-					Print this page at 100%. Write in the cells, then photograph the whole
-					page.
-				</p>
-				<TemplateActions />
+				<TemplateSteps defaultName={defaultName} from={from} />
 			</div>
-			<div className="mx-auto w-fit shadow-float">
-				<TemplateSheet />
-			</div>
+			<TemplatePreview />
 		</Desk>
 	);
 }

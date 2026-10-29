@@ -151,6 +151,122 @@ describe("merge fields", () => {
 		).toBe("Alex");
 	});
 
+	it("the first @ opens the menu right under the caret", async () => {
+		const page = await harness.open(member, `/letters/${letterId}`);
+		await letterText(page).click();
+		await page.keyboard.type("Dear Sam, thank you @");
+		const menu = page.getByRole("listbox", { name: "Fields" });
+		await menu.waitFor();
+		await expect
+			.poll(async () => {
+				const query = await page.locator(".merge-query").boundingBox();
+				const box = await menu.boundingBox();
+				if (!query || !box) return Number.POSITIVE_INFINITY;
+				return Math.max(
+					Math.abs(box.x - query.x),
+					Math.abs(box.y - (query.y + query.height)),
+				);
+			})
+			.toBeLessThan(16);
+	});
+
+	it("Insert field opens at the caret, and Escape leaves the letter as it was", async () => {
+		const page = await harness.open(member, `/letters/${letterId}`);
+		await letterText(page).click();
+		await page.keyboard.type("Dear Sam");
+		await page.getByRole("button", { name: "Insert field" }).click();
+		const menu = page.getByRole("listbox", { name: "Fields" });
+		await menu.waitFor();
+		const caret = await page.locator(".merge-query").boundingBox();
+		const box = await menu.boundingBox();
+		expect(Math.abs((box?.x ?? 0) - (caret?.x ?? 0))).toBeLessThan(16);
+		await page.keyboard.press("Escape");
+		await menu.waitFor({ state: "hidden" });
+		expect(await letterText(page).textContent()).toBe("Dear Sam");
+	});
+
+	it("a click outside closes the menu, and Enter in the title adds no chip", async () => {
+		const page = await harness.open(member, `/letters/${letterId}`);
+		await letterText(page).click();
+		await page.keyboard.type("Dear Sam");
+		await page.getByRole("button", { name: "Insert field" }).click();
+		const menu = page.getByRole("listbox", { name: "Fields" });
+		await menu.waitFor();
+		const title = page.getByRole("textbox", { name: "Title" });
+		await title.click();
+		await menu.waitFor({ state: "hidden" });
+		await title.fill("A note for Sam");
+		await title.press("Enter");
+		expect(await page.locator("[data-field]").count()).toBe(0);
+		expect(await letterText(page).textContent()).toBe("Dear Sam");
+	});
+
+	it("a click elsewhere in the letter closes Insert field and takes its @ back", async () => {
+		const page = await harness.open(member, `/letters/${letterId}`);
+		await letterText(page).click();
+		await page.keyboard.type("Dear Sam, thanks for");
+		await page.getByRole("button", { name: "Insert field" }).click();
+		const menu = page.getByRole("listbox", { name: "Fields" });
+		await menu.waitFor();
+		const text = await letterText(page).locator("p").first().boundingBox();
+		if (!text) throw new Error("the letter text has no box");
+		await page.mouse.click(text.x + 2, text.y + text.height / 2);
+		await menu.waitFor({ state: "hidden" });
+		expect(await letterText(page).textContent()).toBe("Dear Sam, thanks for");
+		await page.keyboard.type("Oh, ");
+		expect(await letterText(page).textContent()).toBe(
+			"Oh, Dear Sam, thanks for",
+		);
+	});
+
+	it("an arrow key closes Insert field and takes its @ back", async () => {
+		const page = await harness.open(member, `/letters/${letterId}`);
+		await letterText(page).click();
+		await page.keyboard.type("Dear Sam");
+		await page.getByRole("button", { name: "Insert field" }).click();
+		const menu = page.getByRole("listbox", { name: "Fields" });
+		await menu.waitFor();
+		await page.keyboard.press("ArrowLeft");
+		await menu.waitFor({ state: "hidden" });
+		expect(await letterText(page).textContent()).toBe("Dear Sam");
+		await page.keyboard.type("!");
+		expect(await letterText(page).textContent()).toBe("Dear Sam!");
+	});
+
+	it("a click on the query keeps the menu open", async () => {
+		const page = await harness.open(member, `/letters/${letterId}`);
+		await letterText(page).click();
+		await page.keyboard.type("Dear Sam @fi");
+		const menu = page.getByRole("listbox", { name: "Fields" });
+		await menu.waitFor();
+		await page.locator(".merge-query").click();
+		await page.waitForTimeout(200);
+		expect(await menu.isVisible()).toBe(true);
+		expect(await letterText(page).textContent()).toBe("Dear Sam @fi");
+	});
+
+	it("a scroll closes the menu", async () => {
+		const page = await harness.open(member, `/letters/${letterId}`);
+		await letterText(page).click();
+		await page.keyboard.type("@");
+		const menu = page.getByRole("listbox", { name: "Fields" });
+		await menu.waitFor();
+		await page.mouse.move(40, 400);
+		await page.mouse.wheel(0, 200);
+		await menu.waitFor({ state: "hidden" });
+	});
+
+	it("a query with no match says so instead of an empty menu", async () => {
+		const page = await harness.open(member, `/letters/${letterId}`);
+		await letterText(page).click();
+		await page.keyboard.type("@xyz");
+		await page.getByText("No matching field").waitFor();
+		expect(await page.getByRole("listbox", { name: "Fields" }).count()).toBe(0);
+		await page.keyboard.press("Enter");
+		expect(await page.locator("[data-field]").count()).toBe(0);
+		expect(await letterText(page).locator("p").count()).toBe(2);
+	});
+
 	it("Insert field inserts a chip at the caret", async () => {
 		const page = await harness.open(member, `/letters/${letterId}`);
 		await letterText(page).click();

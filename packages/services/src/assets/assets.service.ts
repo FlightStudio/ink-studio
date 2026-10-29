@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Db, NewAsset, StoredFile } from "@repo/db";
-import { type ApiErrorCode, apiErrorCodes, ServiceError } from "@repo/errors";
+import { type ApiErrorCode, isApiErrorCode, ServiceError } from "@repo/errors";
 import {
 	type Asset,
 	type AssetJob,
@@ -134,10 +134,8 @@ function jobOf<K extends AssetJob["kind"]>(
 	return job.kind === kind ? (job as JobOf<K>) : null;
 }
 
-function asApiErrorCode(error: string): ApiErrorCode {
-	return (apiErrorCodes as readonly string[]).includes(error)
-		? (error as ApiErrorCode)
-		: "internal_error";
+export function asApiErrorCode(error: string): ApiErrorCode {
+	return isApiErrorCode(error) ? error : "internal_error";
 }
 
 export function isServable(asset: Asset): boolean {

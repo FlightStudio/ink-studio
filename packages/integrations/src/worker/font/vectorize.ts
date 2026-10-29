@@ -286,7 +286,7 @@ function farthestFrom(loop: Point[], from: Point): number {
 	return farthest;
 }
 
-function simplifyLoop(loop: Point[], tolerance: number): Point[] {
+export function simplifyLoop(loop: Point[], tolerance: number): Point[] {
 	const start = farthestFrom(loop, loop[0] as Point);
 	const rotated = [...loop.slice(start), ...loop.slice(0, start)];
 	const split = farthestFrom(rotated, rotated[0] as Point);

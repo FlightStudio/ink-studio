@@ -2,7 +2,13 @@ import { fixtureContent, letterFixture } from "@repo/render/html";
 import { type Member, PAGE_SPECS } from "@repo/types";
 import type { Page } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { type Harness, letterText, startHarness } from "./harness.ts";
+import {
+	type Harness,
+	letterText,
+	nextSave,
+	startHarness,
+	waitForSaved,
+} from "./harness.ts";
 
 const POSTCARD = "thanksio:postcard-6x9" as const;
 const spec = PAGE_SPECS[POSTCARD];
@@ -133,6 +139,33 @@ describe("postcards", () => {
 		).toBe("");
 	});
 
+	it("the front box is the image picker, and a chosen image can be replaced or removed", async () => {
+		const page = await pickPostcard(harness, member);
+		const chooser = page.waitForEvent("filechooser");
+		await page.getByRole("button", { name: "Choose a front image" }).click();
+		await (await chooser).setFiles({
+			name: "pier.png",
+			mimeType: "image/png",
+			buffer: PNG,
+		});
+		await page.locator(".letter-front-empty").waitFor({ state: "detached" });
+		await page.getByRole("button", { name: "Replace front image" }).waitFor();
+		await page.getByRole("button", { name: "Remove front image" }).click();
+		await page.locator(".letter-front-empty").waitFor();
+		expect(
+			await page.getByRole("button", { name: "Remove front image" }).count(),
+		).toBe(0);
+	});
+
+	it("a click on the empty front opens the image picker", async () => {
+		const page = await pickPostcard(harness, member);
+		const box = await page.locator(".letter-front-empty").boundingBox();
+		if (!box) throw new Error("the front has no empty box");
+		const chooser = page.waitForEvent("filechooser", { timeout: 5_000 });
+		await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+		expect((await chooser).isMultiple()).toBe(false);
+	});
+
 	it("text on the back never enters the address block", async () => {
 		const { id } = await harness.letters.createLetter(member, {
 			format: POSTCARD,
@@ -159,15 +192,48 @@ describe("postcards", () => {
 		);
 	});
 
+	it("a postcard without a front image is not exported and says what to do", async () => {
+		const page = await pickPostcard(harness, member);
+		await waitForSaved(page);
+		const since = await page.evaluate(() => performance.now());
+		await page.getByRole("button", { name: "Export proof" }).click();
+		await page
+			.getByRole("dialog")
+			.getByText("Choose a front image, then export again.")
+			.waitFor();
+		expect(
+			await page.evaluate(
+				(start) =>
+					performance
+						.getEntriesByType("resource")
+						.filter(
+							(entry) =>
+								entry.startTime > start && entry.name.includes("/exports"),
+						).length,
+				since,
+			),
+		).toBe(0);
+	});
+
 	it("a postcard proof downloads two PNGs", async () => {
 		const page = await pickPostcard(harness, member);
-		await page
-			.getByRole("status")
-			.filter({ hasText: /^Saved$/ })
-			.waitFor();
+		await page.waitForURL(/\/letters\/[^/]+$/);
+		const letterId = new URL(page.url()).pathname.split("/").at(-1) ?? "";
+		const saved = nextSave(page, letterId);
+		await page.getByLabel("Front image").setInputFiles({
+			name: "pier.png",
+			mimeType: "image/png",
+			buffer: PNG,
+		});
+		await saved;
+		await waitForSaved(page);
 		await page.getByRole("button", { name: "Export proof" }).click();
-		const links = page.getByRole("link", { name: "Download the proof" });
+		const links = page.getByRole("link", { name: /^Open the (front|back)$/ });
 		await expect.poll(() => links.count(), { timeout: 90_000 }).toBe(2);
+		expect(await links.allInnerTexts()).toEqual([
+			"Open the front",
+			"Open the back",
+		]);
 		const sizes = [];
 		for (const link of await links.all()) {
 			const href = await link.getAttribute("href");

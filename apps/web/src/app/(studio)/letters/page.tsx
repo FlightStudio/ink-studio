@@ -1,6 +1,7 @@
 import { Desk } from "@repo/ui/components/desk";
+import Link from "next/link";
 import { DeskMessage } from "@/features/editor/components/desk-message";
-import { LetterCard } from "@/features/editor/components/letter-card";
+import { LetterList } from "@/features/editor/components/letter-list";
 import { NewLetterButton } from "@/features/editor/components/new-letter-button";
 import { getSession } from "@/server/auth";
 import { listLetters } from "@/server/letters";
@@ -17,9 +18,10 @@ export default async function LettersPage() {
 		);
 	}
 	const letters = await listLetters();
+	const empty = letters.items.length === 0;
 
 	return (
-		<Desk className="px-6 py-10 sm:px-12 xl:px-20 xl:py-14">
+		<Desk className="px-6 pt-6 pb-10 sm:px-12 xl:px-20 xl:pt-8 xl:pb-14">
 			<div className="mx-auto flex w-full max-w-6xl flex-col gap-12">
 				<header className="flex flex-wrap items-end justify-between gap-6">
 					<div>
@@ -28,10 +30,10 @@ export default async function LettersPage() {
 						</p>
 						<h1 className="mt-3 font-display text-display">Letters</h1>
 					</div>
-					{letters.length > 0 ? <NewLetterButton label="New letter" /> : null}
+					{empty ? null : <NewLetterButton label="New letter" />}
 				</header>
 
-				{letters.length === 0 ? (
+				{empty ? (
 					<section
 						aria-labelledby="first-letter"
 						className="flex flex-col items-center gap-8 pt-6 text-center animate-settle"
@@ -49,20 +51,22 @@ export default async function LettersPage() {
 								page; it saves as you go.
 							</p>
 						</div>
-						<NewLetterButton label="Start a letter" />
+						<div className="flex flex-col items-center gap-4">
+							<NewLetterButton label="Start a letter" />
+							<p className="max-w-sm text-ui text-ink-muted">
+								Want it in your own hand?{" "}
+								<Link
+									href="/fonts/new"
+									className="text-ink underline decoration-rule underline-offset-4 transition-colors duration-(--duration-quick) hover:decoration-ink focus-visible:outline-2 focus-visible:outline-ring"
+								>
+									Make your handwriting
+								</Link>{" "}
+								first, in about five minutes.
+							</p>
+						</div>
 					</section>
 				) : (
-					<ul className="grid grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))] gap-x-10 gap-y-12">
-						{letters.map((letter) => (
-							<LetterCard
-								key={letter.id}
-								id={letter.id}
-								title={letter.title}
-								updatedAt={letter.updatedAt}
-								productLabel={letter.productLabel}
-							/>
-						))}
-					</ul>
+					<LetterList first={letters} />
 				)}
 			</div>
 		</Desk>

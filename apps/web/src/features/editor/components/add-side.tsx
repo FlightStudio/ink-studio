@@ -3,21 +3,17 @@
 import { Button } from "@repo/ui/components/ui/button";
 import type { Editor } from "@tiptap/core";
 import { closeHistory } from "@tiptap/pm/history";
-import { useEditorState } from "@tiptap/react";
+import { Plus } from "lucide-react";
 
-export type AddSideProps = { editor: Editor; maxPages: number };
+export type AddSideProps = {
+	editor: Editor;
+	sides: number;
+	maxPages: number;
+	onAdded: (side: number) => void;
+};
 
-function minSidesOf(editor: Editor): number {
-	const value = Number(editor.state.doc.attrs.minSides);
-	return Number.isFinite(value) && value > 0 ? value : 1;
-}
-
-export function AddSide({ editor, maxPages }: AddSideProps) {
-	const minSides = useEditorState({
-		editor,
-		selector: ({ editor: current }) => minSidesOf(current),
-	});
-	if (minSides >= maxPages) return null;
+export function AddSide({ editor, sides, maxPages, onAdded }: AddSideProps) {
+	if (sides >= maxPages) return null;
 	return (
 		<Button
 			type="button"
@@ -25,13 +21,14 @@ export function AddSide({ editor, maxPages }: AddSideProps) {
 			size="sm"
 			className="rounded-full bg-paper"
 			onClick={() => {
-				const current = minSidesOf(editor);
-				if (current >= maxPages) return;
-				const tr = editor.state.tr.setDocAttribute("minSides", current + 1);
+				const next = sides + 1;
+				const tr = editor.state.tr.setDocAttribute("minSides", next);
 				closeHistory(tr);
 				editor.view.dispatch(tr);
+				onAdded(next - 1);
 			}}
 		>
+			<Plus />
 			Add a side
 		</Button>
 	);

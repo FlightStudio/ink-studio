@@ -43,6 +43,13 @@ const doodle: PlacedElement = {
 	wrap: false,
 };
 
+const signature: PlacedElement = {
+	...doodle,
+	id: "0192e4a0-7b1c-7cc3-9a5e-3f1d2b4c5a04",
+	kind: "signature",
+	drawingId: "0192e4a0-7b1c-7cc3-9a5e-3f1d2b4c5a03",
+};
+
 function run(text: string, font: FontRef | null): InlineNode {
 	return {
 		type: "text",
@@ -141,38 +148,16 @@ describe("humanSeal", () => {
 	});
 
 	it("a signature adds signed by hand", () => {
-		const content = letter([run("dear sam", karla)], { elements: [doodle] });
-		content.doc.content = [
-			...content.doc.content,
-			{
-				type: "signature",
-				attrs: {
-					drawingId: "0192e4a0-7b1c-7cc3-9a5e-3f1d2b4c5a03",
-					widthIn: 2.25,
-					align: "right",
-					color: "ink-blue",
-				},
-			},
-		];
+		const content = letter([run("dear sam", karla)], {
+			elements: [doodle, signature],
+		});
 		expect(humanSeal(content, ownFonts)).toBe(
 			"Written in Karla's own handwriting · doodles hand-drawn · signed by hand",
 		);
 	});
 
-	it("a signature alone is a seal", () => {
-		const content = letter([]);
-		content.doc.content = [
-			...content.doc.content,
-			{
-				type: "signature",
-				attrs: {
-					drawingId: "0192e4a0-7b1c-7cc3-9a5e-3f1d2b4c5a03",
-					widthIn: 1.5,
-					align: "right",
-					color: "sepia",
-				},
-			},
-		];
+	it("a signature alone is a seal, not a doodle", () => {
+		const content = letter([], { elements: [signature] });
 		expect(humanSeal(content, ownFonts)).toBe("Signed by hand");
 	});
 

@@ -1,11 +1,15 @@
 import { parentPort } from "node:worker_threads";
-import { HANDWRITING_GLYPHS } from "@repo/types";
+import {
+	GLYPH_ALIASES,
+	HANDWRITING_GLYPHS,
+	LOWERCASE_LETTERS,
+	withAliases,
+} from "@repo/types";
 import opentype from "opentype.js";
 import { buildFont, type Contour, type GlyphOutline } from "./opentype-font.ts";
 
 const COMMANDS_PER_GLYPH = 2_000;
 const COMMANDS_IN_TOTAL = 200_000;
-const LOWERCASE = [..."abcdefghijklmnopqrstuvwxyz"];
 
 type Request = { familyName: string; bytes: Uint8Array };
 type Reply =
@@ -76,28 +80,31 @@ function rebuild(request: Request): { bytes: Uint8Array; chars: string } {
 	}
 	const units = font.unitsPerEm || 1000;
 	const factor = 1000 / units;
-	for (const char of LOWERCASE) {
+	for (const char of LOWERCASE_LETTERS) {
 		if (font.charToGlyphIndex(char) === 0)
 			throw new Error("font_missing_glyphs");
 	}
 	const glyphs: GlyphOutline[] = [];
 	const chars: string[] = [];
 	let commands = 0;
-	for (const entry of HANDWRITING_GLYPHS) {
-		if (font.charToGlyphIndex(entry.char) === 0) continue;
-		const glyph = font.charToGlyph(entry.char);
+	for (const char of HANDWRITING_GLYPHS.flatMap((entry) => [
+		entry.char,
+		...(GLYPH_ALIASES[entry.char] ?? []),
+	])) {
+		if (font.charToGlyphIndex(char) === 0) continue;
+		const glyph = font.charToGlyph(char);
 		const path = glyph.path.commands;
 		commands += path.length;
 		if (path.length > COMMANDS_PER_GLYPH || commands > COMMANDS_IN_TOTAL) {
 			throw new Error("font_unreadable");
 		}
 		glyphs.push({
-			char: entry.char,
+			char,
 			variant: 0,
 			advanceWidth: scale(glyph.advanceWidth ?? units / 2, factor),
 			contours: contoursOf(path, factor),
 		});
-		chars.push(entry.char);
+		chars.push(char);
 	}
 	return {
 		bytes: buildFont({
@@ -106,7 +113,7 @@ function rebuild(request: Request): { bytes: Uint8Array; chars: string } {
 			descender: scale(font.descender, factor),
 			glyphs,
 		}),
-		chars: chars.join(""),
+		chars: withAliases(chars),
 	};
 }
 

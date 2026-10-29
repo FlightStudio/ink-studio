@@ -105,6 +105,36 @@ it("another organization finds nothing", async () => {
 	).toBeNull();
 });
 
+it("referenced reads many of the organization's assets at once", async () => {
+	const ada = await member("ada-referenced");
+	const bob = await member("bob-referenced");
+	const organizationId = ada.userOrganization.organizationId;
+	const first = await generated(organizationId, {
+		status: "pending",
+		attempts: 0,
+		lastError: null,
+	});
+	const second = await generated(organizationId, {
+		status: "pending",
+		attempts: 0,
+		lastError: null,
+	});
+	const foreign = await generated(bob.userOrganization.organizationId, {
+		status: "pending",
+		attempts: 0,
+		lastError: null,
+	});
+	const found = await testDb.db.assets.referenced(organizationId, [
+		first.id,
+		second.id,
+		foreign.id,
+	]);
+	expect(found.map((asset) => asset.id).sort()).toEqual(
+		[first.id, second.id].sort(),
+	);
+	expect(await testDb.db.assets.referenced(organizationId, [])).toEqual([]);
+});
+
 async function generated(organizationId: string, processing: AssetProcessing) {
 	const id = uuidv7();
 	return testDb.db.assets.create({

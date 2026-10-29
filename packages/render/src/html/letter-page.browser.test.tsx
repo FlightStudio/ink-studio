@@ -338,9 +338,9 @@ describe.each(ENGINES)("%s", (engine) => {
 			for (const mode of MODES) {
 				const boxes = await withPage(context(), { content, mode }, wordBoxes);
 				const bands = bandsOf(spec, mode);
-				const lastBand = bands.at(-1);
-				expect(bands).toHaveLength(spec.maxPages - 1);
-				expect(boxes.some((box) => lastBand && box.yIn > lastBand.yIn)).toBe(
+				const lastSeam = bands.at(-2);
+				expect(bands).toHaveLength(spec.maxPages);
+				expect(boxes.some((box) => lastSeam && box.yIn > lastSeam.yIn)).toBe(
 					true,
 				);
 				expect(
@@ -545,6 +545,59 @@ describe.each(ENGINES)("%s", (engine) => {
 				expect(past.wordsPastLimit).toBeGreaterThan(0);
 				expect(overflowIn(spec, { textBottomIn: within.textBottomIn })).toBe(0);
 				expect(within.wordsPastLimit).toBe(0);
+			}
+		});
+
+		test("text past the last side starts in the text area of the sheet after it", async () => {
+			const content = fixtureContent(letterFixture("overflow"));
+			const spec = PAGE_SPECS[content.format];
+			for (const mode of MODES) {
+				const boxes = await withPage(context(), { content, mode }, wordBoxes);
+				const trailing = bandsOf(spec, mode).at(-1);
+				if (!trailing) throw new Error("the letter has no bands");
+				expect(trailing.yIn + trailing.heightIn).toBeCloseTo(
+					sideTopIn(spec, spec.maxPages, pageGapIn(mode)),
+				);
+				expect(boxes.some((box) => box.yIn >= trailing.yIn)).toBe(true);
+				expect(boxes.filter((box) => overlaps(box, trailing))).toEqual([]);
+			}
+		});
+
+		test("an overflowing letter measures the same while editing and in print", async () => {
+			const content = fixtureContent(letterFixture("overflow"));
+			const spec = PAGE_SPECS[content.format];
+			const [edit, print] = await Promise.all(
+				MODES.map((mode) =>
+					withPage(context(), { content, mode }, (page) =>
+						measure(page, spec, mode),
+					),
+				),
+			);
+			expect(edit?.wordsPastLimit).toBe(print?.wordsPastLimit);
+			expect(
+				Math.abs((edit?.textBottomIn ?? 0) - (print?.textBottomIn ?? 1)),
+			).toBeLessThan(0.01);
+		});
+
+		test("the settle animation leaves a turned doodle turned, while editing and in print", async () => {
+			const content = doodleLetter(false);
+			const element = content.doc.attrs.elements[0];
+			if (!element) throw new Error("the fixture has no doodle");
+			const turned = { ...element, rotationDeg: 40 };
+			content.doc.attrs.elements = [turned];
+			const expected = boundsOf(turned);
+			for (const mode of MODES) {
+				const drawn = await withPage(context(), { content, mode }, (page) =>
+					page.locator(".letter-element").evaluate(async (node) => {
+						await Promise.all(
+							node.getAnimations().map((animation) => animation.finished),
+						);
+						const rect = node.getBoundingClientRect();
+						return { widthIn: rect.width / 96, heightIn: rect.height / 96 };
+					}),
+				);
+				expect(drawn.widthIn, mode).toBeCloseTo(expected.widthIn, 2);
+				expect(drawn.heightIn, mode).toBeCloseTo(expected.heightIn, 2);
 			}
 		});
 

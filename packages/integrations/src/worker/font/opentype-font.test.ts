@@ -104,6 +104,45 @@ describe("buildFont", () => {
 		);
 	});
 
+	test("a gap in a letter's variants is closed up", () => {
+		const font = parse(
+			buildFont({
+				...params,
+				glyphs: [glyph("a", 0, 500), glyph("a", 2, 700)],
+			}),
+		);
+		expect(glyphNames(font)).toEqual(expect.arrayContaining(["a", "a.alt1"]));
+		expect(glyphNames(font)).not.toContain("a.alt2");
+		expect(font.charToGlyph("a").advanceWidth).toBe(500);
+	});
+
+	test("a blank first variant makes the next one the letter", () => {
+		const font = parse(
+			buildFont({
+				...params,
+				glyphs: [glyph("a", 2, 700), glyph("a", 1, 600)],
+			}),
+		);
+		expect(cmapNames(font).a).toBe("a");
+		expect(font.charToGlyph("a").advanceWidth).toBe(600);
+		expect(glyphNames(font)).toContain("a.alt1");
+	});
+
+	test("the straight quotes also answer for the curly ones", () => {
+		const font = parse(
+			buildFont({
+				...params,
+				glyphs: [glyph("'", 0, 200), glyph('"', 0, 300), glyph("a", 0, 500)],
+			}),
+		);
+		const cmap = cmapNames(font);
+		expect(cmap["\u2019"]).toBe(cmap["'"]);
+		expect(cmap["\u2018"]).toBe(cmap["'"]);
+		expect(cmap["\u201C"]).toBe(cmap['"']);
+		expect(cmap["\u201D"]).toBe(cmap['"']);
+		expect(cmap["'"]).toBe("uni0027");
+	});
+
 	test("two builds of one input parse to the same tables", () => {
 		const first = tables(parse(buildFont(params)));
 		const second = tables(parse(buildFont(params)));
@@ -126,6 +165,26 @@ function rectangle(
 		[x, y + height],
 	];
 	return winding === "cw" ? points : [...points].reverse();
+}
+
+function jitteryRing(
+	cx: number,
+	cy: number,
+	radius: number,
+	count: number,
+	seed?: number,
+): [number, number][] {
+	return Array.from({ length: count }, (_, index) => {
+		const angle = (index / count) * Math.PI * 2;
+		const noise =
+			seed === undefined
+				? 0
+				: (Math.abs(Math.sin((index + 1) * 12.9898 + seed * 78.233)) % 1) * 8;
+		return [
+			cx + (radius + noise) * Math.cos(angle),
+			cy + (radius + noise) * Math.sin(angle),
+		];
+	});
 }
 
 async function builtGlyph(glyphs: OutlineGlyph[]) {
@@ -181,6 +240,15 @@ describe("fromStrokeOutlines", () => {
 		expect(font.charToGlyph("b").name).toBe(".notdef");
 	});
 
+	test("a drawn apostrophe also covers the curly quotes", async () => {
+		const { built, font } = await builtGlyph([
+			{ char: "'", variant: 0, polygons: [rectangle(80, 150, 40, 200)] },
+			{ char: "a", variant: 0, polygons: [rectangle(80, 400, 40, 80)] },
+		]);
+		expect(built.chars).toBe("'a\u2019\u2018");
+		expect(font.charToGlyph("\u2019").name).toBe("uni0027");
+	});
+
 	test("variants become alternates", async () => {
 		const { font } = await builtGlyph(
 			[0, 1, 2].map((variant) => ({
@@ -192,6 +260,28 @@ describe("fromStrokeOutlines", () => {
 		expect(glyphNames(font)).toEqual(
 			expect.arrayContaining(["e", "e.alt1", "e.alt2"]),
 		);
+	});
+
+	test("a cell drawn as densely as the drawing limits allow still builds at its size", async () => {
+		const polygons = Array.from({ length: 40 }, (_, stroke) =>
+			jitteryRing(500, 450, 100 + stroke * 2, 20_000, stroke),
+		);
+		const { built, font } = await builtGlyph([
+			{ char: "e", variant: 0, polygons },
+		]);
+		expect(built.chars).toBe("e");
+		const box = font.charToGlyph("e").getBoundingBox();
+		expect(box.x2 - box.x1).toBeGreaterThan(350);
+		expect(box.x2 - box.x1).toBeLessThan(380);
+	});
+
+	test("a smooth dense outline keeps its shape", async () => {
+		const { font } = await builtGlyph([
+			{ char: "o", variant: 0, polygons: [jitteryRing(500, 450, 200, 8000)] },
+		]);
+		const box = font.charToGlyph("o").getBoundingBox();
+		expect(box.x2 - box.x1).toBeCloseTo(400, 0);
+		expect(box.y2 - box.y1).toBeCloseTo(400, 0);
 	});
 
 	test("overlapping polygons fill as one shape", async () => {
@@ -302,6 +392,73 @@ describe("fromUpload", () => {
 		const font = parsedUpload(built.bytes);
 		expect(font.charToGlyph("a").advanceWidth).toBe(254);
 		expect(font.charToGlyph("b").advanceWidth).toBe(298);
+	});
+
+	test("an uploaded apostrophe also covers the curly quotes", async () => {
+		const file = uploadBytes({
+			glyphs: [
+				letterGlyph("'", 300, (path) => {
+					path.moveTo(0, 1200);
+					path.lineTo(100, 1600);
+				}),
+			],
+		});
+		const built = await new OpentypeFontBuilder().fromUpload({
+			familyName: "own-test",
+			file,
+		});
+		expect(built.chars).toContain("\u2019");
+		expect(built.chars).toContain("\u2018");
+		expect(parsedUpload(built.bytes).charToGlyph("\u2018").name).toBe(
+			"uni0027",
+		);
+	});
+
+	test("an upload's own curly quotes are kept", async () => {
+		const file = uploadBytes({
+			glyphs: [
+				letterGlyph("'", 300, (path) => {
+					path.moveTo(0, 1200);
+					path.lineTo(100, 1600);
+				}),
+				letterGlyph("\u2019", 340, (path) => {
+					path.moveTo(0, 1200);
+					path.quadraticCurveTo(200, 1400, 100, 1600);
+				}),
+			],
+		});
+		const built = await new OpentypeFontBuilder().fromUpload({
+			familyName: "own-test",
+			file,
+		});
+		const font = parsedUpload(built.bytes);
+		expect(font.charToGlyph("\u2019").name).toBe("uni2019");
+		expect(font.charToGlyph("\u2019").advanceWidth).toBe(166);
+		expect(font.charToGlyph("\u2018").name).toBe("uni0027");
+		expect(font.charToGlyph("'").name).toBe("uni0027");
+		expect([...built.chars].filter((char) => char === "\u2019")).toHaveLength(
+			1,
+		);
+	});
+
+	test("a curly quote is kept when the upload has no straight one", async () => {
+		const file = uploadBytes({
+			glyphs: [
+				letterGlyph("\u201C", 400, (path) => {
+					path.moveTo(0, 1200);
+					path.lineTo(100, 1600);
+				}),
+			],
+		});
+		const built = await new OpentypeFontBuilder().fromUpload({
+			familyName: "own-test",
+			file,
+		});
+		const font = parsedUpload(built.bytes);
+		expect(font.charToGlyph("\u201C").name).toBe("uni201C");
+		expect(font.charToGlyphIndex('"')).toBe(0);
+		expect(built.chars).toContain("\u201C");
+		expect(built.chars).not.toContain('"');
 	});
 
 	test("curves survive the rebuild", async () => {

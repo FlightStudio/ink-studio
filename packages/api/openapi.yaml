@@ -16,6 +16,30 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
   /api/letters:
+    get:
+      operationId: listLetters
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          description: The nextCursor of the page before.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: One page of the organization's letters, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LetterListPage"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
     post:
       operationId: createLetter
       requestBody:
@@ -515,6 +539,78 @@ components:
           type: integer
         content:
           $ref: "#/components/schemas/LetterContentEnvelope"
+    LetterResources:
+      type: object
+      additionalProperties: false
+      required:
+        [assetBaseUrl, stockFontBaseUrl, fonts, drawings, frontImageAssetId]
+      properties:
+        assetBaseUrl:
+          type: string
+        stockFontBaseUrl:
+          type: string
+        fonts:
+          type: object
+          additionalProperties:
+            type: string
+            format: uuid
+        drawings:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties: false
+            required: [maskAssetId, aspect]
+            properties:
+              maskAssetId:
+                type: string
+                format: uuid
+              aspect:
+                type: number
+        frontImageAssetId:
+          type: string
+          format: uuid
+          nullable: true
+    LetterPreview:
+      type: object
+      additionalProperties: false
+      required: [side, content, resources]
+      properties:
+        side:
+          type: integer
+          minimum: 0
+        content:
+          $ref: "#/components/schemas/LetterContentEnvelope"
+        resources:
+          $ref: "#/components/schemas/LetterResources"
+    LetterListItem:
+      type: object
+      additionalProperties: false
+      required: [id, title, updatedAt, productLabel, preview]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        productLabel:
+          type: string
+        preview:
+          $ref: "#/components/schemas/LetterPreview"
+    LetterListPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LetterListItem"
+        nextCursor:
+          type: string
+          nullable: true
     DrawnFontSource:
       type: object
       additionalProperties: false
@@ -775,6 +871,7 @@ components:
         - invalid_letter
         - invalid_title
         - invalid_owner_name
+        - owner_name_too_long
         - invalid_glyphs
         - font_incomplete
         - font_not_ready

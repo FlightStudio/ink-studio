@@ -19,6 +19,7 @@ export {
 	clipToText,
 	columnBox,
 	exclusionFloats,
+	keepClearRect,
 	overflowIn,
 	pageExclusions,
 	placementIssues,
@@ -32,6 +33,8 @@ export { outlinePath, STROKE_OPTIONS, strokeOutline } from "./ink.ts";
 export { LETTER_CSS } from "./letter-css.ts";
 export type { LetterPageProps } from "./letter-page.tsx";
 export {
+	elementFrame,
+	keepClearFrame,
 	LetterPage,
 	measureInputFor,
 	pageGapIn,
@@ -43,4 +46,3 @@ export { LetterPrint, LetterText } from "./letter-print.tsx";
 export type { LetterMeasure, MeasureInput } from "./measure.ts";
 export { measureLetter } from "./measure.ts";
 export { MergeChip } from "./merge-chip.tsx";
-export { SignatureMark } from "./signature-mark.tsx";

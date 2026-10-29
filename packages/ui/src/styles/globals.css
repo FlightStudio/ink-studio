@@ -126,6 +126,22 @@
 	body {
 		@apply bg-background text-foreground;
 	}
+
+	@media (pointer: coarse) {
+		[data-slot="button"] {
+			min-width: 44px;
+			min-height: 44px;
+		}
+	}
+}
+
+@layer components {
+	[data-slot="dialog-content"] {
+		grid-template-columns: minmax(0, 1fr);
+		max-height: calc(100dvh - 2rem);
+		overflow-y: auto;
+		overscroll-behavior: contain;
+	}
 }
 
 :root {
@@ -217,15 +233,28 @@ body:has(.studio) {
 	}
 }
 
-.desk {
+.studio {
+	--studio-header-height: 3.5rem;
+}
+
+.desk,
+.studio-header {
 	position: relative;
 	isolation: isolate;
-	min-height: 100dvh;
 	background-color: var(--desk);
 	color: var(--ink);
 }
 
-.desk::before {
+.desk {
+	min-height: calc(100dvh - var(--studio-header-height, 0px));
+}
+
+.studio-header {
+	height: var(--studio-header-height);
+}
+
+.desk::before,
+.studio-header::before {
 	content: "";
 	position: absolute;
 	inset: 0;

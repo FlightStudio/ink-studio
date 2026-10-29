@@ -1,4 +1,5 @@
 export {
+	LETTER_PAGE_SIZE,
 	LetterService,
 	letterOwnerIds,
 	letterResources,
@@ -7,7 +8,9 @@ export type {
 	CreateLetterParams,
 	EditableLetter,
 	LetterListItem,
+	LetterListPage,
 	LetterMeasure,
+	ListLettersParams,
 	MeasureInput,
 	MeasureParams,
 	PrintOutput,

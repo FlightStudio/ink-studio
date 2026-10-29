@@ -7,7 +7,10 @@ export function OverflowNotice({ words, maxPages }: OverflowNoticeProps) {
 			data-overflow-notice=""
 			className="max-w-md text-center text-ui text-ink"
 		>
-			About {words} words won't fit on {maxPages} sides.
+			About {words} words won't fit on {maxPages} sides.{" "}
+			<span className="text-ink-muted">
+				Shorten the letter or pick a smaller text size.
+			</span>
 		</p>
 	);
 }

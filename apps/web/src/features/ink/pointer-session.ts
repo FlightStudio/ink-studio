@@ -11,6 +11,7 @@ export type PointerSample = {
 
 export type PointerSessionState = {
 	strokes: Stroke[];
+	undone: Stroke[];
 	active: { pointerId: number; stroke: Stroke; startedAt: number } | null;
 	penSeen: boolean;
 };
@@ -21,15 +22,26 @@ export type PointerSessionEvent =
 	| { type: "up"; pointerId: number }
 	| { type: "cancel"; pointerId: number }
 	| { type: "undo" }
+	| { type: "redo" }
 	| { type: "clear" };
 
 export const FLAT_PRESSURE = 0.5;
 
 export const EMPTY_POINTER_SESSION: PointerSessionState = {
 	strokes: [],
+	undone: [],
 	active: null,
 	penSeen: false,
 };
+
+export function drawsWith(
+	pointer: { pointerType: string; button: number },
+	penOnly: boolean,
+): boolean {
+	if (pointer.pointerType === "mouse") return pointer.button === 0;
+	if (pointer.pointerType === "touch") return !penOnly;
+	return true;
+}
 
 function pointOf(sample: PointerSample, startedAt: number): StrokePoint {
 	const pressure = sample.input === "pen" ? sample.pressure : FLAT_PRESSURE;
@@ -105,15 +117,31 @@ export function pointerSession(
 			return {
 				...state,
 				strokes: [...state.strokes, state.active.stroke],
+				undone: [],
 				active: null,
 			};
 		case "cancel":
 			if (state.active?.pointerId !== event.pointerId) return state;
 			return { ...state, active: null };
-		case "undo":
-			if (state.strokes.length === 0) return state;
-			return { ...state, strokes: state.strokes.slice(0, -1) };
+		case "undo": {
+			const last = state.strokes.at(-1);
+			if (!last) return state;
+			return {
+				...state,
+				strokes: state.strokes.slice(0, -1),
+				undone: [...state.undone, last],
+			};
+		}
+		case "redo": {
+			const next = state.undone.at(-1);
+			if (!next) return state;
+			return {
+				...state,
+				strokes: [...state.strokes, next],
+				undone: state.undone.slice(0, -1),
+			};
+		}
 		case "clear":
-			return { ...state, strokes: [], active: null };
+			return { ...state, strokes: [], undone: [], active: null };
 	}
 }

@@ -250,18 +250,24 @@ it("a signed letter's export loads the signature mask", async () => {
 		...base,
 		doc: {
 			...base.doc,
-			content: [
-				...base.doc.content,
-				{
-					type: "signature",
-					attrs: {
+			attrs: {
+				...base.doc.attrs,
+				elements: [
+					{
+						id: crypto.randomUUID(),
+						kind: "signature",
 						drawingId: drawing.id,
+						side: 0,
+						xIn: 5.5,
+						yIn: 8,
 						widthIn: 2.25,
-						align: "right",
-						color: "ink-blue",
+						heightIn: 0.75,
+						rotationDeg: -6,
+						tint: "ink-blue",
+						wrap: false,
 					},
-				},
-			],
+				],
+			},
 		},
 	};
 	const { assetId } = await exportLetter(ada, content, "Signed");

@@ -1,7 +1,9 @@
-import type { Font, FontSource } from "@repo/types";
+import type { AssetProcessing, Font, FontSource } from "@repo/types";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { v7 as uuidv7 } from "uuid";
+import { processingOf } from "./assets.ts";
 import type { Query } from "./query.ts";
+import { assets } from "./schema/assets.ts";
 import { fonts } from "./schema/fonts.ts";
 
 export type NewFont = {
@@ -14,10 +16,15 @@ export type NewFont = {
 	chars: string;
 };
 
+export type FontWithBuild = Font & { pendingBuild: AssetProcessing | null };
+
 export type Fonts = {
-	byId: (organizationId: string, id: string) => Promise<Font | null>;
+	byId: (organizationId: string, id: string) => Promise<FontWithBuild | null>;
 	lockById: (organizationId: string, id: string) => Promise<Font | null>;
-	listByOwner: (organizationId: string, ownerUserId: string) => Promise<Font[]>;
+	listByOwner: (
+		organizationId: string,
+		ownerUserId: string,
+	) => Promise<FontWithBuild[]>;
 	create: (input: NewFont) => Promise<Font>;
 	saveSource: (
 		organizationId: string,
@@ -55,6 +62,21 @@ function toFont(row: typeof fonts.$inferSelect): Font {
 	};
 }
 
+function withBuild(row: {
+	font: typeof fonts.$inferSelect;
+	pending: typeof assets.$inferSelect | null;
+}): FontWithBuild {
+	return {
+		...toFont(row.font),
+		pendingBuild: row.pending ? processingOf(row.pending) : null,
+	};
+}
+
+const pendingAsset = and(
+	eq(assets.id, fonts.pendingFontAssetId),
+	eq(assets.organizationId, fonts.organizationId),
+);
+
 function live(organizationId: string, id: string) {
 	return and(
 		eq(fonts.organizationId, organizationId),
@@ -67,12 +89,13 @@ export function createFonts(db: Query): Fonts {
 	return {
 		async byId(organizationId, id) {
 			const rows = await db
-				.select()
+				.select({ font: fonts, pending: assets })
 				.from(fonts)
+				.leftJoin(assets, pendingAsset)
 				.where(live(organizationId, id))
 				.limit(1);
 			const row = rows[0];
-			return row ? toFont(row) : null;
+			return row ? withBuild(row) : null;
 		},
 		async lockById(organizationId, id) {
 			const rows = await db
@@ -86,8 +109,9 @@ export function createFonts(db: Query): Fonts {
 		},
 		async listByOwner(organizationId, ownerUserId) {
 			const rows = await db
-				.select()
+				.select({ font: fonts, pending: assets })
 				.from(fonts)
+				.leftJoin(assets, pendingAsset)
 				.where(
 					and(
 						eq(fonts.organizationId, organizationId),
@@ -96,7 +120,7 @@ export function createFonts(db: Query): Fonts {
 					),
 				)
 				.orderBy(desc(fonts.updatedAt), desc(fonts.id));
-			return rows.map(toFont);
+			return rows.map(withBuild);
 		},
 		async create(input) {
 			const inserted = await db

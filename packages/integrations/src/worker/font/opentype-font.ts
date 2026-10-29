@@ -1,9 +1,9 @@
 import { Worker } from "node:worker_threads";
 import { ServiceError } from "@repo/errors";
-import { CELL } from "@repo/types";
+import { CELL, GLYPH_ALIASES, withAliases } from "@repo/types";
 import opentype from "opentype.js";
 import { readTemplate } from "./template.ts";
-import { vectorize } from "./vectorize.ts";
+import { simplifyLoop, vectorize } from "./vectorize.ts";
 
 export type PathSegment =
 	| ["M", number, number]
@@ -89,17 +89,19 @@ function lettersOf(glyphs: GlyphOutline[]): Letter[] {
 		outlines.push(outline);
 		byChar.set(outline.char, outlines);
 	}
-	return [...byChar.entries()].map(([char, outlines]) => {
-		const sorted = outlines.toSorted((a, b) => a.variant - b.variant);
-		for (const [index, outline] of sorted.entries()) {
-			if (outline.variant !== index) {
-				throw new Error(
-					`The variants of "${char}" must run from 0 without gaps or repeats`,
-				);
-			}
-		}
-		return { char, outlines: sorted };
-	});
+	return [...byChar.entries()].map(([char, outlines]) => ({
+		char,
+		outlines: outlines
+			.toSorted((a, b) => a.variant - b.variant)
+			.map((outline, variant) => ({ ...outline, variant })),
+	}));
+}
+
+function codePointsOf(char: string, drawn: ReadonlySet<string>): number[] {
+	return [
+		char,
+		...(GLYPH_ALIASES[char] ?? []).filter((alias) => !drawn.has(alias)),
+	].map((item) => item.codePointAt(0) ?? 0);
 }
 
 function pathOf(contours: Contour[]): opentype.Path {
@@ -238,14 +240,14 @@ export function buildFont(params: BuildFontParams): Uint8Array {
 			path: new opentype.Path(),
 		}),
 	];
+	const drawn = new Set(letters.map((letter) => letter.char));
 	for (const letter of letters) {
 		for (const outline of letter.outlines) {
+			const unicodes = codePointsOf(letter.char, drawn);
 			glyphs.push(
 				new opentype.Glyph({
 					name: glyphName(letter.char, outline.variant),
-					...(outline.variant === 0
-						? { unicode: letter.char.codePointAt(0) }
-						: {}),
+					...(outline.variant === 0 ? { unicode: unicodes[0], unicodes } : {}),
 					advanceWidth: outline.advanceWidth,
 					path: pathOf(outline.contours),
 				}),
@@ -313,6 +315,8 @@ type UploadReply =
 	| { ok: false; code: "font_unreadable" | "font_missing_glyphs" };
 
 const SIDE_BEARING = 60;
+const OUTLINE_TOLERANCE = 0.5;
+const MAX_GLYPH_POINTS = 10_000;
 
 type Point = [number, number];
 
@@ -337,16 +341,32 @@ function sameWay(points: readonly Point[]): Point[] {
 	return signedArea(mapped) < 0 ? [...mapped].reverse() : mapped;
 }
 
+function withinBudget(polygons: readonly Point[][]): Point[][] {
+	const usable = polygons.filter((points) => points.length >= 3);
+	for (let tolerance = OUTLINE_TOLERANCE; ; tolerance *= 2) {
+		const simplified = usable
+			.map((points) => simplifyLoop(points, tolerance))
+			.filter((points) => points.length >= 3);
+		const count = simplified.reduce((sum, points) => sum + points.length, 0);
+		if (count <= MAX_GLYPH_POINTS) return simplified;
+	}
+}
+
 function outlineOf(
 	char: string,
 	variant: number,
 	polygons: readonly Point[][],
 ): GlyphOutline | null {
-	const usable = polygons.filter((points) => points.length >= 3);
+	const usable = withinBudget(polygons);
 	if (usable.length === 0) return null;
-	const xs = usable.flat().map((point) => point[0]);
-	const minX = Math.min(...xs);
-	const maxX = Math.max(...xs);
+	let minX = Number.POSITIVE_INFINITY;
+	let maxX = Number.NEGATIVE_INFINITY;
+	for (const points of usable) {
+		for (const [x] of points) {
+			minX = Math.min(minX, x);
+			maxX = Math.max(maxX, x);
+		}
+	}
 	const shift = SIDE_BEARING - minX;
 	return {
 		char,
@@ -405,7 +425,7 @@ export class OpentypeFontBuilder implements FontBuilder {
 					.map(
 						([x, y]): Point =>
 							fontPoint([
-								(x / cell.mask.widthPx) * CELL.size,
+								(x / cell.mask.heightPx) * CELL.size,
 								(y / cell.mask.heightPx) * CELL.size,
 							]),
 					)
@@ -413,6 +433,9 @@ export class OpentypeFontBuilder implements FontBuilder {
 			);
 			const outline = outlineOf(cell.char, cell.variant, polygons);
 			if (outline) glyphs.push(outline);
+		}
+		if (glyphs.length === 0) {
+			throw new ServiceError("invalid_input", "no_ink_found");
 		}
 		return this.assemble(params.familyName, glyphs);
 	}
@@ -471,10 +494,6 @@ export class OpentypeFontBuilder implements FontBuilder {
 	}
 
 	private assemble(familyName: string, glyphs: GlyphOutline[]): BuiltFont {
-		const chars: string[] = [];
-		for (const glyph of glyphs) {
-			if (!chars.includes(glyph.char)) chars.push(glyph.char);
-		}
 		return {
 			bytes: buildFont({
 				familyName,
@@ -482,7 +501,7 @@ export class OpentypeFontBuilder implements FontBuilder {
 				descender: CELL.baseline - CELL.descender,
 				glyphs,
 			}),
-			chars: chars.join(""),
+			chars: withAliases(glyphs.map((glyph) => glyph.char)),
 		};
 	}
 }

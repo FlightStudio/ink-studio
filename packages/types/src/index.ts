@@ -19,19 +19,29 @@ export type {
 	Font,
 	FontOption,
 	FontSource,
+	FontSourceKind,
+	FontStatus,
 	StockFontId,
 } from "./font.ts";
-export { STOCK_FONTS } from "./font.ts";
+export {
+	isUsableFont,
+	OWNER_NAME_MAX_CHARACTERS,
+	STOCK_FONTS,
+} from "./font.ts";
 export type { DrawnGlyph } from "./handwriting.ts";
 export {
 	CELL,
+	GLYPH_ALIASES,
 	GLYPH_LIMITS,
 	HANDWRITING_GLYPHS,
 	HANDWRITING_TEMPLATE,
+	LOWERCASE_LETTERS,
 	missingChars,
+	missingLowercase,
+	withAliases,
 } from "./handwriting.ts";
 export type { InkColorId, TextSizePt } from "./ink.ts";
-export { INK_COLORS, TEXT_SIZES } from "./ink.ts";
+export { INK_COLORS, TEXT_LINE_HEIGHT, TEXT_SIZES } from "./ink.ts";
 export type {
 	Align,
 	FontRef,
@@ -41,12 +51,12 @@ export type {
 	InlineNode,
 	LetterContent,
 	LetterDoc,
+	LetterPreview,
 	LetterResources,
 	MergeFieldNode,
 	ParagraphNode,
 	PlacedElement,
 	SealFont,
-	SignatureNode,
 	TextNode,
 } from "./letter.ts";
 export { humanSeal, SIGNATURE_WIDTHS } from "./letter.ts";

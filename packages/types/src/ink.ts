@@ -10,4 +10,6 @@ export type InkColorId = keyof typeof INK_COLORS;
 
 export const TEXT_SIZES = [16, 20, 24, 30] as const;
 
+export const TEXT_LINE_HEIGHT = 1.5;
+
 export type TextSizePt = (typeof TEXT_SIZES)[number];

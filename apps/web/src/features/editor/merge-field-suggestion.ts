@@ -1,22 +1,38 @@
 "use client";
 
+import { shift } from "@floating-ui/dom";
 import type { InkMark, MergeFieldKey } from "@repo/types";
 import { MERGE_FIELDS } from "@repo/types";
 import type { Editor, Range } from "@tiptap/core";
 import { Extension } from "@tiptap/core";
-import { PluginKey } from "@tiptap/pm/state";
+import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
 import { ReactRenderer } from "@tiptap/react";
 import type { SuggestionProps } from "@tiptap/suggestion";
-import Suggestion from "@tiptap/suggestion";
+import Suggestion, { exitSuggestion } from "@tiptap/suggestion";
+import { MergeFieldMenu } from "./merge-field-menu.tsx";
 import {
+	fieldTrigger,
 	type MergeFieldItem,
-	MergeFieldMenu,
-	placeMergeFieldMenu,
-} from "./merge-field-menu.tsx";
+	mergeFieldItems,
+} from "./merge-fields.ts";
 
 const mergeFieldSuggestionKey = new PluginKey("mergeFieldSuggestion");
 
+const CARET_KEYS = new Set(["ArrowLeft", "ArrowRight", "Home", "End"]);
+
 type FieldProps = SuggestionProps<MergeFieldItem, MergeFieldItem>;
+
+const toolbarTriggerKey = new PluginKey<number | null>(
+	"mergeFieldToolbarTrigger",
+);
+
+const toolbarTrigger = new Plugin<number | null>({
+	key: toolbarTriggerKey,
+	state: {
+		init: () => null,
+		apply: (tr) => tr.getMeta(toolbarTriggerKey) ?? null,
+	},
+});
 
 function inkOf(editor: Editor): InkMark | null {
 	const { state } = editor;
@@ -45,93 +61,19 @@ export function insertMergeField(
 	editor.view.dispatch(tr.scrollIntoView());
 }
 
-export function mergeFieldItems(query: string): MergeFieldItem[] {
-	const needle = query.toLocaleLowerCase();
-	return (
-		Object.entries(MERGE_FIELDS) as [
-			MergeFieldKey,
-			(typeof MERGE_FIELDS)[MergeFieldKey],
-		][]
-	)
-		.filter(([, field]) => field.label.toLocaleLowerCase().includes(needle))
-		.map(([field, value]) => ({ field, label: value.label }));
-}
-
-let manualClose: (() => void) | null = null;
-
-function closeManualMenu(): void {
-	manualClose?.();
-	manualClose = null;
-}
-
-function caretRect(editor: Editor): DOMRect | null {
-	try {
-		const coords = editor.view.coordsAtPos(editor.state.selection.from);
-		return new DOMRect(
-			coords.left,
-			coords.top,
-			Math.max(1, coords.right - coords.left),
-			Math.max(1, coords.bottom - coords.top),
-		);
-	} catch {
-		return null;
+export function startMergeField(editor: Editor): void {
+	if (mergeFieldSuggestionKey.getState(editor.state)?.active) {
+		editor.view.focus();
+		return;
 	}
-}
-
-export function openMergeFieldMenu(editor: Editor): void {
-	if (mergeFieldSuggestionKey.getState(editor.state)?.active) return;
-	closeManualMenu();
-	editor.commands.focus();
-	const items = mergeFieldItems("");
-	let selected = 0;
-	const pick = (field: MergeFieldKey) => {
-		insertMergeField(editor, field);
-		close();
-	};
-	const renderer = new ReactRenderer(MergeFieldMenu, {
-		editor,
-		props: { items, selectedIndex: selected, onPick: pick },
-	});
-	const onKey = (event: KeyboardEvent) => {
-		if (event.key === "ArrowDown") {
-			if (items.length === 0) return;
-			selected = (selected + 1) % items.length;
-			renderer.updateProps({ selectedIndex: selected });
-			event.preventDefault();
-			event.stopPropagation();
-			return;
-		}
-		if (event.key === "ArrowUp") {
-			if (items.length === 0) return;
-			selected = (selected + items.length - 1) % items.length;
-			renderer.updateProps({ selectedIndex: selected });
-			event.preventDefault();
-			event.stopPropagation();
-			return;
-		}
-		if (event.key === "Enter") {
-			const item = items[selected];
-			if (item) pick(item.field);
-			event.preventDefault();
-			event.stopPropagation();
-			return;
-		}
-		if (event.key === "Escape") {
-			close();
-			event.preventDefault();
-			event.stopPropagation();
-		}
-	};
-	function close() {
-		window.removeEventListener("keydown", onKey, true);
-		renderer.destroy();
-		renderer.element.remove();
-		if (manualClose === close) manualClose = null;
-	}
-	document.body.append(renderer.element);
-	window.addEventListener("keydown", onKey, true);
-	void placeMergeFieldMenu(renderer.element, () => caretRect(editor));
-	manualClose = close;
+	const { state } = editor;
+	const at = state.selection.to;
+	const trigger = fieldTrigger(state);
+	const tr = state.tr.insertText(trigger, at);
+	tr.setSelection(TextSelection.create(tr.doc, at + trigger.length));
+	tr.setMeta(toolbarTriggerKey, trigger.length - 1);
+	editor.view.dispatch(tr.scrollIntoView());
+	editor.view.focus();
 }
 
 export const mergeFieldSuggestion = Extension.create({
@@ -139,6 +81,7 @@ export const mergeFieldSuggestion = Extension.create({
 	addProseMirrorPlugins() {
 		const editor = this.editor;
 		return [
+			toolbarTrigger,
 			Suggestion<MergeFieldItem, MergeFieldItem>({
 				pluginKey: mergeFieldSuggestionKey,
 				editor,
@@ -146,81 +89,126 @@ export const mergeFieldSuggestion = Extension.create({
 				allowSpaces: false,
 				allowedPrefixes: [" "],
 				decorationClass: "merge-query",
-				items: ({ query }) => mergeFieldItems(query),
+				offset: { mainAxis: 6 },
+				floatingUi: { strategy: "fixed", middleware: [shift({ padding: 8 })] },
+				dismissOnOutsideClick: false,
 				command: ({ editor: current, range, props }) => {
 					insertMergeField(current, props.field, range);
 				},
 				render: () => {
 					let renderer: ReactRenderer<unknown, Record<string, unknown>> | null =
 						null;
+					let unmount: (() => void) | null = null;
 					let selected = 0;
 					let latest: FieldProps | null = null;
 					let items: MergeFieldItem[] = [];
-					const reposition = () => {
-						if (!renderer || !latest?.clientRect) return;
-						void placeMergeFieldMenu(renderer.element, latest.clientRect);
+					let lead: number | null = null;
+
+					const pick = (field: MergeFieldKey) =>
+						latest?.command({ field, label: MERGE_FIELDS[field].label });
+
+					const takeBackTrigger = (): boolean => {
+						if (lead === null || !latest || latest.query !== "") return false;
+						const { view } = latest.editor;
+						view.dispatch(
+							view.state.tr.delete(latest.range.from - lead, latest.range.to),
+						);
+						return true;
 					};
-					const show = (props: FieldProps) => {
-						latest = props;
-						items = props.items;
-						if (selected >= items.length) selected = 0;
+
+					const dismiss = () => {
+						if (!latest) return;
+						const { view } = latest.editor;
+						if (!takeBackTrigger()) {
+							exitSuggestion(view, mergeFieldSuggestionKey);
+						}
+					};
+
+					const onQuery = (event: PointerEvent): boolean => {
+						if (!latest) return false;
+						const { view } = latest.editor;
+						if (!(event.target instanceof Node)) return false;
+						if (!view.dom.contains(event.target)) return false;
+						const at = view.posAtCoords({
+							left: event.clientX,
+							top: event.clientY,
+						});
+						return (
+							at !== null &&
+							at.pos >= latest.range.from &&
+							at.pos <= latest.range.to
+						);
+					};
+
+					const outside = (event: Event) => {
+						const target = event.target;
+						if (!(target instanceof Node) || !latest) return;
+						if (renderer?.element.contains(target)) return;
+						if (event instanceof PointerEvent && onQuery(event)) return;
+						dismiss();
+					};
+
+					const render = () =>
 						renderer?.updateProps({
 							items,
 							selectedIndex: selected,
-							onPick: (field: MergeFieldKey) =>
-								props.command({
-									field,
-									label: MERGE_FIELDS[field].label,
-								}),
+							onPick: pick,
 						});
-						reposition();
-					};
+
+					const scrollOptions = { capture: true, passive: true } as const;
+
 					return {
 						onStart: (props) => {
-							closeManualMenu();
+							lead = toolbarTriggerKey.getState(props.editor.state) ?? null;
+							latest = props;
+							items = mergeFieldItems(props.query);
 							selected = 0;
 							renderer = new ReactRenderer(MergeFieldMenu, {
 								editor: props.editor,
-								props: {
-									items: props.items,
-									selectedIndex: 0,
-									onPick: (field: MergeFieldKey) =>
-										props.command({
-											field,
-											label: MERGE_FIELDS[field].label,
-										}),
-								},
+								props: { items, selectedIndex: selected, onPick: pick },
 							});
-							document.body.append(renderer.element);
-							window.addEventListener("scroll", reposition, true);
-							window.addEventListener("resize", reposition);
-							show(props);
+							renderer.element.style.zIndex = "40";
+							unmount = props.mount(renderer.element);
+							props.editor.on("blur", dismiss);
+							document.addEventListener("pointerdown", outside, true);
+							window.addEventListener("wheel", outside, scrollOptions);
+							window.addEventListener("touchmove", outside, scrollOptions);
 						},
-						onUpdate: show,
-						onExit: () => {
-							window.removeEventListener("scroll", reposition, true);
-							window.removeEventListener("resize", reposition);
+						onUpdate: (props) => {
+							latest = props;
+							items = mergeFieldItems(props.query);
+							if (selected >= items.length) selected = 0;
+							render();
+						},
+						onExit: (props) => {
+							props.editor.off("blur", dismiss);
+							document.removeEventListener("pointerdown", outside, true);
+							window.removeEventListener("wheel", outside, scrollOptions);
+							window.removeEventListener("touchmove", outside, scrollOptions);
+							unmount?.();
 							renderer?.destroy();
-							renderer?.element.remove();
 							renderer = null;
+							unmount = null;
 							latest = null;
 						},
 						onKeyDown: ({ event }) => {
+							if (event.key === "Escape" || CARET_KEYS.has(event.key)) {
+								return takeBackTrigger();
+							}
+							if (items.length === 0) return false;
 							if (event.key === "ArrowDown") {
-								if (items.length === 0) return true;
 								selected = (selected + 1) % items.length;
-								renderer?.updateProps({ selectedIndex: selected });
+								render();
 								return true;
 							}
 							if (event.key === "ArrowUp") {
-								if (items.length === 0) return true;
 								selected = (selected + items.length - 1) % items.length;
-								renderer?.updateProps({ selectedIndex: selected });
+								render();
 								return true;
 							}
-							if (event.key === "Enter") {
+							if (event.key === "Enter" || event.key === "Tab") {
 								const item = items[selected];
-								if (item) latest?.command(item);
+								if (item) pick(item.field);
 								return true;
 							}
 							return false;

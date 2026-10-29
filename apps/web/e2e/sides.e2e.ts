@@ -109,7 +109,7 @@ describe("sides, overflow, an added side and the seal", () => {
 				return (
 					measured.wordsPastLimit > 0 &&
 					text ===
-						`About ${measured.wordsPastLimit} words won't fit on ${spec.maxPages} sides.`
+						`About ${measured.wordsPastLimit} words won't fit on ${spec.maxPages} sides. Shorten the letter or pick a smaller text size.`
 				);
 			})
 			.toBe(true);
@@ -144,6 +144,29 @@ describe("sides, overflow, an added side and the seal", () => {
 				.toBe(sidesCopy(added + 1));
 		}
 		await expect.poll(async () => add.count()).toBe(0);
+	});
+
+	it("Add a side is not offered when the text already fills every side", async () => {
+		const { page } = await openFixture(harness, member, "overflow");
+		await page.locator("[data-overflow-notice]").waitFor();
+		await expect
+			.poll(() => page.getByRole("button", { name: "Add a side" }).count())
+			.toBe(0);
+	});
+
+	it("Add a side adds a blank side after the ones the text uses", async () => {
+		const { page } = await openFixture(harness, member, "one-and-a-half");
+		await expect
+			.poll(async () => sidesLine(page).textContent())
+			.toBe(sidesCopy(2));
+		await page.getByRole("button", { name: "Add a side" }).click();
+		await expect
+			.poll(async () => sidesLine(page).textContent())
+			.toBe(sidesCopy(3));
+		await page.locator('.letter-sheet[data-side="2"]').waitFor();
+		await expect
+			.poll(() => page.getByRole("button", { name: "Add a side" }).count())
+			.toBe(0);
 	});
 
 	it("deleting the extra text clears the notice", async () => {

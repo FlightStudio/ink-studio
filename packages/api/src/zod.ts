@@ -14,6 +14,7 @@ import {
 	GlyphStrokeInput,
 	type LetterContentEnvelope,
 	type LetterState,
+	type ListLettersParams,
 	PageFormatId,
 	type RenameDrawingRequest,
 	type RequestExportRequest,
@@ -87,6 +88,11 @@ export const letterStateSchema: z.ZodType<LetterState> = z.strictObject({
 	revision: z.number().int(),
 	content: letterContentEnvelopeSchema,
 });
+
+export const listLettersParamsSchema: z.ZodType<ListLettersParams> =
+	z.strictObject({
+		cursor: z.string().optional(),
+	});
 
 export const drawnFontSourceSchema = z.strictObject({
 	kind: z.enum(DrawnFontSourceKind),

@@ -1,3 +1,5 @@
+import { TEXT_LINE_HEIGHT } from "@repo/types";
+
 export const LETTER_CSS = `
 .letter-page {
 	position: relative;
@@ -60,12 +62,18 @@ export const LETTER_CSS = `
 	position: relative;
 	display: flow-root;
 }
+.letter-page[data-mode="edit"] .letter-column {
+	pointer-events: none;
+}
+.letter-page[data-mode="edit"] .letter-text {
+	pointer-events: auto;
+}
 .letter-float {
 	pointer-events: none;
 }
 .letter-text {
 	white-space: pre-wrap;
-	line-height: 1.5;
+	line-height: ${TEXT_LINE_HEIGHT};
 	overflow-wrap: anywhere;
 	word-break: normal;
 	font-kerning: normal;
@@ -78,6 +86,9 @@ export const LETTER_CSS = `
 .letter-text p {
 	margin: 0;
 }
+.letter-page[data-mode="print"] .letter-sides {
+	overflow: hidden;
+}
 .letter-element {
 	position: absolute;
 	pointer-events: none;
@@ -85,6 +96,17 @@ export const LETTER_CSS = `
 	mask-size: 100% 100%;
 	-webkit-mask-repeat: no-repeat;
 	mask-repeat: no-repeat;
+}
+.letter-page[data-mode="edit"] .letter-element {
+	animation: letter-element-settle var(--duration-settle, 420ms)
+		var(--ease-settle, ease-out) backwards;
+}
+@keyframes letter-element-settle {
+	from {
+		opacity: 0;
+		scale: 1.015;
+		filter: blur(1.2px);
+	}
 }
 .letter-handles {
 	position: absolute;

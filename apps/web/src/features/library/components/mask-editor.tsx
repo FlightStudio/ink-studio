@@ -1,25 +1,38 @@
 "use client";
 
+import { STROKE_OPTIONS } from "@repo/render/html";
 import type { Stroke } from "@repo/types";
 import { Button } from "@repo/ui/components/ui/button";
 import { Slider } from "@repo/ui/components/ui/slider";
+import { Redo2, RotateCcw, Undo2 } from "lucide-react";
 import {
+	type KeyboardEvent as ReactKeyboardEvent,
 	type PointerEvent as ReactPointerEvent,
 	type Ref,
 	useEffect,
 	useImperativeHandle,
+	useLayoutEffect,
 	useRef,
 	useState,
 } from "react";
-import { InkCanvas, type InkCanvasHandle } from "@/features/ink/ink-canvas";
-import { composeMask, type MaskCrop } from "../compose-mask.ts";
+import {
+	InkCanvas,
+	type InkCanvasHandle,
+	type InkHistory,
+} from "@/features/ink/ink-canvas";
+import {
+	type ComposedMask,
+	composeMask,
+	type MaskCrop,
+} from "../compose-mask.ts";
 
 const MAX_VIEW = { width: 520, height: 360 };
 const MIN_CROP_PX = 32;
 const ERASER_LIMITS = { min: 1, max: 6, initial: 2 };
+const KEY_STEP_SHARE = 0.02;
 
 export type MaskEditorHandle = {
-	compose(): Promise<{ png: Blob; aspect: number }>;
+	compose(): Promise<ComposedMask | null>;
 };
 
 export type MaskEditorProps = {
@@ -40,6 +53,8 @@ type Drag = {
 	rect: DOMRect;
 };
 
+const NO_HISTORY: InkHistory = { canUndo: false, canRedo: false };
+
 export function MaskEditor({ assetId, ref }: MaskEditorProps) {
 	const root = useRef<HTMLDivElement>(null);
 	const frame = useRef<HTMLDivElement>(null);
@@ -49,8 +64,10 @@ export function MaskEditor({ assetId, ref }: MaskEditorProps) {
 	const [stamp, setStamp] = useState<ImageBitmap | null>(null);
 	const [crop, setCrop] = useState<MaskCrop | null>(null);
 	const [strokes, setStrokes] = useState<Stroke[]>([]);
+	const [history, setHistory] = useState<InkHistory>(NO_HISTORY);
 	const [strokeScale, setStrokeScale] = useState(ERASER_LIMITS.initial);
 	const [failed, setFailed] = useState(false);
+	const [shownWidth, setShownWidth] = useState<number | null>(null);
 
 	const latest = useRef({
 		bitmap,
@@ -67,6 +84,7 @@ export function MaskEditor({ assetId, ref }: MaskEditorProps) {
 		setStamp(null);
 		setCrop(null);
 		setStrokes([]);
+		setHistory(NO_HISTORY);
 		void (async () => {
 			try {
 				const response = await fetch(`/api/assets/${assetId}`);
@@ -77,7 +95,7 @@ export function MaskEditor({ assetId, ref }: MaskEditorProps) {
 					return;
 				}
 				setBitmap(next);
-				setCrop({ x: 0, y: 0, width: next.width, height: next.height });
+				setCrop(fullCrop(next));
 			} catch {
 				if (!cancelled) setFailed(true);
 			}
@@ -116,6 +134,17 @@ export function MaskEditor({ assetId, ref }: MaskEditorProps) {
 		};
 	}, [bitmap]);
 
+	const ready = stamp !== null;
+	useLayoutEffect(() => {
+		const node = frame.current;
+		if (!ready || !node) return;
+		const measure = () => setShownWidth(node.getBoundingClientRect().width);
+		measure();
+		const observer = new ResizeObserver(measure);
+		observer.observe(node);
+		return () => observer.disconnect();
+	}, [ready]);
+
 	useImperativeHandle(
 		ref,
 		() => ({
@@ -141,6 +170,13 @@ export function MaskEditor({ assetId, ref }: MaskEditorProps) {
 	);
 
 	const view = bitmap ? viewSize(bitmap.width, bitmap.height) : null;
+	const cropped =
+		bitmap !== null && crop !== null && !sameCrop(crop, fullCrop(bitmap));
+	const eraserPx = Math.round(
+		STROKE_OPTIONS.size *
+			strokeScale *
+			(view && shownWidth ? shownWidth / view.width : 1),
+	);
 
 	function onCornerDown(
 		event: ReactPointerEvent<HTMLButtonElement>,
@@ -184,6 +220,34 @@ export function MaskEditor({ assetId, ref }: MaskEditorProps) {
 		);
 	}
 
+	function onCornerKey(
+		event: ReactKeyboardEvent<HTMLButtonElement>,
+		corner: Corner,
+	) {
+		if (!bitmap || !crop) return;
+		const step = {
+			x: bitmap.width * KEY_STEP_SHARE,
+			y: bitmap.height * KEY_STEP_SHARE,
+		};
+		const moves: Record<string, [number, number]> = {
+			ArrowLeft: [-step.x, 0],
+			ArrowRight: [step.x, 0],
+			ArrowUp: [0, -step.y],
+			ArrowDown: [0, step.y],
+		};
+		const move = moves[event.key];
+		if (!move) return;
+		event.preventDefault();
+		setCrop(
+			resizeCrop(crop, corner, move[0], move[1], bitmap.width, bitmap.height),
+		);
+	}
+
+	function reset() {
+		canvas.current?.clear();
+		if (bitmap) setCrop(fullCrop(bitmap));
+	}
+
 	return (
 		<div ref={root} className="flex flex-col gap-3 text-ink">
 			{failed ? (
@@ -191,64 +255,120 @@ export function MaskEditor({ assetId, ref }: MaskEditorProps) {
 			) : null}
 			{bitmap && crop && stamp && view ? (
 				<>
-					<div
-						ref={frame}
-						data-mask-editor
-						data-view-width={view.width}
-						data-view-height={view.height}
-						data-image-width={bitmap.width}
-						data-image-height={bitmap.height}
-						data-eraser-scale={strokeScale}
-						className="relative overflow-hidden rounded-md"
-					>
-						<InkCanvas
-							ref={canvas}
-							widthPx={view.width}
-							heightPx={view.height}
-							strokeScale={strokeScale}
-							composite="destination-out"
-							underlay={stamp}
-							onStrokeEnd={setStrokes}
-							aria-label="Eraser"
-							className="bg-paper ring-1 ring-rule"
-						/>
-						<CropFrame
-							crop={crop}
-							imageWidth={bitmap.width}
-							imageHeight={bitmap.height}
-							onPointerDown={onCornerDown}
-							onPointerMove={onCornerMove}
-							onPointerUp={() => {
-								drag.current = null;
-							}}
-						/>
+					<div className="p-2 pointer-coarse:p-3">
+						<div
+							ref={frame}
+							data-mask-editor
+							data-view-width={view.width}
+							data-view-height={view.height}
+							data-image-width={bitmap.width}
+							data-image-height={bitmap.height}
+							data-eraser-scale={strokeScale}
+							className="relative mx-auto w-fit max-w-full"
+							style={{ cursor: eraserCursor(eraserPx) }}
+						>
+							<InkCanvas
+								ref={canvas}
+								widthPx={view.width}
+								heightPx={view.height}
+								strokeScale={strokeScale}
+								composite="destination-out"
+								underlay={stamp}
+								onStrokeEnd={(next, nextHistory) => {
+									setStrokes(next);
+									setHistory(nextHistory);
+								}}
+								aria-label="Eraser"
+								className="rounded-md bg-paper ring-1 ring-rule"
+							/>
+							<CropFrame
+								crop={crop}
+								imageWidth={bitmap.width}
+								imageHeight={bitmap.height}
+								onPointerDown={onCornerDown}
+								onPointerMove={onCornerMove}
+								onPointerUp={() => {
+									drag.current = null;
+								}}
+								onKeyDown={onCornerKey}
+							/>
+						</div>
 					</div>
-					<div className="flex flex-col gap-1 text-ui">
-						<p>Eraser size</p>
-						<Slider
-							min={ERASER_LIMITS.min}
-							max={ERASER_LIMITS.max}
-							step={1}
-							value={[strokeScale]}
-							onValueChange={(value) => {
-								const next = Array.isArray(value) ? value[0] : value;
-								if (typeof next === "number") setStrokeScale(next);
-							}}
-							aria-label="Eraser size"
-						/>
+					<p className="text-ui text-ink-muted">
+						Drag over ink to erase. Drag the corners to crop.
+					</p>
+					<div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+						<div className="flex gap-2">
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								disabled={!history.canUndo}
+								onClick={() => canvas.current?.undo()}
+							>
+								<Undo2 />
+								Undo
+							</Button>
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								disabled={!history.canRedo}
+								onClick={() => canvas.current?.redo()}
+							>
+								<Redo2 />
+								Redo
+							</Button>
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								disabled={!cropped && !history.canUndo && !history.canRedo}
+								onClick={reset}
+							>
+								<RotateCcw />
+								Reset
+							</Button>
+						</div>
+						<div className="flex min-w-40 flex-1 items-center gap-3 text-ui">
+							<span aria-hidden className="whitespace-nowrap">
+								Eraser size
+							</span>
+							<Slider
+								min={ERASER_LIMITS.min}
+								max={ERASER_LIMITS.max}
+								step={1}
+								value={[strokeScale]}
+								onValueChange={(value) => {
+									const next = Array.isArray(value) ? value[0] : value;
+									if (typeof next === "number") setStrokeScale(next);
+								}}
+								aria-label="Eraser size"
+							/>
+						</div>
 					</div>
-					<Button
-						type="button"
-						variant="outline"
-						onClick={() => canvas.current?.undo()}
-					>
-						Undo
-					</Button>
 				</>
 			) : failed ? null : (
 				<p className="text-ui text-ink-muted">Opening the ink.</p>
 			)}
 		</div>
+	);
+}
+
+function eraserCursor(diameterPx: number): string {
+	const size = Math.max(diameterPx, 4) + 2;
+	const centre = size / 2;
+	const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><circle cx="${centre}" cy="${centre}" r="${centre - 1}" fill="none" stroke="white" stroke-width="2"/><circle cx="${centre}" cy="${centre}" r="${centre - 1}" fill="none" stroke="black" stroke-width="1"/></svg>`;
+	return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${centre} ${centre}, crosshair`;
+}
+
+function fullCrop(bitmap: { width: number; height: number }): MaskCrop {
+	return { x: 0, y: 0, width: bitmap.width, height: bitmap.height };
+}
+
+function sameCrop(a: MaskCrop, b: MaskCrop): boolean {
+	return (
+		a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height
 	);
 }
 
@@ -317,6 +437,7 @@ function CropFrame({
 	onPointerDown,
 	onPointerMove,
 	onPointerUp,
+	onKeyDown,
 }: {
 	crop: MaskCrop;
 	imageWidth: number;
@@ -327,31 +448,44 @@ function CropFrame({
 	) => void;
 	onPointerMove: (event: ReactPointerEvent<HTMLButtonElement>) => void;
 	onPointerUp: () => void;
+	onKeyDown: (
+		event: ReactKeyboardEvent<HTMLButtonElement>,
+		corner: Corner,
+	) => void;
 }) {
+	const box = {
+		left: `${(crop.x / imageWidth) * 100}%`,
+		top: `${(crop.y / imageHeight) * 100}%`,
+		width: `${(crop.width / imageWidth) * 100}%`,
+		height: `${(crop.height / imageHeight) * 100}%`,
+	};
 	return (
-		<div
-			className="pointer-events-none absolute"
-			style={{
-				left: `${(crop.x / imageWidth) * 100}%`,
-				top: `${(crop.y / imageHeight) * 100}%`,
-				width: `${(crop.width / imageWidth) * 100}%`,
-				height: `${(crop.height / imageHeight) * 100}%`,
-			}}
-		>
-			<div className="absolute inset-0 shadow-[0_0_0_999px_rgba(28,27,24,0.35)] ring-1 ring-ink" />
-			{CORNERS.map((handle) => (
-				<button
-					key={handle.corner}
-					type="button"
-					aria-label={handle.label}
-					className="pointer-events-auto absolute size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-ink bg-paper touch-none"
-					style={cornerStyle(handle.corner)}
-					onPointerDown={(event) => onPointerDown(event, handle.corner)}
-					onPointerMove={onPointerMove}
-					onPointerUp={onPointerUp}
-					onPointerCancel={onPointerUp}
+		<>
+			<div className="pointer-events-none absolute inset-0 overflow-hidden rounded-md">
+				<div
+					data-crop-box
+					className="absolute shadow-[0_0_0_999px_oklch(0.25_0.02_262/0.32)] ring-1 ring-ink"
+					style={box}
 				/>
-			))}
-		</div>
+			</div>
+			<div className="pointer-events-none absolute" style={box}>
+				{CORNERS.map((handle) => (
+					<button
+						key={handle.corner}
+						type="button"
+						aria-label={handle.label}
+						className="group pointer-events-auto absolute grid size-8 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none place-items-center rounded-full outline-none active:cursor-grabbing pointer-coarse:size-11"
+						style={cornerStyle(handle.corner)}
+						onPointerDown={(event) => onPointerDown(event, handle.corner)}
+						onPointerMove={onPointerMove}
+						onPointerUp={onPointerUp}
+						onPointerCancel={onPointerUp}
+						onKeyDown={(event) => onKeyDown(event, handle.corner)}
+					>
+						<span className="size-4 rounded-full border-2 border-ink bg-paper shadow-float transition-transform group-hover:scale-110 group-focus-visible:ring-3 group-focus-visible:ring-ring group-active:scale-110" />
+					</button>
+				))}
+			</div>
+		</>
 	);
 }

@@ -1,4 +1,4 @@
-import type { DrawnGlyph } from "./handwriting.ts";
+import { type DrawnGlyph, missingLowercase } from "./handwriting.ts";
 
 export const STOCK_FONTS = {
 	caveat: { label: "Caveat", file: "Caveat-Regular.ttf" },
@@ -30,18 +30,33 @@ export type Font = {
 	deletedAt: Date | null;
 };
 
+export const OWNER_NAME_MAX_CHARACTERS = 40;
+
+export type FontSourceKind = FontSource["kind"];
+
+export type FontStatus =
+	| "drawing"
+	| "building"
+	| "failed"
+	| "incomplete"
+	| "ready";
+
 export type FontOption = {
 	id: string;
 	ownerName: string;
+	source: FontSourceKind;
+	status: FontStatus;
 	assetId: string | null;
-	building: boolean;
+	pendingAssetId: string | null;
+	error: string | null;
 	chars: string;
+	missingRequired: number;
 };
 
-export type EditableFont = {
-	id: string;
-	ownerName: string;
-	glyphs: DrawnGlyph[];
-	assetId: string | null;
-	building: boolean;
-};
+export type EditableFont = FontOption & { glyphs: DrawnGlyph[] };
+
+export function isUsableFont(
+	font: Pick<FontOption, "assetId" | "chars">,
+): boolean {
+	return font.assetId !== null && missingLowercase(font.chars).length === 0;
+}

@@ -13,13 +13,16 @@ import {
 	useRef,
 } from "react";
 import {
+	drawsWith,
 	EMPTY_POINTER_SESSION,
 	type PointerSample,
 	type PointerSessionEvent,
 	pointerSession,
 } from "./pointer-session.ts";
 
-export type InkCanvasHandle = { undo(): void; clear(): void };
+export type InkCanvasHandle = { undo(): void; redo(): void; clear(): void };
+
+export type InkHistory = { canUndo: boolean; canRedo: boolean };
 
 export type InkCanvasProps = {
 	widthPx: number;
@@ -29,7 +32,8 @@ export type InkCanvasProps = {
 	strokeScale?: number;
 	composite?: "source-over" | "destination-out";
 	underlay?: CanvasImageSource | null;
-	onStrokeEnd(strokes: Stroke[]): void;
+	penOnly?: boolean;
+	onStrokeEnd(strokes: Stroke[], history: InkHistory): void;
 	ref?: Ref<InkCanvasHandle>;
 	className?: string;
 	"aria-label"?: string;
@@ -71,6 +75,7 @@ export function InkCanvas({
 	strokeScale = 1,
 	composite = "source-over",
 	underlay = null,
+	penOnly = false,
 	onStrokeEnd,
 	ref,
 	className,
@@ -132,7 +137,15 @@ export function InkCanvas({
 			if (next === previous) return;
 			session.current = next;
 			if (!frame.current) frame.current = requestAnimationFrame(draw);
-			if (next.strokes !== previous.strokes) strokeEnd.current(next.strokes);
+			if (
+				next.strokes !== previous.strokes ||
+				next.undone !== previous.undone
+			) {
+				strokeEnd.current(next.strokes, {
+					canUndo: next.strokes.length > 0,
+					canRedo: next.undone.length > 0,
+				});
+			}
 		},
 		[draw],
 	);
@@ -141,6 +154,7 @@ export function InkCanvas({
 		ref,
 		() => ({
 			undo: () => dispatch({ type: "undo" }),
+			redo: () => dispatch({ type: "redo" }),
 			clear: () => dispatch({ type: "clear" }),
 		}),
 		[dispatch],
@@ -162,12 +176,32 @@ export function InkCanvas({
 		[],
 	);
 
+	useEffect(() => {
+		const canvas = canvasRef.current;
+		if (!penOnly || !canvas) return;
+		const holdStylus = (event: TouchEvent) => {
+			if (
+				[...event.changedTouches].some(
+					(touch) => "touchType" in touch && touch.touchType === "stylus",
+				)
+			) {
+				event.preventDefault();
+			}
+		};
+		canvas.addEventListener("touchstart", holdStylus, { passive: false });
+		canvas.addEventListener("touchmove", holdStylus, { passive: false });
+		return () => {
+			canvas.removeEventListener("touchstart", holdStylus);
+			canvas.removeEventListener("touchmove", holdStylus);
+		};
+	}, [penOnly]);
+
 	function samples(event: ReactPointerEvent<HTMLCanvasElement>) {
 		return samplesOf(event.nativeEvent, event.currentTarget, widthPx, heightPx);
 	}
 
 	function onPointerDown(event: ReactPointerEvent<HTMLCanvasElement>) {
-		if (event.pointerType === "mouse" && event.button !== 0) return;
+		if (!drawsWith(event, penOnly)) return;
 		event.preventDefault();
 		event.currentTarget.setPointerCapture(event.pointerId);
 		const [sample] = samples(event).slice(-1);
@@ -199,7 +233,10 @@ export function InkCanvas({
 			<canvas
 				ref={canvasRef}
 				aria-label={ariaLabel}
-				className="absolute inset-0 size-full touch-none [-webkit-touch-callout:none]"
+				className={[
+					"absolute inset-0 size-full [-webkit-touch-callout:none]",
+					penOnly ? "touch-pan-y" : "touch-none",
+				].join(" ")}
 				onPointerDown={onPointerDown}
 				onPointerMove={onPointerMove}
 				onPointerUp={(event) =>

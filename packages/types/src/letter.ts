@@ -31,19 +31,9 @@ export type ParagraphNode = {
 	attrs: { align: Align };
 	content?: InlineNode[];
 };
-export type SignatureNode = {
-	type: "signature";
-	attrs: {
-		drawingId: string;
-		widthIn: (typeof SIGNATURE_WIDTHS)[number];
-		align: Align;
-		color: InkColorId;
-	};
-};
-
 export type PlacedElement = {
 	id: string;
-	kind: "drawing";
+	kind: "drawing" | "signature";
 	drawingId: string;
 	side: number;
 	xIn: number;
@@ -61,7 +51,7 @@ export type LetterDoc = {
 		minSides: number;
 		frontImageAssetId: string | null;
 	};
-	content: (ParagraphNode | SignatureNode)[];
+	content: ParagraphNode[];
 };
 export type LetterContent = {
 	schemaVersion: 1;
@@ -76,6 +66,12 @@ export type LetterResources = {
 	fonts: Record<string, string>;
 	drawings: Record<string, { maskAssetId: string; aspect: number }>;
 	frontImageAssetId: string | null;
+};
+
+export type LetterPreview = {
+	side: number;
+	content: LetterContent;
+	resources: LetterResources;
 };
 
 export type SealFont = { ownerName: string; chars: ReadonlySet<string> };
@@ -93,13 +89,8 @@ export function humanSeal(
 ): string | null {
 	let visible = 0;
 	let handwritten = 0;
-	let signed = false;
 	const owners = new Set<string>();
 	for (const block of content.doc.content) {
-		if (block.type === "signature") {
-			signed = true;
-			continue;
-		}
 		for (const node of block.content ?? []) {
 			if (node.type !== "text") continue;
 			const ink = node.marks?.find((mark) => mark.type === "ink");
@@ -120,12 +111,13 @@ export function humanSeal(
 		const names = listOf([...owners].map((name) => `${name}'s`));
 		clauses.push(`${written} in ${names} own handwriting`);
 	}
-	if (
-		content.doc.attrs.elements.some((element) => element.kind === "drawing")
-	) {
+	const { elements } = content.doc.attrs;
+	if (elements.some((element) => element.kind === "drawing")) {
 		clauses.push("doodles hand-drawn");
 	}
-	if (signed) clauses.push("signed by hand");
+	if (elements.some((element) => element.kind === "signature")) {
+		clauses.push("signed by hand");
+	}
 	const seal = clauses.join(" · ");
 	return seal === "" ? null : `${seal.charAt(0).toUpperCase()}${seal.slice(1)}`;
 }

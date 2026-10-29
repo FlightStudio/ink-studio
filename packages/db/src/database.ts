@@ -1,20 +1,31 @@
 import type { Assets } from "./drizzle/assets.ts";
 import type { Drawings } from "./drizzle/drawings.ts";
 import type { Fonts } from "./drizzle/fonts.ts";
-import type { LetterChange, Letters } from "./drizzle/letters.ts";
+import type {
+	BlankDraft,
+	LetterChange,
+	LetterCursor,
+	LetterListQuery,
+	Letters,
+	ListedLetters,
+} from "./drizzle/letters.ts";
 import type { OrganizationUsers } from "./drizzle/organization-users.ts";
 import type { Organizations } from "./drizzle/organizations.ts";
 import type { Users } from "./drizzle/users.ts";
 
 export type { NewAsset, StoredFile } from "./drizzle/assets.ts";
-export type { NewFont } from "./drizzle/fonts.ts";
+export type { FontWithBuild, NewFont } from "./drizzle/fonts.ts";
 export type { Letter, NewLetter } from "./drizzle/letters.ts";
 export type {
 	Assets,
+	BlankDraft,
 	Drawings,
 	Fonts,
 	LetterChange,
+	LetterCursor,
+	LetterListQuery,
 	Letters,
+	ListedLetters,
 	Organizations,
 	OrganizationUsers,
 	Users,

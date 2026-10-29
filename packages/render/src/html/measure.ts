@@ -23,6 +23,7 @@ export function measureLetter(
 		0,
 		Math.round((input.limitIn - textHeightIn) / input.heightIn),
 	);
+	const overflowSide = lastSide + 1;
 	const document = root.ownerDocument;
 	const range = document.createRange();
 	const walker = document.createTreeWalker(root, 1 | 4);
@@ -67,7 +68,7 @@ export function measureLetter(
 	let textBottomIn = 0;
 	for (const line of lines) {
 		const side = Math.min(
-			lastSide,
+			overflowSide,
 			Math.max(0, Math.floor((line.topIn - textHeightIn) / pitchIn) + 1),
 		);
 		lineTopsIn.push(line.topIn - side * input.gapIn);
@@ -86,7 +87,7 @@ export function measureLetter(
 			for (const rect of range.getClientRects()) {
 				const topIn = (rect.top - origin.top) / pxPerIn;
 				const side = Math.min(
-					lastSide,
+					overflowSide,
 					Math.max(0, Math.floor((topIn - textHeightIn) / pitchIn) + 1),
 				);
 				if (

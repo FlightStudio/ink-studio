@@ -1,4 +1,4 @@
-import type { Db } from "@repo/db";
+import type { Db, FontWithBuild } from "@repo/db";
 import { ServiceError } from "@repo/errors";
 import type {
 	DrawnGlyph,
@@ -6,10 +6,15 @@ import type {
 	Font,
 	FontOption,
 	FontSource,
+	FontStatus,
 	Member,
 } from "@repo/types";
-import { missingChars } from "@repo/types";
-import { generatedAsset, publishAssetJob } from "../assets/assets.service.ts";
+import { missingChars, missingLowercase } from "@repo/types";
+import {
+	asApiErrorCode,
+	generatedAsset,
+	publishAssetJob,
+} from "../assets/assets.service.ts";
 import type { Publisher } from "../queue/index.ts";
 import { parseDrawnGlyph, parseOwnerName } from "./fonts.schemas.ts";
 import type { CreateFontParams, SaveGlyphParams } from "./fonts.types.ts";
@@ -35,27 +40,47 @@ function replaceCell(
 	);
 }
 
-function toOption(font: Font): FontOption {
+function statusOf(font: FontWithBuild): {
+	status: FontStatus;
+	error: string | null;
+} {
+	const build = font.pendingBuild;
+	if (build?.status === "pending" || build?.status === "running") {
+		return { status: "building", error: null };
+	}
+	if (build?.status === "failed") {
+		return { status: "failed", error: asApiErrorCode(build.error) };
+	}
+	if (font.fontAssetId !== null) {
+		return {
+			status: missingLowercase(font.chars).length > 0 ? "incomplete" : "ready",
+			error: null,
+		};
+	}
+	if (font.source.kind === "drawn") return { status: "drawing", error: null };
+	return { status: "failed", error: "internal_error" };
+}
+
+function toOption(font: FontWithBuild): FontOption {
 	return {
 		id: font.id,
 		ownerName: font.ownerName,
+		source: font.source.kind,
+		...statusOf(font),
 		assetId: font.fontAssetId,
-		building: font.pendingFontAssetId !== null,
+		pendingAssetId: font.pendingFontAssetId,
 		chars: font.chars,
+		missingRequired:
+			font.source.kind === "drawn"
+				? missingChars(font.source.glyphs).length
+				: 0,
 	};
 }
 
-function drawnGlyphs(font: Font): DrawnGlyph[] {
-	return font.source.kind === "drawn" ? font.source.glyphs : [];
-}
-
-function toEditable(font: Font): EditableFont {
+function toEditable(font: FontWithBuild): EditableFont {
 	return {
-		id: font.id,
-		ownerName: font.ownerName,
-		glyphs: drawnGlyphs(font),
-		assetId: font.fontAssetId,
-		building: font.pendingFontAssetId !== null,
+		...toOption(font),
+		glyphs: font.source.kind === "drawn" ? font.source.glyphs : [],
 	};
 }
 
@@ -70,9 +95,6 @@ export class FontService {
 		params: CreateFontParams,
 	): Promise<{ id: string; assetId?: string }> {
 		const ownerName = parseOwnerName(params.ownerName);
-		if (ownerName === null) {
-			throw new ServiceError("invalid_input", "invalid_owner_name");
-		}
 		const organizationId = member.userOrganization.organizationId;
 		if (params.source?.kind === "template-photo") {
 			const photo = await this.db.assets.byId(
@@ -222,7 +244,7 @@ export class FontService {
 				throw new ServiceError("forbidden", "not_owner");
 			}
 			if (
-				font.source.kind !== "drawn" ||
+				font.source.kind === "drawn" &&
 				missingChars(font.source.glyphs).length > 0
 			) {
 				throw new ServiceError("invalid_input", "font_incomplete");

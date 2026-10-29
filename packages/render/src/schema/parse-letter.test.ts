@@ -39,7 +39,11 @@ const canonical: LetterContent = {
 	doc: {
 		type: "doc",
 		attrs: {
-			elements: [element(1), { ...element(2), wrap: true }],
+			elements: [
+				element(1),
+				{ ...element(2), wrap: true },
+				{ ...element(3), kind: "signature" },
+			],
 			minSides: 2,
 			frontImageAssetId,
 		},
@@ -263,24 +267,51 @@ describe("parseLetterContent", () => {
 		expect(parsed.doc.attrs.elements[1]?.wrap).toBe(false);
 	});
 
-	it("a signature in the middle is refused", () => {
+	it("a signature in the text is refused, since it is placed on the page", () => {
 		const content = copy();
-		const paragraph = content.doc.content[0];
-		if (!paragraph) throw new Error("the letter has no paragraph");
-		content.doc.content = [
-			paragraph,
-			{
-				type: "signature",
-				attrs: {
-					drawingId: "0192e4a0-7b1c-7cc3-9a5e-3f1d2b4c5a20",
-					widthIn: 2.25,
-					align: "right",
-					color: "ink-blue",
-				},
+		const json = {
+			...content,
+			doc: {
+				...content.doc,
+				content: [
+					...content.doc.content,
+					{
+						type: "signature",
+						attrs: {
+							drawingId: "0192e4a0-7b1c-7cc3-9a5e-3f1d2b4c5a20",
+							widthIn: 2.25,
+							align: "right",
+							color: "ink-blue",
+						},
+					},
+				],
 			},
-			paragraph,
+		};
+		expect(() => parseLetterContent(json)).toThrow();
+	});
+
+	it("a second placed signature is refused", () => {
+		const content = copy();
+		content.doc.attrs.elements = [
+			{ ...element(4), kind: "signature" },
+			{ ...element(5), kind: "signature" },
 		];
 		expect(() => parseLetterContent(content)).toThrow();
+	});
+
+	it("an element kind outside drawing and signature is refused", () => {
+		const content = copy();
+		const json = {
+			...content,
+			doc: {
+				...content.doc,
+				attrs: {
+					...content.doc.attrs,
+					elements: [{ ...element(4), kind: "sticker" }],
+				},
+			},
+		};
+		expect(() => parseLetterContent(json)).toThrow();
 	});
 
 	it("a field the catalogue does not have is refused", () => {

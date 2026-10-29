@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@repo/ui/components/ui/button";
+import { Button, buttonVariants } from "@repo/ui/components/ui/button";
 import Link from "next/link";
 import { DeskMessage } from "@/features/editor/components/desk-message";
 
@@ -19,13 +19,14 @@ export default function LetterErrorPage({
 					<Button variant="outline" className="rounded-full" onClick={reset}>
 						Try again
 					</Button>
-					<Button
-						className="rounded-full"
-						nativeButton={false}
-						render={<Link href="/letters" />}
+					<Link
+						href="/letters"
+						className={buttonVariants({
+							className: "rounded-full pointer-coarse:min-h-11",
+						})}
 					>
 						Back to letters
-					</Button>
+					</Link>
 				</>
 			}
 		>

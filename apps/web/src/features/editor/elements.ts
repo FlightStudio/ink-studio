@@ -1,12 +1,10 @@
-import type { PlacedElement, SignatureNode } from "@repo/types";
+import type { PlacedElement } from "@repo/types";
 import { closeHistory } from "@tiptap/pm/history";
 import type { EditorState, Transaction } from "@tiptap/pm/state";
 
-export type ElementChange = Partial<
-	Omit<PlacedElement, "id" | "kind" | "drawingId">
->;
+export type ElementChange = Partial<Omit<PlacedElement, "id" | "kind">>;
 
-function elementsOf(state: EditorState): PlacedElement[] {
+export function elementsOf(state: EditorState): PlacedElement[] {
 	const elements = state.doc.attrs.elements;
 	return Array.isArray(elements) ? (elements as PlacedElement[]) : [];
 }
@@ -42,24 +40,26 @@ export function updateElement(
 	return replaceElements(state, next);
 }
 
+export function signatureOf(state: EditorState): PlacedElement | null {
+	return (
+		elementsOf(state).find((element) => element.kind === "signature") ?? null
+	);
+}
+
 export function signLetter(
 	state: EditorState,
-	signature: SignatureNode["attrs"],
+	signature: PlacedElement,
 ): Transaction {
-	const type = state.schema.nodes.signature;
-	if (!type) throw new Error("the letter cannot hold a signature");
-	const node = type.create(signature);
-	const { doc } = state;
-	const transaction = state.tr;
-	const last = doc.lastChild;
-	const end = doc.content.size;
-	if (last?.type.name === "signature") {
-		transaction.replaceWith(end - last.nodeSize, end, node);
-	} else {
-		transaction.insert(end, node);
-	}
-	closeHistory(transaction);
-	return transaction;
+	const current = signatureOf(state);
+	if (!current) return placeElement(state, signature);
+	return updateElement(state, current.id, {
+		drawingId: signature.drawingId,
+		tint: signature.tint,
+		widthIn: signature.widthIn,
+		heightIn: signature.heightIn,
+		xIn: current.xIn + (current.widthIn - signature.widthIn) / 2,
+		yIn: current.yIn + (current.heightIn - signature.heightIn) / 2,
+	});
 }
 
 export function removeElement(state: EditorState, id: string): Transaction {

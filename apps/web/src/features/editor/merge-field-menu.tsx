@@ -1,9 +1,10 @@
 "use client";
 
-import { computePosition, flip, offset, shift } from "@floating-ui/dom";
 import type { MergeFieldKey } from "@repo/types";
+import type { MergeFieldItem } from "./merge-fields.ts";
 
-export type MergeFieldItem = { field: MergeFieldKey; label: string };
+const PANEL =
+	"min-w-40 rounded-2xl bg-paper text-ink shadow-float ring-1 ring-[oklch(0.3_0.03_60/0.06)]";
 
 export function MergeFieldMenu({
 	items,
@@ -14,12 +15,18 @@ export function MergeFieldMenu({
 	selectedIndex: number;
 	onPick: (field: MergeFieldKey) => void;
 }) {
+	if (items.length === 0) {
+		return (
+			<p
+				role="status"
+				className={`${PANEL} px-4 py-2.5 text-ui text-ink-muted`}
+			>
+				No matching field
+			</p>
+		);
+	}
 	return (
-		<div
-			role="listbox"
-			aria-label="Fields"
-			className="min-w-40 rounded-2xl bg-paper p-1 text-ink shadow-float ring-1 ring-[oklch(0.3_0.03_60/0.06)]"
-		>
+		<div role="listbox" aria-label="Fields" className={`${PANEL} p-1`}>
 			{items.map((item, index) => (
 				<button
 					key={item.field}
@@ -27,7 +34,7 @@ export function MergeFieldMenu({
 					role="option"
 					aria-selected={index === selectedIndex}
 					data-selected={index === selectedIndex ? "true" : "false"}
-					className="block w-full rounded-full px-3 py-1.5 text-left text-ui data-[selected=true]:bg-muted"
+					className="block w-full rounded-full px-3 py-1.5 text-left text-ui data-[selected=true]:bg-muted pointer-coarse:min-h-11"
 					onMouseDown={(event) => {
 						event.preventDefault();
 						onPick(item.field);
@@ -38,25 +45,4 @@ export function MergeFieldMenu({
 			))}
 		</div>
 	);
-}
-
-export async function placeMergeFieldMenu(
-	element: HTMLElement,
-	clientRect: () => DOMRect | null,
-): Promise<void> {
-	const rect = clientRect();
-	if (!rect) return;
-	const { x, y } = await computePosition(
-		{ getBoundingClientRect: () => rect },
-		element,
-		{
-			placement: "bottom-start",
-			strategy: "fixed",
-			middleware: [offset(6), flip(), shift({ padding: 8 })],
-		},
-	);
-	element.style.position = "fixed";
-	element.style.left = `${x}px`;
-	element.style.top = `${y}px`;
-	element.style.zIndex = "40";
 }

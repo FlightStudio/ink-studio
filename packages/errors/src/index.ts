@@ -10,6 +10,7 @@ export const apiErrorCodes = [
 	"invalid_letter",
 	"invalid_title",
 	"invalid_owner_name",
+	"owner_name_too_long",
 	"invalid_glyphs",
 	"font_incomplete",
 	"font_not_ready",
@@ -35,6 +36,10 @@ export const apiErrorCodes = [
 
 export type ApiErrorCode = (typeof apiErrorCodes)[number];
 
+export function isApiErrorCode(value: string): value is ApiErrorCode {
+	return (apiErrorCodes as readonly string[]).includes(value);
+}
+
 export const errorMessages = {
 	invalid_request: "The request is not valid.",
 	unauthenticated: "Sign in is required.",
@@ -46,10 +51,10 @@ export const errorMessages = {
 	no_organization: "You are not in an organization.",
 	invalid_letter: "The letter could not be read.",
 	invalid_title: "A title needs 1 to 120 characters and no control characters.",
-	invalid_owner_name:
-		"A name needs 1 to 40 characters and no control characters.",
-	invalid_glyphs: "That glyph cannot be saved.",
-	font_incomplete: "This handwriting is missing some letters.",
+	invalid_owner_name: "Add a name for the seal.",
+	owner_name_too_long: "That name is too long, so keep it to 40 characters.",
+	invalid_glyphs: "That letter could not be saved, so draw it again.",
+	font_incomplete: "Some needed letters are still blank, so draw them first.",
 	font_not_ready: "That handwriting is not ready yet.",
 	not_owner: "Only the owner can do that.",
 	stale_revision: "This letter changed in another tab.",
@@ -57,17 +62,20 @@ export const errorMessages = {
 	unsupported_file: "That kind of file cannot be used here.",
 	heic_not_supported:
 		"HEIC photos cannot be uploaded, so choose a JPEG, PNG or WebP.",
-	processing_failed: "That file could not be made, so try again.",
+	processing_failed: "Something went wrong on our side, so try again.",
 	photo_unreadable: "That photo could not be opened, so try another one.",
 	photo_too_large: "That photo has too many pixels, so try a smaller one.",
-	no_ink_found: "No ink was found in that photo.",
+	no_ink_found:
+		"No ink was found in that photo, so try a darker pen or more light.",
 	invalid_mask: "That picture cannot be used as a mask.",
 	invalid_drawing: "That drawing is not valid.",
 	invalid_photo: "Only a photo can be lifted.",
-	template_markers_not_found: "The template's corner marks were not found.",
-	font_unreadable: "That font file could not be read.",
-	font_timeout: "That font took too long to read.",
-	font_missing_glyphs: "That font is missing lowercase letters.",
+	template_markers_not_found:
+		"We could not find all four black squares. Lay the page flat and fit all four in the photo.",
+	font_unreadable: "That file could not be read, so choose another one.",
+	font_timeout: "That file took too long to read, so choose another one.",
+	font_missing_glyphs:
+		"That font is missing some of a to z, so choose one that has them all.",
 	letter_overflow: "The words do not fit on the page.",
 	letter_placement: "A doodle sits where the printer needs clear paper.",
 } as const satisfies Record<ApiErrorCode, string>;

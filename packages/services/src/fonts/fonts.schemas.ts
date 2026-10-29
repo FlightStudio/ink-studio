@@ -1,12 +1,12 @@
+import { ServiceError } from "@repo/errors";
 import {
 	CELL,
 	type DrawnGlyph,
 	GLYPH_LIMITS,
 	HANDWRITING_GLYPHS,
+	OWNER_NAME_MAX_CHARACTERS,
 } from "@repo/types";
 import { z } from "zod";
-
-const OWNER_NAME_MAX_CHARACTERS = 40;
 
 const strokePoint = z.tuple([
 	z.number().finite().min(0).max(CELL.size),
@@ -38,14 +38,13 @@ export function parseDrawnGlyph(value: unknown): DrawnGlyph | null {
 	return parsed.data;
 }
 
-export function parseOwnerName(value: string): string | null {
-	const trimmed = value.trim();
-	if (
-		trimmed === "" ||
-		/\p{Cc}/u.test(trimmed) ||
-		[...trimmed].length > OWNER_NAME_MAX_CHARACTERS
-	) {
-		return null;
+export function parseOwnerName(value: string): string {
+	const trimmed = value.replace(/\s+/gu, " ").trim();
+	if (trimmed === "" || /\p{Cc}/u.test(trimmed)) {
+		throw new ServiceError("invalid_input", "invalid_owner_name");
+	}
+	if ([...trimmed].length > OWNER_NAME_MAX_CHARACTERS) {
+		throw new ServiceError("invalid_input", "owner_name_too_long");
 	}
 	return trimmed;
 }

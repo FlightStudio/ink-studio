@@ -52,6 +52,43 @@ export interface LetterState {
   content: LetterContentEnvelope;
 }
 
+export type LetterResourcesFonts = {[key: string]: string};
+
+export type LetterResourcesDrawings = {[key: string]: {
+  maskAssetId: string;
+  aspect: number;
+}};
+
+export interface LetterResources {
+  assetBaseUrl: string;
+  stockFontBaseUrl: string;
+  fonts: LetterResourcesFonts;
+  drawings: LetterResourcesDrawings;
+  /** @nullable */
+  frontImageAssetId: string | null;
+}
+
+export interface LetterPreview {
+  /** @minimum 0 */
+  side: number;
+  content: LetterContentEnvelope;
+  resources: LetterResources;
+}
+
+export interface LetterListItem {
+  id: string;
+  title: string;
+  updatedAt: string;
+  productLabel: string;
+  preview: LetterPreview;
+}
+
+export interface LetterListPage {
+  items: LetterListItem[];
+  /** @nullable */
+  nextCursor: string | null;
+}
+
 export type DrawnFontSourceKind = typeof DrawnFontSourceKind[keyof typeof DrawnFontSourceKind];
 
 
@@ -169,6 +206,7 @@ export const ApiErrorCode = {
   invalid_letter: 'invalid_letter',
   invalid_title: 'invalid_title',
   invalid_owner_name: 'invalid_owner_name',
+  owner_name_too_long: 'owner_name_too_long',
   invalid_glyphs: 'invalid_glyphs',
   font_incomplete: 'font_incomplete',
   font_not_ready: 'font_not_ready',
@@ -334,6 +372,13 @@ export type InternalErrorResponse = ApiError;
  */
 export type NoOrganizationResponse = ApiError;
 
+export type ListLettersParams = {
+/**
+ * The nextCursor of the page before.
+ */
+cursor?: string;
+};
+
 export type UploadFileParams = {
 purpose: UploadPurpose;
 };
@@ -381,6 +426,75 @@ export const getHealth = async ( options?: RequestInit): Promise<getHealthRespon
 
   const data: getHealthResponse['data'] = body ? JSON.parse(body) : {}
   return { data, status: res.status, headers: res.headers } as getHealthResponse
+}
+
+
+
+export type listLettersResponse200 = {
+  data: LetterListPage
+  status: 200
+}
+
+export type listLettersResponse400 = {
+  data: InvalidRequestResponse
+  status: 400
+}
+
+export type listLettersResponse401 = {
+  data: UnauthenticatedResponse
+  status: 401
+}
+
+export type listLettersResponse403 = {
+  data: ForbiddenResponse
+  status: 403
+}
+
+export type listLettersResponse500 = {
+  data: InternalErrorResponse
+  status: 500
+}
+
+export type listLettersResponseSuccess = (listLettersResponse200) & {
+  headers: Headers;
+};
+export type listLettersResponseError = (listLettersResponse400 | listLettersResponse401 | listLettersResponse403 | listLettersResponse500) & {
+  headers: Headers;
+};
+
+export type listLettersResponse = (listLettersResponseSuccess | listLettersResponseError)
+
+export const getListLettersUrl = (params?: ListLettersParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/letters?${stringifiedParams}` : `/api/letters`
+}
+
+export const listLetters = async (params?: ListLettersParams, options?: RequestInit): Promise<listLettersResponse> => {
+
+  const res = await fetch(getListLettersUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+)
+
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listLettersResponse['data'] = body ? JSON.parse(body) : {}
+  return { data, status: res.status, headers: res.headers } as listLettersResponse
 }
 
 

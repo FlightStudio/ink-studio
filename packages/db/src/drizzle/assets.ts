@@ -13,6 +13,7 @@ export type StoredFile = {
 
 export type Assets = {
 	byId: (organizationId: string, id: string) => Promise<Asset | null>;
+	referenced: (organizationId: string, ids: string[]) => Promise<Asset[]>;
 	create: (input: NewAsset) => Promise<Asset>;
 	claim: (id: string, staleBefore: Date) => Promise<Asset | null>;
 	complete: (id: string, file: StoredFile) => Promise<void>;
@@ -39,7 +40,7 @@ function originOf(row: AssetRow): AssetOrigin {
 	};
 }
 
-function processingOf(row: AssetRow): AssetProcessing {
+export function processingOf(row: AssetRow): AssetProcessing {
 	const attempts = row.processingAttempts;
 	switch (row.processingStatus) {
 		case "done":
@@ -122,6 +123,19 @@ export function createAssets(db: Query): Assets {
 				.limit(1);
 			const row = rows[0];
 			return row ? toAsset(row) : null;
+		},
+		async referenced(organizationId, ids) {
+			if (ids.length === 0) return [];
+			const rows = await db
+				.select()
+				.from(assets)
+				.where(
+					and(
+						eq(assets.organizationId, organizationId),
+						inArray(assets.id, ids),
+					),
+				);
+			return rows.map(toAsset);
 		},
 		async create(input) {
 			const inserted = await db

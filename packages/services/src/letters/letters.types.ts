@@ -1,17 +1,30 @@
 import type {
 	CreateLetterRequest,
+	ListLettersParams as ListLettersQuery,
 	RequestExportRequest,
 	SaveLetterRequest,
 } from "@repo/api";
-import type { LetterContent, LetterResources, PrintOutput } from "@repo/types";
+import type {
+	LetterContent,
+	LetterPreview,
+	LetterResources,
+	PrintOutput,
+} from "@repo/types";
 
 export type LetterListItem = {
 	id: string;
 	title: string;
 	updatedAt: Date;
-	humanSeal: string | null;
 	productLabel: string;
+	preview: LetterPreview;
 };
+
+export type LetterListPage = {
+	items: LetterListItem[];
+	nextCursor: string | null;
+};
+
+export type ListLettersParams = ListLettersQuery;
 
 export type SealFontView = { ownerName: string; chars: string };
 

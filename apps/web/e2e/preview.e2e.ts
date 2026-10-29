@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
 	fixtureContent,
 	LETTER_FIXTURES,
@@ -103,6 +104,46 @@ describe("the print preview", () => {
 		}
 	}, 180_000);
 
+	it("the preview is a dialog: Escape closes it and focus goes back", async () => {
+		const page = await openFixture(harness, member, "note");
+		const open = page.getByRole("button", { name: "Print preview" });
+		await open.click();
+		const dialog = page.getByRole("dialog", { name: "Print preview" });
+		await dialog.waitFor();
+		expect(
+			await dialog.evaluate((node) => node.contains(document.activeElement)),
+		).toBe(true);
+		await page.keyboard.press("Escape");
+		await dialog.waitFor({ state: "hidden" });
+		await expect
+			.poll(() => open.evaluate((node) => document.activeElement === node))
+			.toBe(true);
+	});
+
+	it("the preview shows only the sides in use, each with its edge", async () => {
+		const page = await openFixture(harness, member, "note");
+		await page.getByRole("button", { name: "Print preview" }).click();
+		const frame = page.frameLocator('iframe[title="Print preview"]');
+		await frame.locator(".letter-page").waitFor();
+		expect(await frame.locator(".letter-sheet").count()).toBe(
+			Number(await page.locator("[data-sides]").getAttribute("data-sides")),
+		);
+		const sheet = page.locator("[data-preview-sheet]").first();
+		const box = await sheet.boundingBox();
+		const shadow = await sheet.evaluate(
+			(node) => getComputedStyle(node).boxShadow,
+		);
+		expect(shadow).not.toBe("none");
+		const spec = PAGE_SPECS[DEFAULT_FORMAT];
+		expect((box?.width ?? 0) / (box?.height ?? 1)).toBeCloseTo(
+			spec.widthIn / spec.heightIn,
+			2,
+		);
+		expect(await page.locator("[data-preview-sheet]").count()).toBe(
+			await frame.locator(".letter-sheet").count(),
+		);
+	});
+
 	it("the preview has no desk and no guides", async () => {
 		const page = await openFixture(harness, member, "note");
 		await expect
@@ -128,5 +169,85 @@ describe("the print preview", () => {
 		const markup = await frame.locator("body").innerHTML();
 		expect(markup.includes("paper.png")).toBe(false);
 		expect(markup.includes("data-keep-clear")).toBe(false);
+	});
+
+	it("a proof still being made after a minute says so, and Try again asks again", async () => {
+		const page = await openFixture(harness, member, "note");
+		await page.clock.install();
+		let exports = 0;
+		await page.route("**/api/letters/*/exports", (route) => {
+			exports += 1;
+			return route.fulfill({
+				status: 201,
+				contentType: "application/json",
+				body: JSON.stringify({ assetIds: [randomUUID()] }),
+			});
+		});
+		await page.route("**/api/assets/*/status", (route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({ status: "running", error: null }),
+			}),
+		);
+		const polled = page.waitForRequest((request) =>
+			request.url().includes("/status"),
+		);
+		await page.getByRole("button", { name: "Export proof" }).click();
+		await page.getByText("Making the proof").waitFor();
+		await polled;
+		await page
+			.getByText("Usually under a minute. You can keep writing.")
+			.waitFor();
+		expect(
+			await page.getByText("This is taking longer than usual.").count(),
+		).toBe(0);
+		await page.clock.fastForward(61_000);
+		await page.getByText("This is taking longer than usual.").waitFor();
+		await page.getByRole("button", { name: "Try again" }).click();
+		await expect.poll(() => exports).toBe(2);
+		await page
+			.getByText("Usually under a minute. You can keep writing.")
+			.waitFor();
+	});
+
+	it("once one proof fails, the other proofs stop being asked about", async () => {
+		const page = await openFixture(harness, member, "note");
+		await page.clock.install();
+		const failing = randomUUID();
+		const waiting = randomUUID();
+		await page.route("**/api/letters/*/exports", (route) =>
+			route.fulfill({
+				status: 201,
+				contentType: "application/json",
+				body: JSON.stringify({ assetIds: [failing, waiting] }),
+			}),
+		);
+		let asked = 0;
+		await page.route("**/api/assets/*/status", (route) => {
+			const failed = route.request().url().includes(failing);
+			if (!failed) asked += 1;
+			return route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify(
+					failed
+						? { status: "failed", error: "processing_failed" }
+						: { status: "running", error: null },
+				),
+			});
+		});
+		await page.getByRole("button", { name: "Export proof" }).click();
+		await page.getByRole("button", { name: "Try again" }).waitFor();
+		const wait = async () => {
+			for (let step = 0; step < 3; step += 1) {
+				await page.clock.fastForward(4000);
+				await page.waitForTimeout(150);
+			}
+		};
+		await wait();
+		const before = asked;
+		await wait();
+		expect(asked).toBe(before);
 	});
 });

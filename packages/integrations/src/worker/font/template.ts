@@ -8,10 +8,13 @@ type Point = [number, number];
 
 const CELL_PPI = 150;
 const INK = 128;
+const NOTCH_SAMPLES = 5;
+const NOTCH_CONTRAST = 0.5;
 
 const marker = HANDWRITING_TEMPLATE.marker;
 const page = HANDWRITING_TEMPLATE.page;
 const grid = HANDWRITING_TEMPLATE.grid;
+const label = HANDWRITING_TEMPLATE.label;
 
 function markerCentres(): [Point, Point, Point, Point] {
 	const inset = marker.insetIn + marker.sizeIn / 2;
@@ -132,6 +135,18 @@ type Component = {
 	sumY: number;
 };
 
+function neighboursOf(index: number, mask: Mask): number[] {
+	const x = index % mask.widthPx;
+	const found: number[] = [];
+	if (x > 0) found.push(index - 1);
+	if (x < mask.widthPx - 1) found.push(index + 1);
+	if (index >= mask.widthPx) found.push(index - mask.widthPx);
+	if (index + mask.widthPx < mask.alpha.length) {
+		found.push(index + mask.widthPx);
+	}
+	return found;
+}
+
 function componentsOf(mask: Mask): Component[] {
 	const { widthPx, heightPx, alpha } = mask;
 	const seen = new Uint8Array(alpha.length);
@@ -165,17 +180,8 @@ function componentsOf(mask: Mask): Component[] {
 			component.minY = Math.min(component.minY, y);
 			component.maxX = Math.max(component.maxX, x);
 			component.maxY = Math.max(component.maxY, y);
-			const neighbours = [
-				index - 1,
-				index + 1,
-				index - widthPx,
-				index + widthPx,
-			];
-			for (const next of neighbours) {
-				if (next < 0 || next >= alpha.length || seen[next] === 1) continue;
-				if (next === index - 1 && x === 0) continue;
-				if (next === index + 1 && x === widthPx - 1) continue;
-				if ((alpha[next] ?? 0) < INK) continue;
+			for (const next of neighboursOf(index, mask)) {
+				if (seen[next] === 1 || (alpha[next] ?? 0) < INK) continue;
 				seen[next] = 1;
 				queue[tail] = next;
 				tail += 1;
@@ -186,55 +192,58 @@ function componentsOf(mask: Mask): Component[] {
 	return found;
 }
 
-function cornerInk(mask: Mask, component: Component, corner: Point): number {
-	const span = Math.max(
-		2,
-		Math.round(
-			Math.min(
-				component.maxX - component.minX,
-				component.maxY - component.minY,
-			) *
-				(marker.notchIn / marker.sizeIn),
-		),
+function clockwise(centres: Point[]): Point[] {
+	const middleX = centres.reduce((sum, [x]) => sum + x, 0) / centres.length;
+	const middleY = centres.reduce((sum, [, y]) => sum + y, 0) / centres.length;
+	return centres.toSorted(
+		(a, b) =>
+			Math.atan2(a[1] - middleY, a[0] - middleX) -
+			Math.atan2(b[1] - middleY, b[0] - middleX),
 	);
+}
+
+function innerCornerInk(mask: Mask, h: number[], centre: Point): number {
+	const reach = marker.sizeIn / 2 - marker.notchIn / 2;
+	const x = centre[0] + Math.sign(page.widthIn / 2 - centre[0]) * reach;
+	const y = centre[1] + Math.sign(page.heightIn / 2 - centre[1]) * reach;
+	const span = marker.notchIn / 2;
+	const step = span / (NOTCH_SAMPLES - 1);
 	let ink = 0;
-	let total = 0;
-	const [cx, cy] = corner;
-	for (let y = Math.round(cy) - span; y <= Math.round(cy) + span; y += 1) {
-		for (let x = Math.round(cx) - span; x <= Math.round(cx) + span; x += 1) {
-			if (x < component.minX || y < component.minY) continue;
-			if (x > component.maxX || y > component.maxY) continue;
-			total += 1;
-			if ((mask.alpha[y * mask.widthPx + x] ?? 0) >= INK) ink += 1;
+	for (let row = 0; row < NOTCH_SAMPLES; row += 1) {
+		for (let column = 0; column < NOTCH_SAMPLES; column += 1) {
+			const [photoX, photoY] = apply(h, [
+				x - span / 2 + column * step,
+				y - span / 2 + row * step,
+			]);
+			if (sample(mask, photoX, photoY) >= INK) ink += 1;
 		}
 	}
-	return total === 0 ? 1 : ink / total;
+	return ink / NOTCH_SAMPLES ** 2;
 }
 
-function extremes(mask: Mask, component: Component): Point[] {
-	let left: Point = [component.maxX, 0];
-	let right: Point = [component.minX, 0];
-	let top: Point = [0, component.maxY];
-	let bottom: Point = [0, component.minY];
-	for (let y = component.minY; y <= component.maxY; y += 1) {
-		for (let x = component.minX; x <= component.maxX; x += 1) {
-			if ((mask.alpha[y * mask.widthPx + x] ?? 0) < INK) continue;
-			if (x < left[0]) left = [x, y];
-			if (x > right[0]) right = [x, y];
-			if (y < top[1]) top = [x, y];
-			if (y > bottom[1]) bottom = [x, y];
-		}
+function orient(mask: Mask, centres: Point[]): [Point, Point, Point, Point] {
+	const ring = clockwise(centres);
+	const template = markerCentres();
+	let best: { score: number; order: [Point, Point, Point, Point] } | null =
+		null;
+	for (let start = 0; start < ring.length; start += 1) {
+		const [first, second, third, fourth] = [
+			...ring.slice(start),
+			...ring.slice(0, start),
+		];
+		if (!first || !second || !third || !fourth) continue;
+		const order: [Point, Point, Point, Point] = [first, second, third, fourth];
+		const h = homography(template, order);
+		const [notch = 1, ...plain] = template.map((centre) =>
+			innerCornerInk(mask, h, centre),
+		);
+		const score = Math.min(...plain) - notch;
+		if (!best || score > best.score) best = { score, order };
 	}
-	return [left, right, top, bottom];
-}
-
-function notched(mask: Mask, component: Component): boolean {
-	const scores = extremes(mask, component).map((corner) =>
-		cornerInk(mask, component, corner),
-	);
-	const quiet = scores.filter((score) => score < 0.35).length;
-	const full = scores.filter((score) => score > 0.6).length;
-	return quiet === 1 && full >= 2;
+	if (!best || best.score < NOTCH_CONTRAST) {
+		throw new ServiceError("invalid_input", "template_markers_not_found");
+	}
+	return best.order;
 }
 
 function squareEnough(component: Component, mask: Mask): boolean {
@@ -262,54 +271,6 @@ function inCorner(component: Component, mask: Mask): boolean {
 	const nearX = x < mask.widthPx * 0.34 || x > mask.widthPx * 0.66;
 	const nearY = y < mask.heightPx * 0.34 || y > mask.heightPx * 0.66;
 	return nearX && nearY;
-}
-
-function orderMarkers(
-	mask: Mask,
-	squares: Component[],
-): [Point, Point, Point, Point] {
-	let notchedIndex = squares.findIndex((component) => notched(mask, component));
-	if (notchedIndex < 0) {
-		const ranked = squares
-			.map((component, index) => ({ index, fill: fillOf(component) }))
-			.toSorted((a, b) => a.fill - b.fill);
-		const quiet = ranked[0];
-		const rest = ranked.slice(1);
-		const gap = (rest[0]?.fill ?? 0) - (quiet?.fill ?? 0);
-		const spread =
-			Math.max(...rest.map((item) => item.fill)) -
-			Math.min(...rest.map((item) => item.fill));
-		if (!quiet || rest.length < 3 || gap < 0.02 || spread > 0.04) {
-			throw new ServiceError("invalid_input", "template_markers_not_found");
-		}
-		notchedIndex = quiet.index;
-	}
-	const centres = squares.map(centreOf);
-	const origin = centres[notchedIndex] ?? [0, 0];
-	const rest = centres.filter((_, index) => index !== notchedIndex);
-	const far = rest.toSorted(
-		(a, b) =>
-			Math.hypot(b[0] - origin[0], b[1] - origin[1]) -
-			Math.hypot(a[0] - origin[0], a[1] - origin[1]),
-	);
-	const diagonal = far[0];
-	const side = far[1];
-	const other = far[2];
-	if (!diagonal || !side || !other) {
-		throw new ServiceError("invalid_input", "template_markers_not_found");
-	}
-	const turn =
-		(side[0] - origin[0]) * (diagonal[1] - origin[1]) -
-		(side[1] - origin[1]) * (diagonal[0] - origin[0]);
-	const right = turn > 0 ? side : other;
-	const left = turn > 0 ? other : side;
-	return [origin, right, diagonal, left];
-}
-
-function fillOf(component: Component): number {
-	const width = component.maxX - component.minX + 1;
-	const height = component.maxY - component.minY + 1;
-	return component.count / (width * height);
 }
 
 async function lifted(photo: Uint8Array): Promise<Mask> {
@@ -347,7 +308,7 @@ function markersOf(mask: Mask): [Point, Point, Point, Point] {
 	if (squares.length !== 4) {
 		throw new ServiceError("invalid_input", "template_markers_not_found");
 	}
-	return orderMarkers(mask, squares);
+	return orient(mask, squares.map(centreOf));
 }
 
 export async function findTemplateMarkers(
@@ -391,6 +352,42 @@ function cellMask(mask: Mask, h: number[], slot: Slot): Mask {
 	return { widthPx, heightPx, alpha };
 }
 
+function withoutLabel(cell: Mask): Mask {
+	const zoneWidth = Math.round(
+		(label.zoneWidthIn - grid.cellInsetIn) * CELL_PPI,
+	);
+	const zoneHeight = Math.round(
+		(label.zoneHeightIn - grid.cellInsetIn) * CELL_PPI,
+	);
+	const alpha = cell.alpha.slice();
+	const seen = new Uint8Array(alpha.length);
+	for (let y = 0; y < Math.min(zoneHeight, cell.heightPx); y += 1) {
+		for (let x = 0; x < Math.min(zoneWidth, cell.widthPx); x += 1) {
+			const start = y * cell.widthPx + x;
+			if (seen[start] === 1 || (alpha[start] ?? 0) < INK) continue;
+			seen[start] = 1;
+			const pixels = [start];
+			let inside = true;
+			for (let head = 0; head < pixels.length; head += 1) {
+				const index = pixels[head] ?? 0;
+				if (
+					index % cell.widthPx >= zoneWidth ||
+					Math.floor(index / cell.widthPx) >= zoneHeight
+				) {
+					inside = false;
+				}
+				for (const next of neighboursOf(index, cell)) {
+					if (seen[next] === 1 || (alpha[next] ?? 0) < INK) continue;
+					seen[next] = 1;
+					pixels.push(next);
+				}
+			}
+			if (inside) for (const index of pixels) alpha[index] = 0;
+		}
+	}
+	return { ...cell, alpha };
+}
+
 export async function readTemplate(photo: Uint8Array): Promise<TemplateCell[]> {
 	const mask = await lifted(photo);
 	const photoMarkers = markersOf(mask);
@@ -398,6 +395,6 @@ export async function readTemplate(photo: Uint8Array): Promise<TemplateCell[]> {
 	return slots().map((slot) => ({
 		char: slot.char,
 		variant: slot.variant,
-		mask: cellMask(mask, h, slot),
+		mask: withoutLabel(cellMask(mask, h, slot)),
 	}));
 }

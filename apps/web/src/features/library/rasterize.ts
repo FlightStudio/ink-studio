@@ -1,79 +1,100 @@
 import { outlinePath, strokeOutline } from "@repo/render/html";
 import type { Stroke } from "@repo/types";
+import { CROP_PAD } from "./ink-bounds.ts";
 
 const LONG_SIDE_PX = 1200;
-const CROP_PAD = 0.02;
+
+export const MIN_STROKE_SCALE = 0.2;
 
 export type Raster = { png: Blob; aspect: number };
+
+export type RasterPlan = {
+	strokeScale: number;
+	outlines: [number, number][][];
+	inkX: number;
+	inkY: number;
+	inkWidth: number;
+	inkHeight: number;
+	factor: number;
+	widthPx: number;
+	heightPx: number;
+};
+
+type Bounds = { minX: number; minY: number; maxX: number; maxY: number };
+
+function pointBounds(points: Iterable<readonly number[]>): Bounds | null {
+	let bounds: Bounds | null = null;
+	for (const [x = 0, y = 0] of points) {
+		bounds = bounds
+			? {
+					minX: Math.min(bounds.minX, x),
+					minY: Math.min(bounds.minY, y),
+					maxX: Math.max(bounds.maxX, x),
+					maxY: Math.max(bounds.maxY, y),
+				}
+			: { minX: x, minY: y, maxX: x, maxY: y };
+	}
+	return bounds;
+}
+
+export function rasterPlan(
+	strokes: Stroke[],
+	box: { widthPx: number; heightPx: number },
+): RasterPlan | null {
+	const centre = pointBounds(strokes.flatMap((stroke) => stroke.points));
+	if (!centre) return null;
+	const drawnLong = Math.max(
+		centre.maxX - centre.minX,
+		centre.maxY - centre.minY,
+	);
+	const strokeScale = Math.min(
+		1,
+		Math.max(
+			MIN_STROKE_SCALE,
+			drawnLong / Math.max(box.widthPx, box.heightPx, 1),
+		),
+	);
+	const outlines = strokes.map((stroke) => strokeOutline(stroke, strokeScale));
+	const ink = pointBounds(outlines.flat());
+	if (!ink) return null;
+	const pad = CROP_PAD * Math.max(ink.maxX - ink.minX, ink.maxY - ink.minY);
+	const inkWidth = Math.max(ink.maxX - ink.minX + 2 * pad, 1);
+	const inkHeight = Math.max(ink.maxY - ink.minY + 2 * pad, 1);
+	const factor = LONG_SIDE_PX / Math.max(inkWidth, inkHeight);
+	return {
+		strokeScale,
+		outlines,
+		inkX: ink.minX - pad,
+		inkY: ink.minY - pad,
+		inkWidth,
+		inkHeight,
+		factor,
+		widthPx: Math.max(1, Math.round(inkWidth * factor)),
+		heightPx: Math.max(1, Math.round(inkHeight * factor)),
+	};
+}
 
 export async function rasterize(
 	strokes: Stroke[],
 	box: { widthPx: number; heightPx: number },
 ): Promise<Raster> {
-	const longSide = Math.max(box.widthPx, box.heightPx, 1);
-	const factor = LONG_SIDE_PX / longSide;
-	const width = Math.max(1, Math.round(box.widthPx * factor));
-	const height = Math.max(1, Math.round(box.heightPx * factor));
-	const canvas = new OffscreenCanvas(width, height);
-	const context = canvas.getContext("2d", { willReadFrequently: true });
+	const plan = rasterPlan(strokes, box);
+	if (!plan) throw new Error("Draw something before saving.");
+	const canvas = new OffscreenCanvas(plan.widthPx, plan.heightPx);
+	const context = canvas.getContext("2d");
 	if (!context) throw new Error("The doodle could not be drawn.");
-	context.scale(factor, factor);
+	context.setTransform(
+		plan.factor,
+		0,
+		0,
+		plan.factor,
+		-plan.inkX * plan.factor,
+		-plan.inkY * plan.factor,
+	);
 	context.fillStyle = "#000000";
-	for (const stroke of strokes) {
-		context.fill(new Path2D(outlinePath(strokeOutline(stroke, 1))));
+	for (const outline of plan.outlines) {
+		context.fill(new Path2D(outlinePath(outline)));
 	}
-	const bounds = inkBounds(
-		context.getImageData(0, 0, width, height).data,
-		width,
-		height,
-	);
-	if (!bounds) throw new Error("Draw something before saving.");
-	const inkWidth = bounds.maxX - bounds.minX + 1;
-	const inkHeight = bounds.maxY - bounds.minY + 1;
-	const pad = Math.round(CROP_PAD * Math.max(inkWidth, inkHeight));
-	const cropX = Math.max(0, bounds.minX - pad);
-	const cropY = Math.max(0, bounds.minY - pad);
-	const cropRight = Math.min(width, bounds.maxX + 1 + pad);
-	const cropBottom = Math.min(height, bounds.maxY + 1 + pad);
-	const cropWidth = Math.max(1, cropRight - cropX);
-	const cropHeight = Math.max(1, cropBottom - cropY);
-	const cropped = new OffscreenCanvas(cropWidth, cropHeight);
-	const croppedContext = cropped.getContext("2d");
-	if (!croppedContext) throw new Error("The doodle could not be drawn.");
-	croppedContext.drawImage(
-		canvas,
-		cropX,
-		cropY,
-		cropWidth,
-		cropHeight,
-		0,
-		0,
-		cropWidth,
-		cropHeight,
-	);
-	const png = await cropped.convertToBlob({ type: "image/png" });
-	return { png, aspect: cropWidth / cropHeight };
-}
-
-function inkBounds(
-	data: Uint8ClampedArray,
-	width: number,
-	height: number,
-): { minX: number; minY: number; maxX: number; maxY: number } | null {
-	let minX = width;
-	let minY = height;
-	let maxX = -1;
-	let maxY = -1;
-	for (let y = 0; y < height; y += 1) {
-		for (let x = 0; x < width; x += 1) {
-			const alpha = data[(y * width + x) * 4 + 3] ?? 0;
-			if (alpha === 0) continue;
-			if (x < minX) minX = x;
-			if (y < minY) minY = y;
-			if (x > maxX) maxX = x;
-			if (y > maxY) maxY = y;
-		}
-	}
-	if (maxX < 0) return null;
-	return { minX, minY, maxX, maxY };
+	const png = await canvas.convertToBlob({ type: "image/png" });
+	return { png, aspect: plan.widthPx / plan.heightPx };
 }

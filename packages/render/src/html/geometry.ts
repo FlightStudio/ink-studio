@@ -60,7 +60,7 @@ function contains(outer: Rect, inner: Rect): boolean {
 	);
 }
 
-function zoneRect(spec: PageSpec, zone: KeepClearZone): Rect {
+export function keepClearRect(spec: PageSpec, zone: KeepClearZone): Rect {
 	return {
 		xIn: zone.corner.endsWith("left") ? 0 : spec.widthIn - zone.widthIn,
 		yIn: zone.corner.startsWith("top") ? 0 : spec.heightIn - zone.heightIn,
@@ -114,21 +114,24 @@ export function clipToText(
 export function pageExclusions(spec: PageSpec, gapIn: number): Exclusion[] {
 	const sides = writingSides(spec);
 	const exclusions: Exclusion[] = [];
-	for (const [index, side] of sides.entries()) {
-		const next = sides[index + 1];
-		if (next === undefined) continue;
+	for (const side of sides) {
 		const yIn = sideTopIn(spec, side, gapIn) + textHeightIn(spec);
 		exclusions.push({
 			xIn: 0,
 			yIn,
 			widthIn: textWidthIn(spec),
-			heightIn: sideTopIn(spec, next, gapIn) - yIn,
+			heightIn: sideTopIn(spec, side + 1, gapIn) - yIn,
 			wrap: "both",
 		});
 	}
 	for (const zone of spec.keepClear) {
 		if (!sides.includes(zone.side)) continue;
-		const clipped = clipToText(spec, zone.side, zoneRect(spec, zone), gapIn);
+		const clipped = clipToText(
+			spec,
+			zone.side,
+			keepClearRect(spec, zone),
+			gapIn,
+		);
 		if (!clipped) continue;
 		exclusions.push({
 			...clipped,
@@ -274,7 +277,7 @@ export function placementIssues(
 		const blocked = spec.keepClear.some(
 			(zone) =>
 				zone.side === box.side &&
-				intersect(zoneRect(spec, zone), footprint) !== null,
+				intersect(keepClearRect(spec, zone), footprint) !== null,
 		);
 		if (blocked) issues.push({ elementId: box.id, kind: "keep-clear" });
 		if (box.side >= lastSide) {

@@ -1,5 +1,14 @@
-import type { LetterContent } from "@repo/types";
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import type { LetterContent, PageFormatId } from "@repo/types";
+import {
+	and,
+	desc,
+	eq,
+	getTableColumns,
+	isNull,
+	or,
+	type SQL,
+	sql,
+} from "drizzle-orm";
 import { v7 as uuidv7 } from "uuid";
 import type { Query } from "./query.ts";
 import { letters } from "./schema/letters.ts";
@@ -26,9 +35,28 @@ export type LetterChange = {
 	expectedRevision: number;
 };
 
+export type LetterCursor = { updatedAt: string; id: string };
+
+export type BlankDraft = {
+	format: PageFormatId;
+	title: string;
+	minSides: number;
+};
+
+export type LetterListQuery = {
+	limit: number;
+	after: LetterCursor | null;
+	hideBlank: readonly BlankDraft[];
+};
+
+export type ListedLetters = { letters: Letter[]; next: LetterCursor | null };
+
 export type Letters = {
 	byId: (organizationId: string, id: string) => Promise<Letter | null>;
-	list: (organizationId: string) => Promise<Letter[]>;
+	list: (
+		organizationId: string,
+		query: LetterListQuery,
+	) => Promise<ListedLetters>;
 	create: (input: NewLetter) => Promise<Letter>;
 	save: (
 		organizationId: string,
@@ -58,6 +86,29 @@ function live(organizationId: string, id: string) {
 	);
 }
 
+const exactUpdatedAt = sql<string>`to_char(${letters.updatedAt} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`;
+
+function blankDraft(drafts: readonly BlankDraft[]): SQL {
+	const untitled = or(
+		...drafts.map(
+			(draft) =>
+				sql`(${letters.content}->>'format' = ${draft.format} and ${letters.title} = ${draft.title} and ${letters.content} #> '{doc,attrs,minSides}' = to_jsonb(${draft.minSides}::int))`,
+		),
+	);
+	if (untitled === undefined) return sql`false`;
+	return sql`coalesce(${untitled}
+		and jsonb_array_length(${letters.content} #> '{doc,attrs,elements}') = 0
+		and jsonb_typeof(${letters.content} #> '{doc,attrs,frontImageAssetId}') = 'null'
+		and jsonb_array_length(${letters.content} #> '{doc,content}') = 1
+		and ${letters.content} #>> '{doc,content,0,type}' = 'paragraph'
+		and coalesce(jsonb_array_length(${letters.content} #> '{doc,content,0,content}'), 0) = 0, false)`;
+}
+
+function before(cursor: LetterCursor | null): SQL | undefined {
+	if (cursor === null) return undefined;
+	return sql`(${letters.updatedAt}, ${letters.id}) < (${cursor.updatedAt}::timestamptz, ${cursor.id}::uuid)`;
+}
+
 export function createLetters(db: Query): Letters {
 	return {
 		async byId(organizationId, id) {
@@ -69,18 +120,29 @@ export function createLetters(db: Query): Letters {
 			const row = rows[0];
 			return row ? toLetter(row) : null;
 		},
-		async list(organizationId) {
+		async list(organizationId, query) {
 			const rows = await db
-				.select()
+				.select({ ...getTableColumns(letters), exactUpdatedAt })
 				.from(letters)
 				.where(
 					and(
 						eq(letters.organizationId, organizationId),
 						isNull(letters.deletedAt),
+						sql`not ${blankDraft(query.hideBlank)}`,
+						before(query.after),
 					),
 				)
-				.orderBy(desc(letters.updatedAt), desc(letters.id));
-			return rows.map(toLetter);
+				.orderBy(desc(letters.updatedAt), desc(letters.id))
+				.limit(query.limit + 1);
+			const page = rows.slice(0, query.limit);
+			const last = page.at(-1);
+			return {
+				letters: page.map(toLetter),
+				next:
+					rows.length > query.limit && last
+						? { updatedAt: last.exactUpdatedAt, id: last.id }
+						: null,
+			};
 		},
 		async create(input) {
 			const inserted = await db

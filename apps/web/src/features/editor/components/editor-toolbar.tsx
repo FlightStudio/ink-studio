@@ -20,6 +20,7 @@ import {
 	SelectGroup,
 	SelectItem,
 	SelectLabel,
+	SelectSeparator,
 	SelectTrigger,
 	SelectValue,
 } from "@repo/ui/components/ui/select";
@@ -49,20 +50,21 @@ import {
 	AlignLeft,
 	AlignRight,
 	AtSign,
-	Images,
+	LibraryBig,
 	Redo2,
 	Undo2,
 } from "lucide-react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
 	type CSSProperties,
 	type ReactNode,
 	type RefObject,
+	useId,
 	useLayoutEffect,
-	useRef,
 	useSyncExternalStore,
 } from "react";
-import { openMergeFieldMenu } from "../merge-field-suggestion.ts";
+import { fontMenu, hrefOfMenuValue } from "../font-menu.ts";
+import { startMergeField } from "../merge-field-suggestion.ts";
 
 const COARSE_POINTER = "(pointer: coarse)";
 const KEYBOARD_GAP_PX = 12;
@@ -153,8 +155,16 @@ function ownUndoStep({ tr }: { tr: Transaction }): boolean {
 	return true;
 }
 
-function formatInk(editor: Editor, attrs: Partial<InkAttrs>): void {
-	editor.chain().focus().command(ownUndoStep).setMark("ink", attrs).run();
+function formatInk(
+	editor: Editor,
+	attrs: Partial<InkAttrs>,
+	focus = true,
+): void {
+	const chain = editor.chain();
+	(focus ? chain.focus() : chain)
+		.command(ownUndoStep)
+		.setMark("ink", attrs)
+		.run();
 }
 
 function alignParagraphs(editor: Editor, align: Align): void {
@@ -253,7 +263,9 @@ function HistoryButton({
 }
 
 export type EditorToolbarProps = {
+	ref: RefObject<HTMLDivElement | null>;
 	editor: Editor;
+	letterId: string;
 	defaults: InkStyle;
 	fonts?: FontOption[];
 	coarsePointer: boolean;
@@ -274,8 +286,19 @@ function fontFromKey(key: string): FontRef | null {
 	return null;
 }
 
+const GROUP_SEPARATOR = "max-[56rem]:hidden pointer-coarse:max-[64rem]:hidden";
+
+const ROW_BREAK =
+	"hidden basis-full min-[40rem]:max-[56rem]:block pointer-coarse:min-[40rem]:max-[64rem]:block";
+
+function Separator() {
+	return <Toolbar.Separator className={GROUP_SEPARATOR} />;
+}
+
 export function EditorToolbar({
+	ref,
 	editor,
+	letterId,
 	defaults,
 	fonts = [],
 	coarsePointer,
@@ -283,24 +306,28 @@ export function EditorToolbar({
 	onLibrary,
 	onOwnFont,
 }: EditorToolbarProps) {
-	const ref = useRef<HTMLDivElement>(null);
+	const router = useRouter();
+	const inkGroup = useId();
 	const style = useEditorState({
 		editor,
 		selector: ({ editor: current }) => resolvedStyle(current.state, defaults),
 	});
 	useFollowKeyboard(ref, coarsePointer, onKeyboardClearance);
-	const built = fonts.filter((font) => font.assetId !== null);
+	const menu = fontMenu(fonts, letterId);
 	const items = [
 		...FONT_ITEMS.map((item) => ({
 			value: `stock:${item.value}`,
 			label: item.label,
 		})),
-		...built.map((font) => ({
+		...menu.usable.map(({ font }) => ({
 			value: `own:${font.id}`,
 			label: `${font.ownerName}'s handwriting`,
 		})),
+		...menu.links.map((link) => ({ value: link.value, label: link.label })),
 	];
 	const font = style.font ? fontKey(style.font) : null;
+	const fontLabel =
+		items.find((item) => item.value === font)?.label ?? "Mixed fonts";
 
 	return (
 		<TooltipProvider delay={400}>
@@ -308,7 +335,7 @@ export function EditorToolbar({
 				ref={ref}
 				placement={coarsePointer ? "bottom" : "top"}
 				aria-label="Formatting"
-				className="mb-5 max-w-[calc(100vw-1rem)] overflow-x-auto"
+				className="mb-5 max-w-[calc(100vw-1rem)] flex-wrap justify-center gap-y-1 rounded-[22px] max-[56rem]:gap-x-3 pointer-coarse:rounded-[26px] pointer-coarse:max-[64rem]:gap-x-3"
 				style={coarsePointer ? KEYBOARD_PLACEMENT : undefined}
 			>
 				<Toolbar.Group aria-label="History" className="flex">
@@ -327,12 +354,17 @@ export function EditorToolbar({
 						<Redo2 />
 					</HistoryButton>
 				</Toolbar.Group>
-				<Toolbar.Separator />
+				<Separator />
 				<Select
 					items={items}
 					value={font}
 					onValueChange={(next) => {
 						if (!next) return;
+						const href = hrefOfMenuValue(next);
+						if (href) {
+							router.push(href);
+							return;
+						}
 						const chosen = fontFromKey(next);
 						if (!chosen) return;
 						formatInk(editor, { font: chosen });
@@ -346,7 +378,8 @@ export function EditorToolbar({
 						render={
 							<SelectTrigger
 								aria-label="Font"
-								className="w-38 rounded-full border-transparent pl-3.5 hover:bg-muted"
+								title={fontLabel}
+								className="w-44 min-w-0 rounded-full border-transparent pl-3.5 hover:bg-muted *:data-[slot=select-value]:block *:data-[slot=select-value]:truncate"
 							/>
 						}
 					>
@@ -359,11 +392,11 @@ export function EditorToolbar({
 						sideOffset={8}
 						className="w-auto min-w-(--anchor-width) p-1"
 					>
-						{built.map((item) =>
-							item.assetId ? (
+						{menu.usable.map(({ font: own }) =>
+							own.assetId ? (
 								<style
-									key={item.id}
-								>{`@font-face { font-family: "own-${item.id}"; src: url("/api/assets/${item.assetId}"); font-display: block; }`}</style>
+									key={own.id}
+								>{`@font-face { font-family: "own-${own.id}"; src: url("/api/assets/${own.assetId}"); font-display: block; }`}</style>
 							) : null,
 						)}
 						<SelectGroup>
@@ -379,31 +412,42 @@ export function EditorToolbar({
 								</SelectItem>
 							))}
 						</SelectGroup>
+						<SelectSeparator />
 						<SelectGroup>
 							<SelectLabel>My handwriting</SelectLabel>
-							{built.length === 0 ? (
-								<Link
-									href="/fonts/new"
-									className="block rounded-md px-2.5 py-1.5 text-ui text-ink hover:bg-muted"
+							{menu.usable.map(({ font: own, note }) => (
+								<SelectItem
+									key={own.id}
+									value={`own:${own.id}`}
+									className="overflow-hidden py-1.5 pl-2.5"
 								>
-									Make a handwriting font
-								</Link>
-							) : (
-								built.map((item) => (
-									<SelectItem
-										key={item.id}
-										value={`own:${item.id}`}
-										className="overflow-hidden py-1.5 pl-2.5 text-title"
-										style={{ fontFamily: `"own-${item.id}", "stock-caveat"` }}
+									<span
+										className="text-title"
+										style={{ fontFamily: `"own-${own.id}", "stock-caveat"` }}
 									>
-										{item.ownerName}'s handwriting
-									</SelectItem>
-								))
-							)}
+										{own.ownerName}'s handwriting
+									</span>
+									<span className="self-center text-label text-ink-muted">
+										· {note}
+									</span>
+								</SelectItem>
+							))}
+							{menu.links.map((link) => (
+								<SelectItem
+									key={link.value}
+									value={link.value}
+									className="py-1.5 pl-2.5 text-ui pointer-coarse:min-h-11"
+								>
+									<span>{link.label}</span>
+									{link.note ? (
+										<span className="text-ink-muted">· {link.note}</span>
+									) : null}
+								</SelectItem>
+							))}
 						</SelectGroup>
 					</SelectContent>
 				</Select>
-				<Toolbar.Separator />
+				<Separator />
 				<ToggleGroup
 					aria-label="Size"
 					spacing={0}
@@ -414,34 +458,58 @@ export function EditorToolbar({
 					}}
 				>
 					{TEXT_SIZES.map((size) => (
-						<Toolbar.Button
-							key={size}
-							aria-label={`${size} pt`}
-							render={
-								<ToggleGroupItem
-									value={String(size)}
-									className="tabular-nums"
-								/>
-							}
-						>
-							{size}
-						</Toolbar.Button>
+						<Tooltip key={size}>
+							<TooltipTrigger
+								render={
+									<Toolbar.Button
+										aria-label={`${size} pt`}
+										render={
+											<ToggleGroupItem
+												value={String(size)}
+												className="tabular-nums"
+											/>
+										}
+									/>
+								}
+							>
+								{size}
+							</TooltipTrigger>
+							<TooltipContent side="bottom">Text size {size} pt</TooltipContent>
+						</Tooltip>
 					))}
 				</ToggleGroup>
-				<Toolbar.Separator />
-				<div role="radiogroup" aria-label="Ink" className="flex">
+				<span aria-hidden className={ROW_BREAK} />
+				<Separator />
+				<div
+					role="radiogroup"
+					aria-label="Ink"
+					className="flex"
+					onKeyDown={(event) => {
+						if (event.key.startsWith("Arrow")) event.stopPropagation();
+					}}
+				>
 					{INK_ITEMS.map((ink) => (
-						<Swatch
-							key={ink.id}
-							color={ink.css}
-							label={ink.label}
-							labelHidden
-							selected={style.color === ink.id}
-							onSelect={() => formatInk(editor, { color: ink.id })}
-						/>
+						<Tooltip key={ink.id}>
+							<TooltipTrigger
+								render={
+									<Swatch
+										color={ink.css}
+										label={ink.label}
+										labelHidden
+										name={inkGroup}
+										selected={style.color === ink.id}
+										onMouseDown={(event) => event.preventDefault()}
+										onSelect={(source) =>
+											formatInk(editor, { color: ink.id }, source === "pointer")
+										}
+									/>
+								}
+							/>
+							<TooltipContent side="bottom">{ink.label}</TooltipContent>
+						</Tooltip>
 					))}
 				</div>
-				<Toolbar.Separator />
+				<Separator />
 				<ToggleGroup
 					aria-label="Align"
 					spacing={0}
@@ -467,37 +535,31 @@ export function EditorToolbar({
 						</Tooltip>
 					))}
 				</ToggleGroup>
-				<Toolbar.Separator />
-				<Tooltip>
-					<TooltipTrigger
-						render={
-							<Toolbar.Button
-								aria-label="Insert field"
-								onMouseDown={(event) => event.preventDefault()}
-								onClick={() => openMergeFieldMenu(editor)}
-								render={<Button variant="ghost" size="icon" />}
-							/>
-						}
+				<Separator />
+				<div className="flex items-center gap-0.5">
+					<Tooltip>
+						<TooltipTrigger
+							render={
+								<Toolbar.Button
+									aria-label="Insert field"
+									onMouseDown={(event) => event.preventDefault()}
+									onClick={() => startMergeField(editor)}
+									render={<Button variant="ghost" size="icon" />}
+								/>
+							}
+						>
+							<AtSign />
+						</TooltipTrigger>
+						<TooltipContent side="bottom">Insert field</TooltipContent>
+					</Tooltip>
+					<Toolbar.Button
+						onClick={onLibrary}
+						render={<Button variant="ghost" className="px-3" />}
 					>
-						<AtSign />
-					</TooltipTrigger>
-					<TooltipContent side="bottom">Insert field</TooltipContent>
-				</Tooltip>
-				<Toolbar.Separator />
-				<Tooltip>
-					<TooltipTrigger
-						render={
-							<Toolbar.Button
-								aria-label="Library"
-								onClick={onLibrary}
-								render={<Button variant="ghost" size="icon" />}
-							/>
-						}
-					>
-						<Images />
-					</TooltipTrigger>
-					<TooltipContent side="bottom">Library</TooltipContent>
-				</Tooltip>
+						<LibraryBig />
+						Library
+					</Toolbar.Button>
+				</div>
 			</FloatingToolbar>
 		</TooltipProvider>
 	);

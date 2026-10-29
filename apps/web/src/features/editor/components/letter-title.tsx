@@ -49,7 +49,7 @@ export function LetterTitle({
 					onDone();
 				}
 			}}
-			className="field-sizing-content min-w-[8ch] max-w-[min(30rem,55vw)] truncate rounded-md bg-transparent px-1.5 py-0.5 -mx-1.5 text-title text-ink outline-none transition-colors duration-(--duration-quick) placeholder:text-ink-muted hover:bg-desk/60 focus-visible:bg-desk/60 focus-visible:ring-2 focus-visible:ring-ring"
+			className="field-sizing-content pointer-coarse:min-h-11 min-w-[8ch] max-w-[min(30rem,55vw)] truncate rounded-md bg-transparent px-1.5 py-0.5 -mx-1.5 text-title text-ink outline-none transition-colors duration-(--duration-quick) placeholder:text-ink-muted hover:bg-desk/60 focus-visible:bg-desk/60 focus-visible:ring-2 focus-visible:ring-ring"
 		/>
 	);
 }

@@ -1,13 +1,18 @@
 import type { TestDb } from "@repo/db";
 import { seedDevIdentity, startTestDb } from "@repo/db/testing";
-import type { LetterContent, Member, UploadPurpose } from "@repo/types";
+import type {
+	LetterContent,
+	Member,
+	PlacedElement,
+	UploadPurpose,
+} from "@repo/types";
 import { SAMPLE_MERGE_VALUES } from "@repo/types";
 import { v7 as uuidv7 } from "uuid";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { generatedAsset } from "../assets/assets.service.ts";
 import { FontService } from "../fonts/fonts.service.ts";
 import type { Publisher } from "../queue/queue.types.ts";
-import { LetterService } from "./letters.service.ts";
+import { LETTER_PAGE_SIZE, LetterService } from "./letters.service.ts";
 
 const ownFontId = "0192e4a0-7b1c-7cc3-9a5e-3f1d2b4c5a10";
 
@@ -161,22 +166,67 @@ it("the list holds this organization's live letters, newest first", async () => 
 	const deleted = await letters.createLetter(ada, {});
 	await letters.createLetter(bob, {});
 	await letters.deleteLetter(ada, deleted.id);
-	const { content } = await stored(ada, older.id);
+	const { content } = await stored(ada, newer.id);
+	await letters.saveLetter(ada, newer.id, {
+		title: "Untitled letter",
+		content: written(content, "Dear Sam,"),
+		expectedRevision: 1,
+	});
 	await letters.saveLetter(ada, older.id, {
 		title: "Touched last",
 		content: written(content, "Dear Alex,"),
 		expectedRevision: 1,
 	});
-	const list = await letters.listLetters(ada);
+	const { items: list, nextCursor } = await letters.listLetters(ada, {});
+	expect(nextCursor).toBeNull();
 	expect(list.map((item) => item.id)).toEqual([older.id, newer.id]);
 	expect(list[0]).toEqual({
 		id: older.id,
 		title: "Touched last",
 		updatedAt: (await stored(ada, older.id)).updatedAt,
-		humanSeal: null,
 		productLabel: "Letter",
+		preview: {
+			side: 0,
+			content: written(content, "Dear Alex,"),
+			resources: {
+				assetBaseUrl: "/api/assets/",
+				stockFontBaseUrl: "/fonts/stock/",
+				fonts: {},
+				drawings: {},
+				frontImageAssetId: null,
+			},
+		},
 	});
 	expect(list[1]?.title).toBe("Untitled letter");
+});
+
+it("the list leaves out drafts that are still blank and untitled", async () => {
+	const ada = await member("ada-blank-drafts");
+	const blank = await letters.createLetter(ada, {});
+	const blankPostcard = await letters.createLetter(ada, {
+		format: "thanksio:postcard-6x9",
+	});
+	const titled = await letters.createLetter(ada, {});
+	const { content } = await stored(ada, titled.id);
+	await letters.saveLetter(ada, titled.id, {
+		title: "For Sam",
+		content,
+		expectedRevision: 1,
+	});
+	const sided = await letters.createLetter(ada, {});
+	await letters.saveLetter(ada, sided.id, {
+		title: "Untitled letter",
+		content: {
+			...content,
+			doc: { ...content.doc, attrs: { ...content.doc.attrs, minSides: 2 } },
+		},
+		expectedRevision: 1,
+	});
+	const ids = (await letters.listLetters(ada, {})).items.map((item) => item.id);
+	expect(ids).toEqual([sided.id, titled.id]);
+	expect(ids).not.toContain(blank.id);
+	expect(ids).not.toContain(blankPostcard.id);
+	expect(await letters.getLetter(ada, blank.id)).not.toBeNull();
 });
 
 it("a deleted letter is gone from the list and from getLetter", async () => {
@@ -184,7 +234,10 @@ it("a deleted letter is gone from the list and from getLetter", async () => {
 	const { id } = await letters.createLetter(ada, {});
 	await letters.deleteLetter(ada, id);
 	expect(await letters.getLetter(ada, id)).toBeNull();
-	expect(await letters.listLetters(ada)).toEqual([]);
+	expect(await letters.listLetters(ada, {})).toEqual({
+		items: [],
+		nextCursor: null,
+	});
 	await expect(letters.deleteLetter(ada, id)).rejects.toMatchObject({
 		kind: "not_found",
 		code: "not_found",
@@ -716,26 +769,42 @@ async function inkDrawing(
 	});
 }
 
+function placed(
+	kind: "drawing" | "signature",
+	drawingId: string,
+	side = 0,
+): PlacedElement {
+	return {
+		id: uuidv7(),
+		kind,
+		drawingId,
+		side,
+		xIn: 5,
+		yIn: 9,
+		widthIn: 2.25,
+		heightIn: 0.75,
+		rotationDeg: -4,
+		tint: "ink-blue",
+		wrap: false,
+	};
+}
+
 function withSignature(
 	content: LetterContent,
 	drawingId: string,
+	side = 0,
 ): LetterContent {
 	return {
 		...content,
 		doc: {
 			...content.doc,
-			content: [
-				...content.doc.content,
-				{
-					type: "signature",
-					attrs: {
-						drawingId,
-						widthIn: 2.25,
-						align: "right",
-						color: "ink-blue",
-					},
-				},
-			],
+			attrs: {
+				...content.doc.attrs,
+				elements: [
+					...content.doc.attrs.elements,
+					placed("signature", drawingId, side),
+				],
+			},
 		},
 	};
 }
@@ -771,6 +840,47 @@ it("a letter cannot sign with another organization's signature", async () => {
 	expect((await stored(ada, id)).revision).toBe(1);
 });
 
+it("a doodle on the page cannot be someone's signature", async () => {
+	const karla = await member("karla-signature-as-doodle");
+	const sam = await teammate(karla, "sam-signature-as-doodle");
+	const signature = await inkDrawing(karla, "signature", "Karla");
+	const { id } = await letters.createLetter(sam, {});
+	const { content } = await stored(sam, id);
+	await expect(
+		letters.saveLetter(sam, id, {
+			title: "Slipped in",
+			content: {
+				...content,
+				doc: {
+					...content.doc,
+					attrs: {
+						...content.doc.attrs,
+						elements: [placed("drawing", signature.id)],
+					},
+				},
+			},
+			expectedRevision: 1,
+		}),
+	).rejects.toMatchObject({ kind: "invalid_input", code: "invalid_letter" });
+	expect((await stored(sam, id)).revision).toBe(1);
+});
+
+it("a placed signature saves where it was put and turned", async () => {
+	const ada = await member("ada-placed-signature");
+	const signature = await inkDrawing(ada, "signature", "Ada");
+	const { id } = await letters.createLetter(ada, {});
+	const { content } = await stored(ada, id);
+	const signed = withSignature(content, signature.id);
+	await letters.saveLetter(ada, id, {
+		title: "Signed",
+		content: signed,
+		expectedRevision: 1,
+	});
+	expect((await stored(ada, id)).content.doc.attrs.elements).toEqual(
+		signed.doc.attrs.elements,
+	);
+});
+
 it("a teammate in the same organization cannot sign with Karla's signature", async () => {
 	const karla = await member("karla-signature-owner");
 	const sam = await teammate(karla, "sam-signature-owner");
@@ -784,6 +894,65 @@ it("a teammate in the same organization cannot sign with Karla's signature", asy
 			expectedRevision: 1,
 		}),
 	).rejects.toMatchObject({ kind: "forbidden", code: "not_owner" });
+});
+
+it("a page loads its letters' fonts, drawings and front images in one query each", async () => {
+	const ada = await member("ada-list-resources");
+	const signature = await inkDrawing(ada, "signature", "Ada");
+	const fontAsset = await fontFile(ada);
+	const font = await handwriting(ada, fontAsset, "Hel");
+	const cover = await storedAsset(ada, "cover", "image/png");
+	const signed = await letters.createLetter(ada, {});
+	const { content } = await stored(ada, signed.id);
+	await letters.saveLetter(ada, signed.id, {
+		title: "Signed",
+		content: withSignature(content, signature.id),
+		expectedRevision: 1,
+	});
+	const handwritten = await letters.createLetter(ada, {});
+	await letters.saveLetter(ada, handwritten.id, {
+		title: "In hand",
+		content: inHand(content, font.id),
+		expectedRevision: 1,
+	});
+	const postcard = await letters.createLetter(ada, {
+		format: "thanksio:postcard-6x9",
+	});
+	const front = await stored(ada, postcard.id);
+	await letters.saveLetter(ada, postcard.id, {
+		title: "Front",
+		content: {
+			...front.content,
+			doc: {
+				...front.content.doc,
+				attrs: { ...front.content.doc.attrs, frontImageAssetId: cover },
+			},
+		},
+		expectedRevision: 1,
+	});
+	const drawings = vi.spyOn(testDb.db.drawings, "referenced");
+	const fonts = vi.spyOn(testDb.db.fonts, "referenced");
+	const assets = vi.spyOn(testDb.db.assets, "referenced");
+	const byId = vi.spyOn(testDb.db.assets, "byId");
+	const { items } = await letters.listLetters(ada, {});
+	const byLetter = new Map(
+		items.map((item) => [item.id, item.preview.resources]),
+	);
+	expect(byLetter.get(signed.id)?.drawings[signature.id]?.maskAssetId).toBe(
+		signature.maskAssetId,
+	);
+	expect(byLetter.get(signed.id)?.fonts).toEqual({});
+	expect(byLetter.get(handwritten.id)?.fonts).toEqual({
+		[font.id]: fontAsset,
+	});
+	expect(byLetter.get(handwritten.id)?.drawings).toEqual({});
+	expect(byLetter.get(postcard.id)?.frontImageAssetId).toBe(cover);
+	expect(byLetter.get(signed.id)?.frontImageAssetId).toBeNull();
+	expect(drawings).toHaveBeenCalledTimes(1);
+	expect(fonts).toHaveBeenCalledTimes(1);
+	expect(assets).toHaveBeenCalledTimes(1);
+	expect(byId).not.toHaveBeenCalled();
+	vi.restoreAllMocks();
 });
 
 it("a signed letter's resources hold its signature mask", async () => {
@@ -801,4 +970,171 @@ it("a signed letter's resources hold its signature mask", async () => {
 		signature.maskAssetId,
 	);
 	expect(letter?.editable).toBe(true);
+});
+
+it("the list comes in pages of 24, and the cursor carries on after the last letter", async () => {
+	const ada = await member("ada-pages");
+	const bob = await member("bob-pages");
+	const { content } = await stored(
+		ada,
+		(await letters.createLetter(ada, {})).id,
+	);
+	const titled: string[] = [];
+	for (let index = 0; index < LETTER_PAGE_SIZE + 1; index += 1) {
+		const letter = await testDb.db.letters.create({
+			organizationId: organizationId(ada),
+			title: `For Sam ${index}`,
+			content,
+		});
+		titled.unshift(letter.id);
+	}
+	for (let index = 0; index < 3; index += 1) {
+		await letters.createLetter(ada, {});
+		await letters.createLetter(bob, {
+			format: "thanksio:postcard-6x9",
+		});
+	}
+	await testDb.db.letters.create({
+		organizationId: organizationId(bob),
+		title: "Bob's own",
+		content,
+	});
+	const first = await letters.listLetters(ada, {});
+	expect(first.items.map((item) => item.id)).toEqual(
+		titled.slice(0, LETTER_PAGE_SIZE),
+	);
+	expect(first.nextCursor).not.toBeNull();
+	const second = await letters.listLetters(ada, {
+		cursor: first.nextCursor ?? undefined,
+	});
+	expect(second.items.map((item) => item.id)).toEqual(
+		titled.slice(LETTER_PAGE_SIZE),
+	);
+	expect(second.nextCursor).toBeNull();
+	expect(
+		(await letters.listLetters(bob, {})).items.map((item) => item.title),
+	).toEqual(["Bob's own"]);
+});
+
+it("a cursor the list did not give is refused", async () => {
+	const ada = await member("ada-bad-cursor");
+	for (const cursor of [
+		"",
+		"not a cursor",
+		Buffer.from("2026-01-01T00:00:00.000000Z|nope").toString("base64url"),
+		Buffer.from(`yesterday|${uuidv7()}`).toString("base64url"),
+	]) {
+		await expect(letters.listLetters(ada, { cursor })).rejects.toMatchObject({
+			kind: "invalid_input",
+			code: "invalid_request",
+		});
+	}
+});
+
+it("a list item carries only the side its card shows, with that side's resources", async () => {
+	const ada = await member("ada-preview");
+	const onFirst = await inkDrawing(ada, "doodle", "Star");
+	const onSecond = await inkDrawing(ada, "doodle", "Moon");
+	const signature = await inkDrawing(ada, "signature", "Ada");
+	const { id } = await letters.createLetter(ada, {});
+	const { content } = await stored(ada, id);
+	const place = (drawingId: string, side: number) => ({
+		id: uuidv7(),
+		kind: "drawing" as const,
+		drawingId,
+		side,
+		xIn: 1,
+		yIn: 1,
+		widthIn: 1,
+		heightIn: 1,
+		rotationDeg: 0,
+		tint: "ink-blue" as const,
+		wrap: false,
+	});
+	const first = place(onFirst.id, 0);
+	const long: LetterContent = withSignature(
+		{
+			...content,
+			doc: {
+				...content.doc,
+				attrs: {
+					...content.doc.attrs,
+					minSides: 3,
+					elements: [first, place(onSecond.id, 1)],
+				},
+				content: Array.from({ length: 90 }, (_, index) => ({
+					type: "paragraph" as const,
+					attrs: { align: "left" as const },
+					content: [{ type: "text" as const, text: `Line ${index}` }],
+				})),
+			},
+		},
+		signature.id,
+		2,
+	);
+	await letters.saveLetter(ada, id, {
+		title: "Three sides",
+		content: long,
+		expectedRevision: 1,
+	});
+	const [item] = (await letters.listLetters(ada, {})).items;
+	expect(item?.preview.side).toBe(0);
+	expect(item?.preview.content.doc.attrs.elements).toEqual([first]);
+	expect(item?.preview.content.doc.content.length).toBeLessThan(90);
+	expect(item?.preview.content.doc.content).toEqual(
+		long.doc.content.slice(0, item?.preview.content.doc.content.length),
+	);
+	expect(item?.preview.resources.drawings).toEqual({
+		[onFirst.id]: { maskAssetId: onFirst.maskAssetId, aspect: 3 },
+	});
+});
+
+it("a deleted font cannot be added to a letter, but a letter already in it still saves", async () => {
+	const karla = await member("karla-deleted-font-save");
+	const font = await handwriting(karla, await fontFile(karla));
+	const kept = await letters.createLetter(karla, {});
+	const { content } = await stored(karla, kept.id);
+	await letters.saveLetter(karla, kept.id, {
+		title: "In her hand",
+		content: inHand(content, font.id),
+		expectedRevision: 1,
+	});
+	const fresh = await letters.createLetter(karla, {});
+	await new FontService(testDb.db, { publish: async () => {} }).deleteFont(
+		karla,
+		font.id,
+	);
+	await expect(
+		letters.saveLetter(karla, fresh.id, {
+			title: "Too late",
+			content: inHand(content, font.id),
+			expectedRevision: 1,
+		}),
+	).rejects.toMatchObject({ kind: "invalid_input", code: "invalid_letter" });
+	expect((await stored(karla, fresh.id)).revision).toBe(1);
+	expect(
+		await letters.saveLetter(karla, kept.id, {
+			title: "Still in her hand",
+			content: inHand(content, font.id, "Hello again"),
+			expectedRevision: 2,
+		}),
+	).toEqual({ revision: 3 });
+});
+
+it("a save in a deleted font to a letter that does not exist is not found", async () => {
+	const karla = await member("karla-deleted-font-missing");
+	const font = await handwriting(karla, await fontFile(karla));
+	const { id } = await letters.createLetter(karla, {});
+	const { content } = await stored(karla, id);
+	await new FontService(testDb.db, { publish: async () => {} }).deleteFont(
+		karla,
+		font.id,
+	);
+	await expect(
+		letters.saveLetter(karla, "0190a5b8-0000-7000-8000-000000000000", {
+			title: "Nowhere",
+			content: inHand(content, font.id),
+			expectedRevision: 1,
+		}),
+	).rejects.toMatchObject({ kind: "not_found", code: "not_found" });
 });

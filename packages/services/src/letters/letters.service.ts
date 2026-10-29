@@ -1,7 +1,9 @@
-import type { Db, Tx } from "@repo/db";
+import type { BlankDraft, Db, LetterCursor, Tx } from "@repo/db";
 import { ServiceError } from "@repo/errors";
 import { parseLetterContent } from "@repo/render/schema";
 import type {
+	Asset,
+	Drawing,
 	Font,
 	FontRef,
 	InkStyle,
@@ -9,22 +11,20 @@ import type {
 	LetterResources,
 	Member,
 	PageFormatId,
+	PlacedElement,
 	PrintOutput,
 	ProductKind,
-	SealFont,
 } from "@repo/types";
-import {
-	DEFAULT_FORMAT,
-	humanSeal,
-	PAGE_SPECS,
-	SAMPLE_MERGE_VALUES,
-} from "@repo/types";
+import { DEFAULT_FORMAT, PAGE_SPECS, SAMPLE_MERGE_VALUES } from "@repo/types";
+import { z } from "zod";
 import { generatedAsset, publishAssetJob } from "../assets/assets.service.ts";
 import type { Publisher } from "../queue/queue.types.ts";
+import { letterPreview } from "./letter-preview.ts";
 import type {
 	CreateLetterParams,
 	EditableLetter,
-	LetterListItem,
+	LetterListPage,
+	ListLettersParams,
 	RequestExportParams,
 	SaveLetterParams,
 } from "./letters.types.ts";
@@ -42,6 +42,8 @@ const DEFAULT_INK_STYLE: InkStyle = {
 
 const TITLE_MAX_CHARACTERS = 120;
 
+export const LETTER_PAGE_SIZE = 24;
+
 function newLetterContent(format: PageFormatId): LetterContent {
 	const spec = PAGE_SPECS[format];
 	return {
@@ -58,6 +60,31 @@ function newLetterContent(format: PageFormatId): LetterContent {
 			content: [{ type: "paragraph", attrs: { align: "left" } }],
 		},
 	};
+}
+
+const BLANK_DRAFTS: readonly BlankDraft[] = (
+	Object.keys(PAGE_SPECS) as PageFormatId[]
+).map((format) => ({
+	format,
+	title: UNTITLED[PAGE_SPECS[format].product],
+	minSides: newLetterContent(format).doc.attrs.minSides,
+}));
+
+const cursorSchema = z.tuple([z.iso.datetime({ precision: 6 }), z.uuid()]);
+
+function encodeCursor(cursor: LetterCursor): string {
+	return Buffer.from(`${cursor.updatedAt}|${cursor.id}`).toString("base64url");
+}
+
+function decodeCursor(cursor: string): LetterCursor {
+	const parsed = cursorSchema.safeParse(
+		Buffer.from(cursor, "base64url").toString("utf8").split("|"),
+	);
+	if (!parsed.success) {
+		throw new ServiceError("invalid_input", "invalid_request");
+	}
+	const [updatedAt, id] = parsed.data;
+	return { updatedAt, id };
 }
 
 function fontRefs(content: LetterContent): FontRef[] {
@@ -106,21 +133,28 @@ async function referencedFonts(
 async function knownFonts(
 	db: Tx,
 	member: Member,
+	letterId: string,
 	content: LetterContent,
 ): Promise<void> {
 	const ids = ownFontIds(content);
 	if (ids.length === 0) return;
-	const found = await referencedFonts(
-		db,
-		member.userOrganization.organizationId,
-		content,
-	);
+	const organizationId = member.userOrganization.organizationId;
+	const found = await referencedFonts(db, organizationId, content);
 	if (found.length !== ids.length) {
 		throw new ServiceError("invalid_input", "invalid_letter");
 	}
 	for (const font of found) {
 		if (font.ownerUserId !== member.user.id) {
 			throw new ServiceError("forbidden", "not_owner");
+		}
+	}
+	const deleted = found.filter((font) => font.deletedAt !== null);
+	if (deleted.length > 0) {
+		const stored = await db.letters.byId(organizationId, letterId);
+		if (stored === null) throw new ServiceError("not_found", "not_found");
+		const used = new Set(ownFontIds(stored.content));
+		if (deleted.some((font) => !used.has(font.id))) {
+			throw new ServiceError("invalid_input", "invalid_letter");
 		}
 	}
 	for (const font of found) {
@@ -140,17 +174,6 @@ function sealRecord(
 	return record;
 }
 
-function sealMap(fonts: readonly Font[]): Map<string, SealFont> {
-	const map = new Map<string, SealFont>();
-	for (const font of fonts) {
-		map.set(font.id, {
-			ownerName: font.ownerName,
-			chars: new Set(font.chars),
-		});
-	}
-	return map;
-}
-
 function validTitle(title: string): string {
 	const trimmed = title.trim();
 	if (
@@ -163,20 +186,21 @@ function validTitle(title: string): string {
 	return trimmed;
 }
 
-function placedDrawingIds(content: LetterContent): string[] {
+function placedDrawingIds(
+	content: LetterContent,
+	kind?: PlacedElement["kind"],
+): string[] {
 	return [
-		...new Set(content.doc.attrs.elements.map((element) => element.drawingId)),
+		...new Set(
+			content.doc.attrs.elements
+				.filter((element) => kind === undefined || element.kind === kind)
+				.map((element) => element.drawingId),
+		),
 	];
 }
 
 function signatureIds(content: LetterContent): string[] {
-	return [
-		...new Set(
-			content.doc.content.flatMap((block) =>
-				block.type === "signature" ? [block.attrs.drawingId] : [],
-			),
-		),
-	];
+	return placedDrawingIds(content, "signature");
 }
 
 async function knownDrawings(
@@ -184,10 +208,13 @@ async function knownDrawings(
 	organizationId: string,
 	content: LetterContent,
 ): Promise<void> {
-	const ids = placedDrawingIds(content);
+	const ids = placedDrawingIds(content, "drawing");
 	if (ids.length === 0) return;
 	const found = await db.drawings.referenced(organizationId, ids);
-	if (found.length !== ids.length) {
+	if (
+		found.length !== ids.length ||
+		found.some((drawing) => drawing.kind !== "doodle")
+	) {
 		throw new ServiceError("invalid_input", "invalid_letter");
 	}
 }
@@ -234,30 +261,59 @@ const EDITOR_BASES = {
 	stockFontBaseUrl: "/fonts/stock/",
 };
 
-export async function letterResources(
+type ResourceRows = {
+	drawings: readonly Drawing[];
+	fonts: readonly Font[];
+	covers: readonly Asset[];
+};
+
+async function resourceRows(
 	tx: Tx,
 	organizationId: string,
+	contents: readonly LetterContent[],
+): Promise<ResourceRows> {
+	const unique = (ids: string[]) => [...new Set(ids)];
+	const drawingIds = unique(
+		contents.flatMap((content) => placedDrawingIds(content)),
+	);
+	const fontIds = unique(contents.flatMap(ownFontIds));
+	const coverIds = unique(
+		contents.flatMap((content) => {
+			const id = content.doc.attrs.frontImageAssetId;
+			return id === null ? [] : [id];
+		}),
+	);
+	const [drawings, fonts, covers] = await Promise.all([
+		tx.drawings.referenced(organizationId, drawingIds),
+		tx.fonts.referenced(organizationId, fontIds),
+		tx.assets.referenced(organizationId, coverIds),
+	]);
+	return { drawings, fonts, covers };
+}
+
+function resourcesFrom(
 	content: LetterContent,
-	bases: { assetBaseUrl: string; stockFontBaseUrl: string } = EDITOR_BASES,
-): Promise<LetterResources> {
-	const ids = [
-		...new Set([...placedDrawingIds(content), ...signatureIds(content)]),
-	];
-	const found =
-		ids.length === 0 ? [] : await tx.drawings.referenced(organizationId, ids);
+	rows: ResourceRows,
+	bases: { assetBaseUrl: string; stockFontBaseUrl: string },
+): LetterResources {
+	const drawingIds = new Set(placedDrawingIds(content));
 	const drawings: LetterResources["drawings"] = {};
-	for (const drawing of found) {
+	for (const drawing of rows.drawings) {
+		if (!drawingIds.has(drawing.id)) continue;
 		drawings[drawing.id] = {
 			maskAssetId: drawing.maskAssetId,
 			aspect: drawing.aspect,
 		};
 	}
+	const fontIds = new Set(ownFontIds(content));
 	const fonts: LetterResources["fonts"] = {};
-	for (const font of await referencedFonts(tx, organizationId, content)) {
-		if (font.fontAssetId !== null) fonts[font.id] = font.fontAssetId;
+	for (const font of rows.fonts) {
+		if (fontIds.has(font.id) && font.fontAssetId !== null) {
+			fonts[font.id] = font.fontAssetId;
+		}
 	}
 	const frontId = content.doc.attrs.frontImageAssetId;
-	const front = frontId ? await tx.assets.byId(organizationId, frontId) : null;
+	const front = rows.covers.find((asset) => asset.id === frontId);
 	const frontImageAssetId =
 		front?.origin.source === "uploaded" && front.origin.purpose === "cover"
 			? front.id
@@ -269,6 +325,19 @@ export async function letterResources(
 		drawings,
 		frontImageAssetId,
 	};
+}
+
+export async function letterResources(
+	tx: Tx,
+	organizationId: string,
+	content: LetterContent,
+	bases: { assetBaseUrl: string; stockFontBaseUrl: string } = EDITOR_BASES,
+): Promise<LetterResources> {
+	return resourcesFrom(
+		content,
+		await resourceRows(tx, organizationId, [content]),
+		bases,
+	);
 }
 
 export async function letterOwnerIds(
@@ -345,28 +414,39 @@ export class LetterService {
 		};
 	}
 
-	async listLetters(member: Member): Promise<LetterListItem[]> {
-		const letters = await this.db.letters.list(
-			member.userOrganization.organizationId,
+	async listLetters(
+		member: Member,
+		params: ListLettersParams,
+	): Promise<LetterListPage> {
+		const organizationId = member.userOrganization.organizationId;
+		const page = await this.db.letters.list(organizationId, {
+			limit: LETTER_PAGE_SIZE,
+			after: params.cursor === undefined ? null : decodeCursor(params.cursor),
+			hideBlank: BLANK_DRAFTS,
+		});
+		const listed = page.letters.map((letter) => ({
+			letter,
+			...letterPreview(letter.content),
+		}));
+		const rows = await resourceRows(
+			this.db,
+			organizationId,
+			listed.map(({ content }) => content),
 		);
-		return Promise.all(
-			letters.map(async (letter) => ({
+		return {
+			items: listed.map(({ letter, side, content }) => ({
 				id: letter.id,
 				title: letter.title,
 				updatedAt: letter.updatedAt,
-				humanSeal: humanSeal(
-					letter.content,
-					sealMap(
-						await referencedFonts(
-							this.db,
-							member.userOrganization.organizationId,
-							letter.content,
-						),
-					),
-				),
 				productLabel: PAGE_SPECS[letter.content.format].label,
+				preview: {
+					side,
+					content,
+					resources: resourcesFrom(content, rows, EDITOR_BASES),
+				},
 			})),
-		);
+			nextCursor: page.next === null ? null : encodeCursor(page.next),
+		};
 	}
 
 	async saveLetter(
@@ -380,7 +460,7 @@ export class LetterService {
 		await knownDrawings(this.db, organizationId, content);
 		await knownSignatures(this.db, member, content);
 		await knownCover(this.db, organizationId, content);
-		await knownFonts(this.db, member, content);
+		await knownFonts(this.db, member, letterId, content);
 		const revision = await this.db.letters.save(organizationId, letterId, {
 			title,
 			content,

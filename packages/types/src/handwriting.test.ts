@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+	GLYPH_ALIASES,
 	HANDWRITING_GLYPHS,
 	HANDWRITING_TEMPLATE,
 	missingChars,
+	missingLowercase,
+	withAliases,
 } from "./handwriting.ts";
 import type { Stroke } from "./stroke.ts";
 
@@ -33,6 +36,31 @@ describe("missingChars", () => {
 
 	it("a cell with no strokes does not count", () => {
 		expect(missingChars(drawnOnce())).toEqual(["x"]);
+	});
+});
+
+describe("missingLowercase", () => {
+	it("names each lowercase letter a font's characters lack", () => {
+		expect(missingLowercase("abcdefghijklmnoprstuvwxy.ABC")).toEqual([
+			"q",
+			"z",
+		]);
+		expect(missingLowercase("abcdefghijklmnopqrstuvwxyz")).toEqual([]);
+	});
+});
+
+describe("withAliases", () => {
+	it("the straight quotes bring their curly ones", () => {
+		expect(GLYPH_ALIASES["'"]).toEqual(["\u2019", "\u2018"]);
+		expect(GLYPH_ALIASES['"']).toEqual(["\u201C", "\u201D"]);
+		expect(withAliases(["a", "'", "b", '"'])).toBe(
+			"a'b\"\u2019\u2018\u201C\u201D",
+		);
+	});
+
+	it("a font without straight quotes gains nothing, and nothing repeats", () => {
+		expect(withAliases(["a", "b"])).toBe("ab");
+		expect(withAliases(["'", "\u2019"])).toBe("'\u2019\u2018");
 	});
 });
 

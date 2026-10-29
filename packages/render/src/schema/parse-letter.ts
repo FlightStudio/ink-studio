@@ -3,7 +3,6 @@ import {
 	INK_COLORS,
 	MERGE_FIELDS,
 	PAGE_SPECS,
-	SIGNATURE_WIDTHS,
 	STOCK_FONTS,
 	TEXT_SIZES,
 } from "@repo/types";
@@ -60,23 +59,9 @@ const paragraphNode = z.strictObject({
 	content: z.array(inlineNode).optional(),
 });
 
-const signatureNode = z.strictObject({
-	type: z.literal("signature"),
-	attrs: z.strictObject({
-		drawingId: z.uuid(),
-		widthIn: z.union([
-			z.literal(SIGNATURE_WIDTHS[0]),
-			z.literal(SIGNATURE_WIDTHS[1]),
-			z.literal(SIGNATURE_WIDTHS[2]),
-		]),
-		align: z.enum(ALIGNS),
-		color: inkColor,
-	}),
-});
-
 const placedElement = z.strictObject({
 	id: z.uuid(),
-	kind: z.literal("drawing"),
+	kind: z.enum(["drawing", "signature"]),
 	drawingId: z.uuid(),
 	side: z.int().nonnegative(),
 	xIn: z.number(),
@@ -91,7 +76,6 @@ const placedElement = z.strictObject({
 function characterCount(doc: Pick<LetterDoc, "content">): number {
 	let count = doc.content.length - 1;
 	for (const block of doc.content) {
-		if (block.type !== "paragraph") continue;
 		for (const node of block.content ?? []) {
 			count += node.type === "text" ? node.text.length : 1;
 		}
@@ -103,11 +87,19 @@ const letterDoc = z
 	.strictObject({
 		type: z.literal("doc"),
 		attrs: z.strictObject({
-			elements: z.array(placedElement).max(LETTER_LIMITS.elements),
+			elements: z
+				.array(placedElement)
+				.max(LETTER_LIMITS.elements)
+				.refine(
+					(elements) =>
+						elements.filter((element) => element.kind === "signature").length <=
+						1,
+					{ message: "A letter has one signature at most." },
+				),
 			minSides: z.int().min(1).default(1),
 			frontImageAssetId: z.uuid().nullable().default(null),
 		}),
-		content: z.array(z.union([paragraphNode, signatureNode])).min(1),
+		content: z.array(paragraphNode).min(1),
 	})
 	.refine((doc) => characterCount(doc) <= LETTER_LIMITS.characters, {
 		message: "The letter is longer than the character limit.",

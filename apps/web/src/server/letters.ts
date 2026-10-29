@@ -1,4 +1,4 @@
-import type { EditableLetter, LetterListItem } from "@repo/services/letters";
+import type { EditableLetter, LetterListPage } from "@repo/services/letters";
 import type { Member } from "@repo/types";
 import { cache } from "react";
 import { z } from "zod";
@@ -24,6 +24,6 @@ export const getLetter = cache(
 );
 
 export const listLetters = cache(
-	async (): Promise<LetterListItem[]> =>
-		getLetterService().listLetters(await getMember()),
+	async (): Promise<LetterListPage> =>
+		getLetterService().listLetters(await getMember(), {}),
 );

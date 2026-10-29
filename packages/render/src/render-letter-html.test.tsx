@@ -59,6 +59,16 @@ function withDrawing(content: LetterContent, drawingId: string): LetterContent {
 	};
 }
 
+function signed(content: LetterContent, drawingId: string): LetterContent {
+	const placed = withDrawing(content, drawingId);
+	placed.doc.attrs.elements = placed.doc.attrs.elements.map((element) => ({
+		...element,
+		kind: "signature",
+		rotationDeg: -8,
+	}));
+	return placed;
+}
+
 function render(
 	content: LetterContent,
 	mergeValues: MergeValues = SAMPLE_MERGE_VALUES,
@@ -79,21 +89,9 @@ function urlsIn(html: string): string[] {
 }
 
 describe("renderLetterHtml", () => {
-	test("the signature's mask URL comes from the resources", () => {
+	test("a placed signature prints from its mask, turned where it was put", () => {
 		const signatureId = "0190a8d6-5c1e-7b3a-9f00-000000000008";
-		const content = fixtureContent(letterFixture("note"));
-		content.doc.content = [
-			...content.doc.content,
-			{
-				type: "signature",
-				attrs: {
-					drawingId: signatureId,
-					widthIn: 2.25,
-					align: "right",
-					color: "sepia",
-				},
-			},
-		];
+		const content = signed(fixtureContent(letterFixture("note")), signatureId);
 		const signedResources: LetterResources = {
 			...resources,
 			drawings: {
@@ -108,23 +106,19 @@ describe("renderLetterHtml", () => {
 			mergeValues: SAMPLE_MERGE_VALUES,
 		});
 		expect(html).toContain(`${resources.assetBaseUrl}${MASK_ASSET_ID}`);
-		expect(html).toContain(`data-signature="${signatureId}"`);
+		expect(html).toMatch(
+			new RegExp(
+				`data-element-id="${ELEMENT_ID}"[^>]*data-element-kind="signature"`,
+			),
+		);
+		expect(html).toContain("rotate:-8deg");
 	});
 
 	test("a signature drawing the resources lack throws", () => {
-		const content = fixtureContent(letterFixture("note"));
-		content.doc.content = [
-			...content.doc.content,
-			{
-				type: "signature",
-				attrs: {
-					drawingId: "0190a8d6-5c1e-7b3a-9f00-0000000000ee",
-					widthIn: 3,
-					align: "center",
-					color: "ink-blue",
-				},
-			},
-		];
+		const content = signed(
+			fixtureContent(letterFixture("note")),
+			"0190a8d6-5c1e-7b3a-9f00-0000000000ee",
+		);
 		expect(() => render(content)).toThrow();
 	});
 

@@ -9,6 +9,7 @@ import {
 	pageExclusions,
 	placementIssues,
 	sidesUsed,
+	sideTopIn,
 	wrapExclusions,
 	writingSides,
 } from "./geometry.ts";
@@ -32,6 +33,7 @@ describe("pageExclusions", () => {
 		expect(pageExclusions(letter, 0)).toEqual([
 			{ xIn: 0, yIn: 9.5, widthIn: 7, heightIn: 1.5, wrap: "both" },
 			{ xIn: 0, yIn: 20.5, widthIn: 7, heightIn: 1.5, wrap: "both" },
+			{ xIn: 0, yIn: 31.5, widthIn: 7, heightIn: 1.5, wrap: "both" },
 		]);
 	});
 
@@ -39,7 +41,22 @@ describe("pageExclusions", () => {
 		expect(pageExclusions(letter, 0.5)).toEqual([
 			{ xIn: 0, yIn: 9.5, widthIn: 7, heightIn: 2, wrap: "both" },
 			{ xIn: 0, yIn: 21, widthIn: 7, heightIn: 2, wrap: "both" },
+			{ xIn: 0, yIn: 32.5, widthIn: 7, heightIn: 2, wrap: "both" },
 		]);
+	});
+
+	it("a band after the last side keeps overflow text off its bottom margin", () => {
+		const last = pageExclusions(letter, 0.5).at(-1);
+		expect(last).toEqual({
+			xIn: 0,
+			yIn: sideTopIn(letter, letter.maxPages - 1, 0.5) + 9.5,
+			widthIn: 7,
+			heightIn: 2,
+			wrap: "both",
+		});
+		expect((last?.yIn ?? 0) + (last?.heightIn ?? 0)).toBe(
+			sideTopIn(letter, letter.maxPages, 0.5),
+		);
 	});
 
 	it("a postcard writes only on its back", () => {
@@ -52,7 +69,9 @@ describe("pageExclusions", () => {
 	});
 
 	it("the postcard's address block shapes the back's text", () => {
-		const exclusions = pageExclusions(postcard, 0.5);
+		const exclusions = pageExclusions(postcard, 0.5).filter(
+			(exclusion) => exclusion.wrap !== "both",
+		);
 		expect(exclusions).toHaveLength(1);
 		const [block] = exclusions;
 		expect(block?.wrap).toBe("right");

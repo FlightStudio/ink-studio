@@ -20,6 +20,8 @@ const VARIANTS = {
 	s: 2,
 } as const satisfies Record<string, 2 | 3>;
 
+export const LOWERCASE_LETTERS = [..."abcdefghijklmnopqrstuvwxyz"] as const;
+
 const REQUIRED_PUNCTUATION = [".", ",", "!", "?", "'"] as const;
 
 const PUNCTUATION = [
@@ -49,7 +51,7 @@ function glyph(
 }
 
 export const HANDWRITING_GLYPHS = [
-	...[..."abcdefghijklmnopqrstuvwxyz"].map((char) => glyph(char, true)),
+	...LOWERCASE_LETTERS.map((char) => glyph(char, true)),
 	...[..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"].map((char) => glyph(char, false)),
 	...[..."0123456789"].map((char) => glyph(char, false)),
 	...PUNCTUATION.map((char) =>
@@ -65,6 +67,13 @@ export const HANDWRITING_TEMPLATE = {
 	version: 1,
 	page: { widthIn: 8.5, heightIn: 11 },
 	marker: { sizeIn: 0.4, insetIn: 0.4, notchIn: 0.12 },
+	label: {
+		xIn: 0.04,
+		yIn: 0.02,
+		sizePt: 10,
+		zoneWidthIn: 0.32,
+		zoneHeightIn: 0.2,
+	},
 	grid: {
 		columns: 8,
 		rows: 13,
@@ -101,4 +110,22 @@ export function missingChars(glyphs: readonly DrawnGlyph[]): string[] {
 	return HANDWRITING_GLYPHS.filter(
 		(entry) => entry.required && !drawn.has(entry.char),
 	).map((entry) => entry.char);
+}
+
+export function missingLowercase(chars: string): string[] {
+	const present = new Set(chars);
+	return LOWERCASE_LETTERS.filter((char) => !present.has(char));
+}
+
+export const GLYPH_ALIASES: Readonly<Record<string, readonly string[]>> = {
+	"'": ["\u2019", "\u2018"],
+	'"': ["\u201C", "\u201D"],
+};
+
+export function withAliases(chars: Iterable<string>): string {
+	const all = new Set(chars);
+	for (const char of [...all]) {
+		for (const alias of GLYPH_ALIASES[char] ?? []) all.add(alias);
+	}
+	return [...all].join("");
 }

@@ -1,4 +1,5 @@
 import { Desk } from "@repo/ui/components/desk";
+import { buttonVariants } from "@repo/ui/components/ui/button";
 import Link from "next/link";
 import { DeskMessage } from "@/features/editor/components/desk-message";
 import { FontList } from "@/features/fonts/components/font-list";
@@ -27,9 +28,14 @@ export default async function FontsPage() {
 						</p>
 						<h1 className="mt-3 font-display text-display">Handwriting</h1>
 					</div>
-					<Link href="/fonts/new" className="text-ui text-ink">
-						New handwriting
-					</Link>
+					{fonts.length > 0 ? (
+						<Link
+							href="/fonts/new"
+							className={buttonVariants({ size: "lg", className: "px-4" })}
+						>
+							Make your handwriting
+						</Link>
+					) : null}
 				</header>
 				<FontList fonts={fonts} />
 			</div>

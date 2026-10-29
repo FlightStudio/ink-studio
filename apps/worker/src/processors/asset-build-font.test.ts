@@ -1,5 +1,6 @@
 import type { TestDb } from "@repo/db";
 import { seedDevIdentity, startTestDb } from "@repo/db/testing";
+import { ServiceError } from "@repo/errors";
 import {
 	type FontBuilder,
 	OpentypeFontBuilder,
@@ -311,4 +312,115 @@ it("a failed rebuild leaves the last good build in use", async () => {
 		font.id,
 	);
 	expect(stored?.fontAssetId).toBe(good.id);
+});
+
+it("drawn variants become alternates, and a cleared first one gives way to the next", async () => {
+	const karla = await member("karla-drawn-variants");
+	const font = await testDb.db.fonts.create({
+		organizationId: karla.userOrganization.organizationId,
+		ownerUserId: karla.user.id,
+		ownerName: "Karla",
+		source: {
+			kind: "drawn",
+			glyphs: [
+				{ char: "l", variant: 0, strokes: [stem()] },
+				{ char: "e", variant: 0, strokes: [] },
+				{ char: "e", variant: 1, strokes: [stem()] },
+				{ char: "e", variant: 2, strokes: [stem()] },
+			],
+		},
+		fontAssetId: null,
+		pendingFontAssetId: null,
+		chars: "",
+	});
+	const asset = await pendingBuild(karla, font.id);
+	await testDb.db.fonts.setPending(
+		karla.userOrganization.organizationId,
+		font.id,
+		asset.id,
+	);
+	const processor = processorFor(new OpentypeFontBuilder());
+	await processor.process(message(processor, asset.id));
+	const bytes = files.get(asset.storageKey);
+	if (!bytes) throw new Error("the font file was not stored");
+	const built = parsed(bytes);
+	expect(built.charToGlyph("e").name).toBe("e");
+	const names: string[] = [];
+	for (let index = 0; index < built.glyphs.length; index += 1) {
+		names.push(built.glyphs.get(index).name ?? "");
+	}
+	expect(names).toContain("e.alt1");
+	expect(names).not.toContain("e.alt2");
+	const stored = await testDb.db.fonts.byId(
+		karla.userOrganization.organizationId,
+		font.id,
+	);
+	expect(stored?.chars).toBe("le");
+});
+
+it("a photo without its corner marks fails the build once, on the font's pending build", async () => {
+	const karla = await member("karla-markers-font");
+	const photoId = crypto.randomUUID();
+	const storageKey = `organizations/${karla.userOrganization.organizationId}/assets/${photoId}`;
+	files.set(storageKey, new Uint8Array([1]));
+	await testDb.db.assets.create({
+		id: photoId,
+		organizationId: karla.userOrganization.organizationId,
+		storageKey,
+		mimeType: "image/png",
+		byteSize: 1,
+		checksum: "c".repeat(64),
+		origin: {
+			source: "uploaded",
+			purpose: "photo",
+			filename: "template.png",
+			uploadedByUserId: karla.user.id,
+		},
+		processing: { status: "done", attempts: 0 },
+	});
+	const font = await testDb.db.fonts.create({
+		organizationId: karla.userOrganization.organizationId,
+		ownerUserId: karla.user.id,
+		ownerName: "Karla",
+		source: {
+			kind: "template-photo",
+			templateVersion: 1,
+			photoAssetId: photoId,
+		},
+		fontAssetId: null,
+		pendingFontAssetId: null,
+		chars: "",
+	});
+	const asset = await pendingBuild(karla, font.id);
+	await testDb.db.fonts.setPending(
+		karla.userOrganization.organizationId,
+		font.id,
+		asset.id,
+	);
+	const fromTemplatePhoto = vi.fn<FontBuilder["fromTemplatePhoto"]>(
+		async () => {
+			throw new ServiceError("invalid_input", "template_markers_not_found");
+		},
+	);
+	const processor = processorFor({
+		fromStrokeOutlines: async () => {
+			throw new Error("drawn");
+		},
+		fromTemplatePhoto,
+		fromUpload: async () => {
+			throw new Error("upload");
+		},
+	});
+	await processor.process(message(processor, asset.id));
+	await processor.process(message(processor, asset.id));
+	expect(fromTemplatePhoto).toHaveBeenCalledOnce();
+	const stored = await testDb.db.fonts.byId(
+		karla.userOrganization.organizationId,
+		font.id,
+	);
+	expect(stored?.pendingBuild).toEqual({
+		status: "failed",
+		attempts: 1,
+		error: "template_markers_not_found",
+	});
 });

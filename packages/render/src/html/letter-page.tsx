@@ -18,6 +18,7 @@ import { inkProperties } from "../schema/letter-schema.ts";
 import {
 	columnBox,
 	exclusionFloats,
+	keepClearRect,
 	pageExclusions,
 	sideTopIn,
 	wrapExclusions,
@@ -102,18 +103,31 @@ function fontFaces(resources: LetterResources): string {
 	return [...stock, ...own].join("\n");
 }
 
-function zoneStyle(
+export function keepClearFrame(
 	spec: PageSpec,
 	zone: KeepClearZone,
 	gapIn: number,
 ): CSSProperties {
-	const left = zone.corner.endsWith("left") ? 0 : spec.widthIn - zone.widthIn;
-	const top = zone.corner.startsWith("top") ? 0 : spec.heightIn - zone.heightIn;
+	const rect = keepClearRect(spec, zone);
 	return {
-		left: inches(left),
-		top: inches(sideTopIn(spec, zone.side, gapIn) + top),
-		width: inches(zone.widthIn),
-		height: inches(zone.heightIn),
+		left: inches(rect.xIn),
+		top: inches(sideTopIn(spec, zone.side, gapIn) + rect.yIn),
+		width: inches(rect.widthIn),
+		height: inches(rect.heightIn),
+	};
+}
+
+export function elementFrame(
+	spec: PageSpec,
+	element: PlacedElement,
+	gapIn: number,
+): CSSProperties {
+	return {
+		left: inches(element.xIn),
+		top: inches(sideTopIn(spec, element.side, gapIn) + element.yIn),
+		width: inches(element.widthIn),
+		height: inches(element.heightIn),
+		rotate: `${element.rotationDeg}deg`,
 	};
 }
 
@@ -133,11 +147,7 @@ function elementStyle(
 	}
 	const mask = assetUrl(resources, drawing.maskAssetId);
 	return {
-		left: inches(element.xIn),
-		top: inches(sideTopIn(spec, element.side, gapIn) + element.yIn),
-		width: inches(element.widthIn),
-		height: inches(element.heightIn),
-		transform: `rotate(${element.rotationDeg}deg)`,
+		...elementFrame(spec, element, gapIn),
 		WebkitMaskImage: mask,
 		maskImage: mask,
 		backgroundColor: INK_COLORS[element.tint].css,
@@ -242,6 +252,7 @@ export function LetterPage(props: LetterPageProps): ReactElement {
 						paddingTop: inches(spec.marginIn),
 						paddingLeft: inches(spec.marginIn),
 						paddingBottom: inches(spec.marginIn),
+						height: inches(sideTopIn(spec, props.sheets, gapIn) - gapIn),
 					}}
 				>
 					{drawnSides.map((side) => (
@@ -262,7 +273,7 @@ export function LetterPage(props: LetterPageProps): ReactElement {
 							className="letter-keep-clear"
 							data-keep-clear={zone.corner}
 							data-side={zone.side}
-							style={zoneStyle(spec, zone, gapIn)}
+							style={keepClearFrame(spec, zone, gapIn)}
 						/>
 					))}
 					<div
@@ -290,8 +301,9 @@ export function LetterPage(props: LetterPageProps): ReactElement {
 					{content.doc.attrs.elements.map((element) => (
 						<div
 							key={element.id}
-							className="letter-element animate-settle"
+							className="letter-element"
 							data-element-id={element.id}
+							data-element-kind={element.kind}
 							style={elementStyle(spec, element, resources, gapIn)}
 						/>
 					))}
