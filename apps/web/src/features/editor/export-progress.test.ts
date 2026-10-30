@@ -1,17 +1,19 @@
 import { errorMessages } from "@repo/errors";
-import { PAGE_SPECS } from "@repo/types";
+import { type LetterContent, PAGE_SPECS } from "@repo/types";
 import { expect, it } from "vitest";
 import {
 	afterReading,
 	type ExportState,
 	exportBlocker,
+	proofFonts,
 	proofLabels,
+	proofMatches,
 	workingOn,
 } from "./export-progress.ts";
 
 const working = workingOn(["a", "b"]);
 
-const quiet = { error: null, slow: false, unreachable: false };
+const quiet = { error: null, slow: false, issue: null };
 
 it("words past the last side stop the export and say what to do", () => {
 	expect(
@@ -24,6 +26,58 @@ it("words past the last side stop the export and say what to do", () => {
 	).toBe(
 		"About 42 words won't fit on 3 sides. Shorten the letter or pick a smaller text size, then export again.",
 	);
+});
+
+it("proof freshness includes displayed font assets with key-order-independent equality", () => {
+	const proof = { revision: 2, fonts: { a: "a1", b: "b1" } };
+	expect(proofMatches(proof, 2, { b: "b1", a: "a1" })).toBe(true);
+	expect(proofMatches(proof, 2, { a: "a2", b: "b1" })).toBe(false);
+	expect(proofMatches(proof, 3, proof.fonts)).toBe(false);
+	expect(proofMatches(proof, null, proof.fonts)).toBe(false);
+	expect(proofMatches(null, 2, proof.fonts)).toBe(false);
+	expect(proofMatches(proof, 2, { a: "a1" })).toBe(false);
+});
+
+it("only fonts referenced by defaults and marks are submitted for the proof", () => {
+	const content: LetterContent = {
+		schemaVersion: 1,
+		format: "thanksio:letter-windowless",
+		defaults: {
+			font: { kind: "own", fontId: "default" },
+			sizePt: 20,
+			color: "ink-blue",
+		},
+		doc: {
+			type: "doc",
+			attrs: { elements: [], frontImageAssetId: null, minSides: 1 },
+			content: [
+				{
+					type: "paragraph",
+					attrs: { align: "left" },
+					content: [
+						{
+							type: "text",
+							text: "Hello",
+							marks: [
+								{
+									type: "ink",
+									attrs: {
+										font: { kind: "own", fontId: "marked" },
+										sizePt: null,
+										color: null,
+									},
+								},
+							],
+						},
+					],
+				},
+			],
+		},
+	};
+	expect(
+		proofFonts(content, { default: "a", marked: "b", unused: "c" }),
+	).toEqual({ default: "a", marked: "b" });
+	expect(proofFonts(content, { default: "a" })).toEqual({ default: "a" });
 });
 
 it("a doodle in the wrong place stops the export with the placement sentence", () => {
@@ -93,7 +147,7 @@ it("one failed proof fails the export with its message", () => {
 			status: "failed",
 			error: "letter_overflow",
 			slow: false,
-			unreachable: false,
+			issue: null,
 		}),
 	).toEqual({ phase: "failed", message: errorMessages.letter_overflow });
 	expect(
@@ -101,18 +155,39 @@ it("one failed proof fails the export with its message", () => {
 			status: "failed",
 			error: "nonsense",
 			slow: false,
-			unreachable: false,
-		}),
-	).toEqual({ phase: "failed", message: errorMessages.processing_failed });
-	expect(
-		afterReading(working, "a", {
-			status: "failed",
-			error: null,
-			slow: false,
-			unreachable: true,
+			issue: null,
 		}),
 	).toEqual({ phase: "failed", message: errorMessages.processing_failed });
 });
+
+it.each(["unreachable", "unauthenticated", "forbidden", "not_found"] as const)(
+	"an %s status check preserves the export and its proof IDs",
+	(issue) => {
+		const interrupted = afterReading(working, "a", {
+			status: "running",
+			...quiet,
+			issue,
+		});
+		expect(interrupted).toEqual({
+			phase: "working",
+			proofs: [
+				{ id: "a", status: "running", ...quiet, issue },
+				{ id: "b", status: "pending", ...quiet },
+			],
+		});
+		const recovered = afterReading(interrupted, "a", {
+			status: "running",
+			...quiet,
+		});
+		expect(recovered).toEqual({
+			phase: "working",
+			proofs: [
+				{ id: "a", status: "running", ...quiet },
+				{ id: "b", status: "pending", ...quiet },
+			],
+		});
+	},
+);
 
 it("a reading that lands after the export ended, or for another export, changes nothing", () => {
 	const idle: ExportState = { phase: "idle" };

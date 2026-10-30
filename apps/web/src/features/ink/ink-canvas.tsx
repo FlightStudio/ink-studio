@@ -1,7 +1,7 @@
 "use client";
 
 import { outlinePath, strokeOutline } from "@repo/render/html";
-import type { Stroke, StrokeInput } from "@repo/types";
+import type { StrokeInput } from "@repo/types";
 import {
 	type ReactNode,
 	type PointerEvent as ReactPointerEvent,
@@ -13,6 +13,7 @@ import {
 	useRef,
 } from "react";
 import {
+	type CanvasStroke,
 	drawsWith,
 	EMPTY_POINTER_SESSION,
 	type PointerSample,
@@ -33,7 +34,7 @@ export type InkCanvasProps = {
 	composite?: "source-over" | "destination-out";
 	underlay?: CanvasImageSource | null;
 	penOnly?: boolean;
-	onStrokeEnd(strokes: Stroke[], history: InkHistory): void;
+	onStrokeEnd(strokes: CanvasStroke[], history: InkHistory): void;
 	ref?: Ref<InkCanvasHandle>;
 	className?: string;
 	"aria-label"?: string;
@@ -86,7 +87,7 @@ export function InkCanvas({
 	const frame = useRef(0);
 	const cache = useRef({
 		scale: strokeScale,
-		paths: new WeakMap<Stroke, Path2D>(),
+		paths: new WeakMap<CanvasStroke, Path2D>(),
 	});
 	const strokeEnd = useRef(onStrokeEnd);
 
@@ -103,10 +104,12 @@ export function InkCanvas({
 			cache.current = { scale: strokeScale, paths: new WeakMap() };
 		}
 		const { paths } = cache.current;
-		const pathOf = (stroke: Stroke) => {
+		const pathOf = (stroke: CanvasStroke) => {
 			const known = paths.get(stroke);
 			if (known) return known;
-			const path = new Path2D(outlinePath(strokeOutline(stroke, strokeScale)));
+			const path = new Path2D(
+				outlinePath(strokeOutline(stroke, stroke.strokeScale ?? strokeScale)),
+			);
 			paths.set(stroke, path);
 			return path;
 		};
@@ -125,7 +128,14 @@ export function InkCanvas({
 		for (const stroke of strokes) context.fill(pathOf(stroke));
 		if (active) {
 			context.fill(
-				new Path2D(outlinePath(strokeOutline(active.stroke, strokeScale))),
+				new Path2D(
+					outlinePath(
+						strokeOutline(
+							active.stroke,
+							active.stroke.strokeScale ?? strokeScale,
+						),
+					),
+				),
 			);
 		}
 	}, [widthPx, heightPx, strokeScale, composite, underlay]);
@@ -205,7 +215,12 @@ export function InkCanvas({
 		event.preventDefault();
 		event.currentTarget.setPointerCapture(event.pointerId);
 		const [sample] = samples(event).slice(-1);
-		if (sample) dispatch({ type: "down", sample });
+		if (sample)
+			dispatch({
+				type: "down",
+				sample,
+				...(composite === "destination-out" ? { strokeScale } : {}),
+			});
 	}
 
 	function onPointerMove(event: ReactPointerEvent<HTMLCanvasElement>) {
@@ -243,6 +258,9 @@ export function InkCanvas({
 					dispatch({ type: "up", pointerId: event.pointerId })
 				}
 				onPointerCancel={(event) =>
+					dispatch({ type: "cancel", pointerId: event.pointerId })
+				}
+				onLostPointerCapture={(event) =>
 					dispatch({ type: "cancel", pointerId: event.pointerId })
 				}
 			/>

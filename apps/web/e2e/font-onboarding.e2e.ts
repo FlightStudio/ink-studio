@@ -144,10 +144,11 @@ async function seedBuild(
 	if (outcome === "pending") return build.id;
 	await harness.db.assets.claim(build.id, new Date(0));
 	if ("failed" in outcome) {
-		await harness.db.assets.fail(build.id, outcome.failed);
+		await harness.db.assets.fail(build.id, 1, outcome.failed);
 		return build.id;
 	}
-	await harness.db.assets.complete(build.id, {
+	await harness.db.assets.complete(build.id, 1, {
+		storageKey: `${build.storageKey}/attempts/1`,
 		mimeType: "font/ttf",
 		byteSize: 1,
 		checksum: "e2e",

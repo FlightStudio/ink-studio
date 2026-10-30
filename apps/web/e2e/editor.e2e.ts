@@ -124,7 +124,9 @@ describe("the editor", () => {
 
 		await letterText(tabB).click();
 		await tabB.keyboard.type("Written in tab B.");
-		await tabB.getByText("This letter changed in another tab").waitFor();
+		await tabB
+			.getByText("A different version of this letter is saved")
+			.waitFor();
 		expect(
 			await tabB.getByRole("button", { name: "Load the latest" }).isVisible(),
 		).toBe(true);

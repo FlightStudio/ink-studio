@@ -90,7 +90,7 @@ it("a font reads the processing of its pending build", async () => {
 		(await testDb.db.fonts.byId(organizationId, font.id))?.pendingBuild,
 	).toEqual({ status: "pending", attempts: 0, lastError: null });
 	await testDb.db.assets.claim(assetId, new Date(0));
-	await testDb.db.assets.fail(assetId, "template_markers_not_found");
+	await testDb.db.assets.fail(assetId, 1, "template_markers_not_found");
 	const failed = {
 		status: "failed",
 		attempts: 1,

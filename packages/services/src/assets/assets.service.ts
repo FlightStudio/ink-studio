@@ -300,40 +300,39 @@ export class AssetService {
 			throw new Error(`asset ${asset.id} is not a ${params.kind} job`);
 		}
 		if (attempts > MAX_ATTEMPTS) {
-			await this.db.assets.fail(asset.id, "processing_failed");
+			await this.db.assets.fail(asset.id, attempts, "processing_failed");
 			return;
 		}
 		try {
 			const file = await params.produce(job, asset);
+			const outputKey = `${storageKey(asset.organizationId, asset.id)}/attempts/${attempts}`;
 			await this.storage.put({
-				key: asset.storageKey,
+				key: outputKey,
 				bytes: file.bytes,
 				contentType: file.mimeType,
 			});
 			const stored: StoredFile = {
+				storageKey: outputKey,
 				mimeType: file.mimeType,
 				byteSize: file.bytes.byteLength,
 				checksum: sha256(file.bytes),
 			};
 			await this.db.transaction(async (tx) => {
-				await tx.assets.complete(asset.id, stored);
-				await params.onComplete?.(
-					tx,
-					{ ...asset, ...stored, processing: { status: "done", attempts } },
-					file.result,
-				);
+				const completed = await tx.assets.complete(asset.id, attempts, stored);
+				if (completed) await params.onComplete?.(tx, completed, file.result);
 			});
 		} catch (error) {
 			if (error instanceof ServiceError && error.kind === "invalid_input") {
-				await this.db.assets.fail(asset.id, error.code);
+				await this.db.assets.fail(asset.id, attempts, error.code);
 				return;
 			}
 			if (attempts >= MAX_ATTEMPTS) {
-				await this.db.assets.fail(asset.id, "processing_failed");
+				await this.db.assets.fail(asset.id, attempts, "processing_failed");
 				return;
 			}
-			await this.db.assets.release(asset.id, errorText(error));
-			throw error;
+			if (await this.db.assets.release(asset.id, attempts, errorText(error))) {
+				throw error;
+			}
 		}
 	}
 

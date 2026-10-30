@@ -139,6 +139,6 @@ it("a lifted mask can be read back", async () => {
 		attributes: {},
 	});
 	expect(await assets.getAssetReadUrl(ada.userOrganization, assetId)).toBe(
-		`https://storage.test/organizations/${ada.userOrganization.organizationId}/assets/${assetId}?signed`,
+		`https://storage.test/organizations/${ada.userOrganization.organizationId}/assets/${assetId}/attempts/1?signed`,
 	);
 });

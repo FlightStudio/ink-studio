@@ -10,6 +10,7 @@ import { Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { AssetWatchNotice } from "@/components/shared/asset-watch-notice";
 import { useAssetWatch } from "@/lib/use-asset-watch";
 import { fontHome } from "../font-links.ts";
 import {
@@ -26,11 +27,8 @@ export type FontListProps = { fonts: FontOption[] };
 
 function BuildWatch({ assetId }: { assetId: string }) {
 	const router = useRouter();
-	useAssetWatch(assetId, (state) => {
-		if (state.unreachable) return;
-		router.refresh();
-	});
-	return null;
+	const { state, retry } = useAssetWatch(assetId, () => router.refresh());
+	return <AssetWatchNotice issue={state?.issue ?? null} onRetry={retry} />;
 }
 
 export function FontList({ fonts }: FontListProps) {
@@ -85,9 +83,6 @@ export function FontList({ fonts }: FontListProps) {
 							data-font-id={font.id}
 							className="group relative flex items-center gap-4 rounded-[3px] bg-paper px-5 py-4 shadow-sheet transition-[translate,box-shadow] duration-(--duration-settle) ease-settle focus-within:outline-2 focus-within:outline-offset-4 focus-within:outline-ring hover:-translate-y-0.5"
 						>
-							{font.status === "building" && font.pendingAssetId ? (
-								<BuildWatch assetId={font.pendingAssetId} />
-							) : null}
 							<div className="flex min-w-0 flex-1 flex-col gap-1.5">
 								<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
 									<Link
@@ -114,6 +109,9 @@ export function FontList({ fonts }: FontListProps) {
 										text={SPECIMEN_TEXT}
 										className="truncate text-[1.5rem] leading-[1.4] text-ink"
 									/>
+								) : null}
+								{font.status === "building" && font.pendingAssetId ? (
+									<BuildWatch assetId={font.pendingAssetId} />
 								) : null}
 							</div>
 							<Button

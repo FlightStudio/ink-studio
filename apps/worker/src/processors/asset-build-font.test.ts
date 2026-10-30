@@ -118,7 +118,11 @@ it("a drawn stroke makes a glyph as tall as its centre line plus its width", asy
 	);
 	const processor = processorFor(new OpentypeFontBuilder());
 	await processor.process(message(processor, asset.id));
-	const bytes = files.get(asset.storageKey);
+	const published = await testDb.db.assets.byId(
+		karla.userOrganization.organizationId,
+		asset.id,
+	);
+	const bytes = published ? files.get(published.storageKey) : undefined;
 	if (!bytes) throw new Error("the font file was not stored");
 	const built = parsed(bytes);
 	const box = built.charToGlyph("l").getBoundingBox();
@@ -146,7 +150,7 @@ it("a finished build becomes the font in use and records its characters", async 
 	expect(stored?.pendingFontAssetId).toBeNull();
 	expect(stored?.chars).toBe("l");
 	expect(await assets.getAssetReadUrl(karla.userOrganization, asset.id)).toBe(
-		`https://storage.test/${asset.storageKey}?signed`,
+		`https://storage.test/${asset.storageKey}/attempts/1?signed`,
 	);
 });
 
@@ -341,7 +345,11 @@ it("drawn variants become alternates, and a cleared first one gives way to the n
 	);
 	const processor = processorFor(new OpentypeFontBuilder());
 	await processor.process(message(processor, asset.id));
-	const bytes = files.get(asset.storageKey);
+	const published = await testDb.db.assets.byId(
+		karla.userOrganization.organizationId,
+		asset.id,
+	);
+	const bytes = published ? files.get(published.storageKey) : undefined;
 	if (!bytes) throw new Error("the font file was not stored");
 	const built = parsed(bytes);
 	expect(built.charToGlyph("e").name).toBe("e");

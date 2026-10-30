@@ -52,7 +52,7 @@ import {
 } from "react";
 import { StudioHeaderActions } from "@/components/studio/studio-header";
 import { LibrarySheet } from "@/features/library/components/library-sheet";
-import { useAutosave } from "@/lib/use-autosave";
+import { useAutosave, useLetterRecovery } from "@/lib/use-autosave";
 import {
 	elementsOf,
 	placeElement,
@@ -61,7 +61,7 @@ import {
 	signLetter,
 	updateElement,
 } from "../elements.ts";
-import { exportBlocker } from "../export-progress.ts";
+import { exportBlocker, proofFonts } from "../export-progress.ts";
 import { writeLetterIn } from "../letter-font.ts";
 import { mergeFieldSuggestion } from "../merge-field-suggestion.ts";
 import { placementFor, signaturePlacement } from "../transform.ts";
@@ -401,7 +401,12 @@ function withoutFontParam(): void {
 	window.history.replaceState(null, "", url);
 }
 
-export function LetterEditor({
+export function LetterEditor(props: LetterEditorProps) {
+	const { letter, generation } = useLetterRecovery(props.letter);
+	return <LetterEditorSession key={generation} {...props} letter={letter} />;
+}
+
+function LetterEditorSession({
 	letter,
 	doodles,
 	signatures = [],
@@ -475,8 +480,8 @@ export function LetterEditor({
 
 	const autosave = useAutosave({
 		letterId: letter.id,
-		revision: letter.revision,
 		enabled: letter.editable,
+		resources,
 		draft: () => ({
 			title,
 			content: {
@@ -530,16 +535,30 @@ export function LetterEditor({
 	}, [editor, moveBlankFont]);
 
 	const [empty, setEmpty] = useState(() => isBlank(letter.content.doc));
-
-	const measure = useCallback(() => {
-		const column =
-			pageRef.current?.querySelector<HTMLElement>(".letter-column");
-		if (!column || !editor) return;
-		const nextDoc = editor.getJSON() as LetterDoc;
-		setDoc(nextDoc);
-		setPageState(pageStateOf(spec, column, nextDoc));
-		setFlowBottomIn(flowBottomOf(column, spec) ?? 0);
-	}, [editor, spec]);
+	const live = useMemo(
+		() => ({ ...letter.content, defaults, doc }),
+		[letter.content, defaults, doc],
+	);
+	const renderedPage = useMemo(
+		() => ({
+			content: preview
+				? {
+						...live,
+						doc: {
+							...live.doc,
+							attrs: {
+								...live.doc.attrs,
+								elements: live.doc.attrs.elements.map((element) =>
+									element.id === preview.id ? preview : element,
+								),
+							},
+						},
+					}
+				: live,
+			resources,
+		}),
+		[live, preview, resources],
+	);
 
 	useEffect(() => {
 		if (!editor) return;
@@ -547,7 +566,6 @@ export function LetterEditor({
 			edited();
 			setEmpty(editor.isEmpty);
 			setDoc(editor.getJSON() as LetterDoc);
-			measure();
 		};
 		const onFocus = () => setSelectedId(null);
 		editor.on("update", onUpdate);
@@ -556,21 +574,43 @@ export function LetterEditor({
 			editor.off("update", onUpdate);
 			editor.off("focus", onFocus);
 		};
-	}, [editor, edited, measure]);
+	}, [editor, edited]);
 
-	useEffect(() => {
-		if (inkReady && desk.scale !== null) measure();
-	}, [inkReady, desk.scale, measure]);
-
-	useEffect(() => {
-		let live = true;
-		void document.fonts.ready.then(() => {
-			if (live) measure();
-		});
-		return () => {
-			live = false;
+	useLayoutEffect(() => {
+		if (!editor || !inkReady || desk.scale === null) return;
+		const column =
+			pageRef.current?.querySelector<HTMLElement>(".letter-column");
+		if (!column) return;
+		let active = true;
+		let frame: number | null = null;
+		const schedule = () => {
+			if (!active || frame !== null) return;
+			frame = requestAnimationFrame(() => {
+				frame = null;
+				setPageState(pageStateOf(spec, column, renderedPage.content.doc));
+				setFlowBottomIn(flowBottomOf(column, spec) ?? 0);
+			});
 		};
-	}, [measure]);
+		const observer = new ResizeObserver(schedule);
+		observer.observe(column);
+		observer.observe(editor.view.dom);
+		window.addEventListener("resize", schedule);
+		const viewport = window.visualViewport;
+		viewport?.addEventListener("resize", schedule);
+		document.fonts.addEventListener("loadingdone", schedule);
+		document.fonts.addEventListener("loadingerror", schedule);
+		void document.fonts.ready.then(schedule);
+		schedule();
+		return () => {
+			active = false;
+			if (frame !== null) cancelAnimationFrame(frame);
+			observer.disconnect();
+			window.removeEventListener("resize", schedule);
+			viewport?.removeEventListener("resize", schedule);
+			document.fonts.removeEventListener("loadingdone", schedule);
+			document.fonts.removeEventListener("loadingerror", schedule);
+		};
+	}, [editor, inkReady, desk.scale, renderedPage, spec]);
 
 	useEffect(() => {
 		if (!editor || !inkReady || !letter.editable || caretPlaced.current) {
@@ -644,17 +684,7 @@ export function LetterEditor({
 		if (revealSheet(page, revealSide)) setRevealSide(null);
 	}, [revealSide, sheets]);
 
-	const live = { ...letter.content, defaults, doc };
-	const shownElements = live.doc.attrs.elements.map((element) =>
-		preview?.id === element.id ? preview : element,
-	);
-	const shown = {
-		...live,
-		doc: {
-			...live.doc,
-			attrs: { ...live.doc.attrs, elements: shownElements },
-		},
-	};
+	const shownElements = renderedPage.content.doc.attrs.elements;
 	const placementWarning = placementSentence(
 		pageState.issues.filter(
 			(issue) =>
@@ -763,6 +793,7 @@ export function LetterEditor({
 					<ExportButton
 						letterId={letter.id}
 						spec={spec}
+						fonts={proofFonts(live, resources.fonts)}
 						revision={
 							autosave.state.status === "saved" ? autosave.state.revision : null
 						}
@@ -863,8 +894,8 @@ export function LetterEditor({
 								</style>
 								<LetterPage
 									letterId={letter.id}
-									content={shown}
-									resources={resources}
+									content={renderedPage.content}
+									resources={renderedPage.resources}
 									mode="edit"
 									mergeValues={null}
 									sheets={sheets}
@@ -1002,15 +1033,17 @@ export function LetterEditor({
 						editable={letter.editable}
 						onTitle={(next) => {
 							setTitle(next);
-							edited();
+							edited({ title: next });
 						}}
 						onDone={() => editor?.commands.focus("end")}
 					/>
 					{letter.editable ? (
 						<SaveLine
 							state={autosave.state}
-							onLoadLatest={() => router.refresh()}
+							onLoadLatest={() => void autosave.loadLatest()}
 							onKeepMine={() => void autosave.keepMine()}
+							onRetry={() => void autosave.retry()}
+							onDownload={autosave.download}
 						/>
 					) : (
 						<p className="pr-3 text-ui text-ink-muted">

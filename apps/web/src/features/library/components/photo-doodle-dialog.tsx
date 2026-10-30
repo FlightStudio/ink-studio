@@ -15,6 +15,8 @@ import {
 	DialogTitle,
 } from "@repo/ui/components/ui/dialog";
 import { useEffect, useRef, useState } from "react";
+import { AssetWatchNotice } from "@/components/shared/asset-watch-notice";
+import type { AssetReadIssue } from "@/lib/asset-watch";
 import { watchAssetStatus } from "@/lib/use-asset-watch";
 import { nextDrawingName } from "../drawing-name.ts";
 import { MaskEditor, type MaskEditorHandle } from "./mask-editor.tsx";
@@ -112,6 +114,7 @@ function PhotoForm({
 	);
 	const [polling, setPolling] = useState(false);
 	const [slow, setSlow] = useState(false);
+	const [readIssue, setReadIssue] = useState<AssetReadIssue | null>(null);
 	const [name, setName] = useState(defaultName);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -146,29 +149,38 @@ function PhotoForm({
 		return run.current;
 	}
 
-	function watch(id: string) {
+	function watch(id: string, status: "pending" | "running" = "pending") {
+		stopWatching.current();
 		setPolling(true);
-		stopWatching.current = watchAssetStatus(id, (reading) => {
-			setSlow(reading.slow);
-			if (reading.status === "done") {
-				restart();
-				setLiftId(id);
-				setPhase("edit");
-				return;
-			}
-			if (reading.status === "failed") {
-				restart();
-				setPhase("failed");
-				setError(liftFailure(reading.error));
-				return;
-			}
-			setLiftStatus(reading.status);
-		});
+		setLiftId(id);
+		stopWatching.current = watchAssetStatus(
+			id,
+			(reading) => {
+				setSlow(reading.slow);
+				setReadIssue(reading.issue);
+				setPolling(reading.issue === null || reading.issue === "unreachable");
+				if (reading.status === "done") {
+					restart();
+					setPhase("edit");
+					return;
+				}
+				if (reading.status === "failed") {
+					restart();
+					setPhase("failed");
+					setError(liftFailure(reading.error));
+					return;
+				}
+				setLiftStatus(reading.status);
+			},
+			{ status, error: null },
+		);
 	}
 
 	async function lift(photoId: string) {
 		const current = restart();
 		setSlow(false);
+		setReadIssue(null);
+		setLiftId(null);
 		setLiftStatus("pending");
 		setPhase("lifting");
 		const response = await requestLift({ photoAssetId: photoId }).catch(
@@ -190,6 +202,7 @@ function PhotoForm({
 		setPhotoAssetId(null);
 		setLiftId(null);
 		setSlow(false);
+		setReadIssue(null);
 		setError(null);
 		if (file.current) {
 			file.current.value = "";
@@ -321,7 +334,15 @@ function PhotoForm({
 					</figcaption>
 				</figure>
 			) : null}
-			{waiting && slow ? (
+			{waiting ? (
+				<AssetWatchNotice
+					issue={readIssue}
+					onRetry={() => {
+						if (liftId) watch(liftId, liftStatus);
+					}}
+				/>
+			) : null}
+			{waiting && slow && readIssue === null ? (
 				<div className="flex flex-wrap items-center gap-2">
 					<p className="mr-auto text-ui text-ink">
 						This is taking longer than usual

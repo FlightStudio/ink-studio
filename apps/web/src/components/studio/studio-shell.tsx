@@ -1,5 +1,7 @@
 import { Libre_Baskerville, Outfit } from "next/font/google";
 import type { CSSProperties, ReactNode } from "react";
+import { GlyphSessionProvider } from "@/features/fonts/glyph-session-provider";
+import { LetterSaveProvider } from "@/lib/letter-save-provider";
 import { StudioHeader } from "./studio-header.tsx";
 
 const display = Libre_Baskerville({
@@ -28,7 +30,11 @@ export function StudioShell({ children }: { children: ReactNode }) {
 			<style href="studio-portal-fonts" precedence="default">
 				{portalFonts}
 			</style>
-			<StudioHeader>{children}</StudioHeader>
+			<LetterSaveProvider>
+				<GlyphSessionProvider>
+					<StudioHeader>{children}</StudioHeader>
+				</GlyphSessionProvider>
+			</LetterSaveProvider>
 		</div>
 	);
 }

@@ -74,6 +74,22 @@ export type LetterPreview = {
 	resources: LetterResources;
 };
 
+export function ownFontIds(content: LetterContent): string[] {
+	const refs = [content.defaults.font];
+	for (const block of content.doc.content) {
+		for (const node of block.content ?? []) {
+			for (const mark of node.marks ?? []) {
+				if (mark.attrs.font) refs.push(mark.attrs.font);
+			}
+		}
+	}
+	return [
+		...new Set(
+			refs.flatMap((font) => (font.kind === "own" ? [font.fontId] : [])),
+		),
+	];
+}
+
 export type SealFont = { ownerName: string; chars: ReadonlySet<string> };
 
 function listOf(items: readonly string[]): string {

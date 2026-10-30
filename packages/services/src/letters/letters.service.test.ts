@@ -632,7 +632,7 @@ it("an export of a stale revision is refused", async () => {
 	const exporting = new LetterService(testDb.db, { publish });
 	const { id } = await exporting.createLetter(ada, {});
 	await expect(
-		exporting.requestExport(ada, id, { revision: 2 }),
+		exporting.requestExport(ada, id, { revision: 2, fonts: {} }),
 	).rejects.toMatchObject({ kind: "conflict", code: "stale_revision" });
 	expect(publish).not.toHaveBeenCalled();
 });
@@ -649,7 +649,10 @@ it("an export carries the letter as it was and one recipient's values", async ()
 		expectedRevision: 1,
 	});
 	const before = await stored(ada, id);
-	const { assetIds } = await exporting.requestExport(ada, id, { revision: 2 });
+	const { assetIds } = await exporting.requestExport(ada, id, {
+		revision: 2,
+		fonts: {},
+	});
 	await exporting.saveLetter(ada, id, {
 		title: "Second",
 		content: written(before.content, "Edited sentence"),
@@ -674,7 +677,10 @@ it("a letter exports one PDF", async () => {
 	const publish = vi.fn<Publisher["publish"]>(async () => {});
 	const exporting = new LetterService(testDb.db, { publish });
 	const { id } = await exporting.createLetter(ada, {});
-	const { assetIds } = await exporting.requestExport(ada, id, { revision: 1 });
+	const { assetIds } = await exporting.requestExport(ada, id, {
+		revision: 1,
+		fonts: {},
+	});
 	expect(assetIds).toHaveLength(1);
 	const asset = await testDb.db.assets.byId(
 		organizationId(ada),
@@ -735,7 +741,10 @@ it("a postcard exports one PNG per side", async () => {
 	const { id } = await exporting.createLetter(ada, {
 		format: "thanksio:postcard-6x9",
 	});
-	const { assetIds } = await exporting.requestExport(ada, id, { revision: 1 });
+	const { assetIds } = await exporting.requestExport(ada, id, {
+		revision: 1,
+		fonts: {},
+	});
 	expect(assetIds).toHaveLength(2);
 	const outputs = [];
 	for (const assetId of assetIds) {
@@ -768,7 +777,7 @@ it("a teammate cannot export a letter in Karla's hand", async () => {
 		expectedRevision: 1,
 	});
 	await expect(
-		letters.requestExport(sam, id, { revision: 2 }),
+		letters.requestExport(sam, id, { revision: 2, fonts: {} }),
 	).rejects.toMatchObject({ kind: "forbidden", code: "not_owner" });
 });
 

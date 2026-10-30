@@ -26,6 +26,10 @@ export type Harness = {
 };
 
 export async function startHarness(): Promise<Harness> {
+	const engine = process.env.E2E_BROWSER ?? "chromium";
+	if (engine !== "chromium" && engine !== "webkit") {
+		throw new Error("E2E_BROWSER must be chromium or webkit");
+	}
 	const url = process.env.DATABASE_URL;
 	if (!url) throw new Error("DATABASE_URL is required for the e2e harness");
 	const db = createDb(url);
@@ -45,7 +49,8 @@ export async function startHarness(): Promise<Harness> {
 				organizationName: "E2E studio",
 			}),
 		async open(member, path, options) {
-			const context = await browsers.chromium.newContext({
+			const context = await browsers[engine].newContext({
+				ignoreHTTPSErrors: process.env.E2E_IGNORE_HTTPS_ERRORS === "1",
 				viewport: options?.viewport ?? { width: 1440, height: 900 },
 				hasTouch: options?.hasTouch,
 			});

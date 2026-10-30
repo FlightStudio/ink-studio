@@ -23,6 +23,7 @@ export function GET(request: Request, context: Context) {
 			title: letter.title,
 			revision: letter.revision,
 			content: letter.content,
+			resources: letter.resources,
 		};
 		return Response.json(state);
 	});

@@ -1,5 +1,5 @@
 import { outlinePath, strokeOutline } from "@repo/render/html";
-import type { Stroke } from "@repo/types";
+import type { CanvasStroke } from "../ink/pointer-session.ts";
 import { CROP_PAD, inkBox } from "./ink-bounds.ts";
 
 export type MaskCrop = { x: number; y: number; width: number; height: number };
@@ -9,8 +9,7 @@ export type ComposeMaskParams = {
 	imageWidth: number;
 	imageHeight: number;
 	crop: MaskCrop;
-	strokes: Stroke[];
-	strokeScale: number;
+	strokes: CanvasStroke[];
 	viewWidth: number;
 	viewHeight: number;
 };
@@ -39,7 +38,7 @@ export async function composeMask(
 	context.setTransform(scaleX, 0, 0, scaleY, -x, -y);
 	for (const stroke of params.strokes) {
 		context.fill(
-			new Path2D(outlinePath(strokeOutline(stroke, params.strokeScale))),
+			new Path2D(outlinePath(strokeOutline(stroke, stroke.strokeScale ?? 1))),
 		);
 	}
 	const ink = inkBox(

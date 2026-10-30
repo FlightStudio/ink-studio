@@ -317,6 +317,16 @@ function produced(): ProducedFile<null> {
 	return { bytes: ABC, mimeType: "image/png", result: null };
 }
 
+function deferred<T>() {
+	let resolve: (value: T) => void = () => {};
+	let reject: (reason: unknown) => void = () => {};
+	const promise = new Promise<T>((accept, refuse) => {
+		resolve = accept;
+		reject = refuse;
+	});
+	return { promise, resolve, reject };
+}
+
 async function generated(caller: Member, processing?: AssetProcessing) {
 	const asset = generatedAsset(caller.userOrganization.organizationId, {
 		kind: "lift-ink",
@@ -360,7 +370,7 @@ it("a finished job stores the output with its size and checksum", async () => {
 		produce: async () => produced(),
 	});
 	expect(storage.put).toHaveBeenCalledExactlyOnceWith({
-		key: asset.storageKey,
+		key: `${asset.storageKey}/attempts/1`,
 		bytes: ABC,
 		contentType: "image/png",
 	});
@@ -393,6 +403,85 @@ it("two workers racing on one asset produce it once", async () => {
 		attempts: 1,
 	});
 });
+
+it("a reclaimed attempt cannot replace the winning bytes or publish its callback", async () => {
+	const ada = await member("ada-reclaimed-output");
+	const asset = await generated(ada);
+	const started = deferred<void>();
+	const held = deferred<ProducedFile<string>>();
+	const objects = new Map<string, Uint8Array>();
+	storage.put.mockImplementation(async ({ key, bytes }) => {
+		objects.set(key, bytes);
+	});
+	const onComplete = vi.fn<
+		NonNullable<Parameters<AssetService["runJob"]>[0]["onComplete"]>
+	>(async () => {});
+	const first = assets.runJob({
+		assetId: asset.id,
+		kind: "lift-ink",
+		produce: async () => {
+			started.resolve();
+			return held.promise;
+		},
+		onComplete,
+	});
+	await started.promise;
+	await backdate(asset.id, 16);
+	const winnerBytes = bytes([4, 5, 6]);
+	await assets.runJob({
+		assetId: asset.id,
+		kind: "lift-ink",
+		produce: async () => ({
+			bytes: winnerBytes,
+			mimeType: "image/png",
+			result: "winner",
+		}),
+		onComplete,
+	});
+	const winner = await testDb.db.assets.byId(
+		ada.userOrganization.organizationId,
+		asset.id,
+	);
+	held.resolve({ ...produced(), result: "stale" });
+	await first;
+	expect(onComplete).toHaveBeenCalledOnce();
+	expect(onComplete.mock.calls[0]?.[2]).toBe("winner");
+	expect(winner).not.toBeNull();
+	expect(objects.get(winner?.storageKey ?? "")).toEqual(winnerBytes);
+	expect(
+		await testDb.db.assets.byId(ada.userOrganization.organizationId, asset.id),
+	).toEqual(winner);
+});
+
+it.each(["transient", "permanent"])(
+	"a stale %s failure cannot change the replacement attempt",
+	async (failure) => {
+		const ada = await member(`ada-reclaimed-${failure}`);
+		const asset = await generated(ada);
+		const started = deferred<void>();
+		const held = deferred<ProducedFile<null>>();
+		const first = assets
+			.runJob({
+				assetId: asset.id,
+				kind: "lift-ink",
+				produce: async () => {
+					started.resolve();
+					return held.promise;
+				},
+			})
+			.catch(() => undefined);
+		await started.promise;
+		await backdate(asset.id, 16);
+		const replacement = await testDb.db.assets.claim(asset.id, new Date());
+		held.reject(
+			failure === "transient"
+				? new Error("late timeout")
+				: new ServiceError("invalid_input", "photo_unreadable"),
+		);
+		await first;
+		expect(await processingOf(ada, asset.id)).toEqual(replacement?.processing);
+	},
+);
 
 it("a transient failure releases the asset and nacks", async () => {
 	const ada = await member("ada-transient");

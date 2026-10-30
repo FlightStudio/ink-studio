@@ -13,6 +13,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { trackElementPointer } from "../element-pointer.ts";
 import type { ElementChange } from "../elements.ts";
 import {
 	type Handle,
@@ -211,6 +212,7 @@ export function ElementHandles(props: ElementHandlesProps) {
 	const propsRef = useRef(props);
 	propsRef.current = props;
 	const gestureRef = useRef<Gesture | null>(null);
+	const stopPointer = useRef<(() => void) | null>(null);
 	const moveButtons = useRef(new Map<string, HTMLButtonElement>());
 	const [heldKnob, setHeldKnob] = useState<KnobSide | null>(null);
 	const hintId = useId();
@@ -236,16 +238,16 @@ export function ElementHandles(props: ElementHandlesProps) {
 		}
 	}, [props.selectedId]);
 
-	function finish() {
+	useEffect(() => () => stopPointer.current?.(), []);
+
+	function finish(cancelled = false) {
 		const gesture = gestureRef.current;
-		window.removeEventListener("pointermove", onMove);
-		window.removeEventListener("pointerup", finish);
-		window.removeEventListener("pointercancel", finish);
+		stopPointer.current = null;
 		gestureRef.current = null;
 		setHeldKnob(null);
 		if (!gesture) return;
 		const change =
-			gesture.moved && gesture.latest
+			!cancelled && gesture.moved && gesture.latest
 				? changed(gesture.origin, gesture.latest)
 				: null;
 		propsRef.current.onPreview(null);
@@ -294,13 +296,19 @@ export function ElementHandles(props: ElementHandlesProps) {
 	function begin(event: ReactPointerEvent<HTMLElement>, gesture: Gesture) {
 		event.preventDefault();
 		event.stopPropagation();
+		if (gestureRef.current || event.button !== 0) return;
 		props.onSelect(gesture.origin.id);
 		moveButtons.current.get(gesture.origin.id)?.focus({ preventScroll: true });
 		gestureRef.current = gesture;
 		if (gesture.kind === "rotate") setHeldKnob(gesture.knob);
-		window.addEventListener("pointermove", onMove);
-		window.addEventListener("pointerup", finish);
-		window.addEventListener("pointercancel", finish);
+		stopPointer.current = trackElementPointer({
+			root: window,
+			target: event.currentTarget,
+			pointerId: event.pointerId,
+			onMove,
+			onFinish: () => finish(),
+			onCancel: () => finish(true),
+		});
 	}
 
 	function startMove(
@@ -336,6 +344,7 @@ export function ElementHandles(props: ElementHandlesProps) {
 		if (event.metaKey || event.ctrlKey || event.altKey) return;
 		if (event.key === "Escape") {
 			event.preventDefault();
+			stopPointer.current?.();
 			props.onRelease();
 			return;
 		}

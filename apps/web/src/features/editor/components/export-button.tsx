@@ -13,18 +13,24 @@ import {
 } from "@repo/ui/components/ui/popover";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AssetWatchNotice } from "@/components/shared/asset-watch-notice";
+import { isSettled } from "@/lib/asset-watch";
 import { watchAssetStatus } from "@/lib/use-asset-watch";
 import {
 	afterReading,
 	type ExportState,
 	failureMessage,
+	type Proof,
+	type ProofIdentity,
 	proofLabels,
+	proofMatches,
 	workingOn,
 } from "../export-progress.ts";
 
 export type ExportButtonProps = {
 	letterId: string;
 	revision: number | null;
+	fonts: Readonly<Record<string, string>>;
 	spec: PageSpec;
 	blocker: string | null;
 };
@@ -32,27 +38,34 @@ export type ExportButtonProps = {
 export function ExportButton({
 	letterId,
 	revision,
+	fonts,
 	spec,
 	blocker,
 }: ExportButtonProps) {
 	const [state, setState] = useState<ExportState>({ phase: "idle" });
 	const [open, setOpen] = useState(false);
-	const [exported, setExported] = useState<number | null>(null);
+	const [exported, setExported] = useState<ProofIdentity | null>(null);
 	const stopWatching = useRef<() => void>(() => {});
 
 	useEffect(() => () => stopWatching.current(), []);
 
-	const watch = useCallback((ids: readonly string[]) => {
-		stopWatching.current();
-		const stops = ids.map((id) =>
-			watchAssetStatus(id, (reading) =>
-				setState((previous) => afterReading(previous, id, reading)),
-			),
-		);
-		stopWatching.current = () => {
-			for (const stop of stops) stop();
-		};
-	}, []);
+	const watch = useCallback(
+		(ids: readonly string[], readings: readonly Proof[] = []) => {
+			stopWatching.current();
+			const stops = ids.map((id) =>
+				watchAssetStatus(
+					id,
+					(reading) =>
+						setState((previous) => afterReading(previous, id, reading)),
+					readings.find((proof) => proof.id === id),
+				),
+			);
+			stopWatching.current = () => {
+				for (const stop of stops) stop();
+			};
+		},
+		[],
+	);
 
 	const start = useCallback(async () => {
 		stopWatching.current();
@@ -65,10 +78,9 @@ export function ExportButton({
 			return;
 		}
 		setState({ phase: "starting" });
-		setExported(revision);
-		const created = await requestExport(letterId, { revision }).catch(
-			() => null,
-		);
+		const requested = { revision, fonts: { ...fonts } };
+		setExported(requested);
+		const created = await requestExport(letterId, requested).catch(() => null);
 		if (created?.status !== 201) {
 			setState({
 				phase: "failed",
@@ -81,7 +93,7 @@ export function ExportButton({
 		}
 		setState(workingOn(created.data.assetIds));
 		watch(created.data.assetIds);
-	}, [blocker, letterId, revision, watch]);
+	}, [blocker, letterId, revision, fonts, watch]);
 
 	useEffect(() => {
 		if (state.phase === "saving" && revision !== null) void start();
@@ -97,6 +109,14 @@ export function ExportButton({
 		state.phase === "working";
 	const slow =
 		state.phase === "working" && state.proofs.some((proof) => proof.slow);
+	const issue =
+		state.phase === "working"
+			? (state.proofs.find(
+					(proof) => proof.issue !== null && proof.issue !== "unreachable",
+				)?.issue ??
+				state.proofs.find((proof) => proof.issue !== null)?.issue ??
+				null)
+			: null;
 	const labels =
 		state.phase === "ready" ? proofLabels(spec, state.proofs.length) : [];
 
@@ -106,7 +126,8 @@ export function ExportButton({
 			onOpenChange={(next) => {
 				setOpen(next);
 				if (!next || busy) return;
-				if (state.phase === "ready" && exported === revision) return;
+				if (state.phase === "ready" && proofMatches(exported, revision, fonts))
+					return;
 				void start();
 			}}
 		>
@@ -149,7 +170,21 @@ export function ExportButton({
 					{state.phase === "starting" || state.phase === "working" ? (
 						<>
 							<StatusPill status="running" label="Making the proof" />
-							{slow ? (
+							{issue ? (
+								<AssetWatchNotice
+									issue={issue}
+									onRetry={() => {
+										if (state.phase === "working") {
+											watch(
+												state.proofs
+													.filter((proof) => !isSettled(proof))
+													.map((proof) => proof.id),
+												state.proofs,
+											);
+										}
+									}}
+								/>
+							) : slow ? (
 								<div className="flex w-full items-center justify-between gap-3">
 									<p className="text-ink-muted">
 										This is taking longer than usual.
@@ -192,9 +227,9 @@ export function ExportButton({
 									</a>
 								))}
 							</div>
-							{exported !== revision ? (
+							{!proofMatches(exported, revision, fonts) ? (
 								<p className="text-ink-muted">
-									The letter changed since.{" "}
+									The letter or its handwriting changed since this proof.{" "}
 									<button
 										type="button"
 										className="text-ink underline decoration-rule underline-offset-4 hover:decoration-ink"

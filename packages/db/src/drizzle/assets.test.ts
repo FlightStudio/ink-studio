@@ -211,6 +211,37 @@ it("a finished asset is never claimed", async () => {
 	expect(await testDb.db.assets.claim(failed.id, minutesAgo(15))).toBeNull();
 });
 
+it("only the owning attempt can complete, fail, or release a reclaimed asset", async () => {
+	const ada = await member("ada-attempt-owner");
+	const organizationId = ada.userOrganization.organizationId;
+	const asset = await generated(organizationId, {
+		status: "pending",
+		attempts: 0,
+		lastError: null,
+	});
+	await testDb.db.assets.claim(asset.id, minutesAgo(15));
+	await backdate(asset.id, 16);
+	const replacement = await testDb.db.assets.claim(asset.id, minutesAgo(15));
+	const file = {
+		storageKey: `${asset.storageKey}/attempts/2`,
+		mimeType: "image/png",
+		byteSize: 3,
+		checksum: "d".repeat(64),
+	};
+	expect(await testDb.db.assets.complete(asset.id, 1, file)).toBeNull();
+	expect(await testDb.db.assets.release(asset.id, 1, "late")).toBe(false);
+	expect(await testDb.db.assets.fail(asset.id, 1, "late")).toBe(false);
+	expect(await testDb.db.assets.byId(organizationId, asset.id)).toEqual(
+		replacement,
+	);
+	const winner = await testDb.db.assets.complete(asset.id, 2, file);
+	expect(winner).toMatchObject({
+		...file,
+		processing: { status: "done", attempts: 2 },
+	});
+	expect(await testDb.db.assets.complete(asset.id, 2, file)).toBeNull();
+});
+
 it("complete stores the file and clears the last error", async () => {
 	const ada = await member("ada-complete");
 	const organizationId = ada.userOrganization.organizationId;
@@ -220,7 +251,8 @@ it("complete stores the file and clears the last error", async () => {
 		lastError: "boom",
 	});
 	await testDb.db.assets.claim(asset.id, minutesAgo(15));
-	await testDb.db.assets.complete(asset.id, {
+	await testDb.db.assets.complete(asset.id, 2, {
+		storageKey: `${asset.storageKey}/attempts/2`,
 		mimeType: "image/png",
 		byteSize: 3,
 		checksum: "c".repeat(64),
@@ -248,8 +280,8 @@ it("release puts a running asset back with its error and fail ends it", async ()
 	});
 	await testDb.db.assets.claim(released.id, minutesAgo(15));
 	await testDb.db.assets.claim(ended.id, minutesAgo(15));
-	await testDb.db.assets.release(released.id, "timeout");
-	await testDb.db.assets.fail(ended.id, "photo_unreadable");
+	await testDb.db.assets.release(released.id, 1, "timeout");
+	await testDb.db.assets.fail(ended.id, 1, "photo_unreadable");
 	expect(
 		(await testDb.db.assets.byId(organizationId, released.id))?.processing,
 	).toEqual({ status: "pending", attempts: 1, lastError: "timeout" });
@@ -265,8 +297,8 @@ it("a finished asset is not moved by a late release or fail", async () => {
 		status: "done",
 		attempts: 1,
 	});
-	await testDb.db.assets.release(asset.id, "late");
-	await testDb.db.assets.fail(asset.id, "processing_failed");
+	await testDb.db.assets.release(asset.id, 1, "late");
+	await testDb.db.assets.fail(asset.id, 1, "processing_failed");
 	expect(
 		(await testDb.db.assets.byId(organizationId, asset.id))?.processing,
 	).toEqual({ status: "done", attempts: 1 });

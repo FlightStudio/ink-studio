@@ -3,9 +3,17 @@ export type AssetReading = {
 	error: string | null;
 };
 
+export type AssetReadIssue =
+	| "unreachable"
+	| "unauthenticated"
+	| "forbidden"
+	| "not_found";
+
+export type AssetReadResult = AssetReading | { issue: AssetReadIssue };
+
 export type AssetWatchState = AssetReading & {
 	slow: boolean;
-	unreachable: boolean;
+	issue: AssetReadIssue | null;
 };
 
 export const SLOW_AFTER_MS = 60_000;
@@ -25,20 +33,31 @@ export function isSettled(reading: AssetReading): boolean {
 	return reading.status === "done" || reading.status === "failed";
 }
 
+export function assetReadIssue(status: number): AssetReadIssue {
+	if (status === 401) return "unauthenticated";
+	if (status === 403) return "forbidden";
+	if (status === 404) return "not_found";
+	return "unreachable";
+}
+
 export type WatchAssetOptions = {
-	read: () => Promise<AssetReading | null>;
+	read: () => Promise<AssetReadResult>;
 	onChange: (state: AssetWatchState) => void;
+	initialReading?: AssetReading;
 	slowAfterMs?: number;
 };
 
 export function watchAsset({
 	read,
 	onChange,
+	initialReading = { status: "pending", error: null },
 	slowAfterMs = SLOW_AFTER_MS,
 }: WatchAssetOptions): () => void {
 	let stopped = false;
 	let attempt = 0;
 	let state: AssetWatchState | null = null;
+	let reading = initialReading;
+	let issue: AssetReadIssue | null = null;
 	let slow = false;
 	let next: ReturnType<typeof setTimeout> | undefined;
 
@@ -48,33 +67,43 @@ export function watchAsset({
 		clearTimeout(slowTimer);
 	}
 
-	function emit(reading: AssetReading, unreachable = false) {
-		state = {
-			...reading,
-			slow: slow && !isSettled(reading) && !unreachable,
-			unreachable,
+	function emit() {
+		const nextState: AssetWatchState = {
+			status: reading.status,
+			error: reading.error,
+			slow: slow && !isSettled(reading) && issue === null,
+			issue,
 		};
+		if (
+			state?.status === nextState.status &&
+			state.error === nextState.error &&
+			state.slow === nextState.slow &&
+			state.issue === nextState.issue
+		)
+			return;
+		state = nextState;
 		onChange(state);
 	}
 
 	const slowTimer = setTimeout(() => {
 		slow = true;
-		if (state) emit(state);
-		else emit({ status: "pending", error: null });
+		emit();
 	}, slowAfterMs);
 
 	async function tick() {
-		const reading = await read().catch(() => null);
+		const result = await read().catch(() => ({
+			issue: "unreachable" as const,
+		}));
 		if (stopped) return;
-		if (!reading) {
-			emit({ status: "failed", error: null }, true);
-			stop();
-			return;
+		if ("issue" in result) {
+			issue = result.issue;
+		} else {
+			reading = result;
+			issue = null;
 		}
-		if (reading.status !== state?.status || reading.error !== state.error) {
-			emit(reading);
-		}
-		if (isSettled(reading)) {
+		emit();
+		if (stopped) return;
+		if (isSettled(reading) || (issue !== null && issue !== "unreachable")) {
 			stop();
 			return;
 		}

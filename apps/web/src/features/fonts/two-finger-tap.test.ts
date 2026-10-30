@@ -26,6 +26,20 @@ function run(events: TapEvent[]): { state: TapState; taps: number } {
 }
 
 describe("twoFingerTap", () => {
+	test("a touch beginning on a control or outside drawing space cannot undo", () => {
+		const { taps } = run([
+			{ type: "start", t: 0, changed: [finger(1)], remaining: 1 },
+			{
+				type: "start",
+				t: 20,
+				changed: [{ ...finger(2), eligible: false }],
+				remaining: 2,
+			},
+			{ type: "end", t: 90, changed: [finger(1), finger(2)], remaining: 0 },
+		]);
+		expect(taps).toBe(0);
+	});
+
 	test("two fingers down and up quickly is one tap", () => {
 		const { state, taps } = run([
 			{ type: "start", t: 0, changed: [finger(1)], remaining: 1 },

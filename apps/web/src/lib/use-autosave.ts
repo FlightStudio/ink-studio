@@ -1,112 +1,138 @@
 "use client";
 
-import { getLetter, saveLetter } from "@repo/api";
-import type { LetterContent } from "@repo/types";
+import { getLetter } from "@repo/api";
+import type { EditableLetter } from "@repo/services/letters";
+import type { LetterResources } from "@repo/types";
 import {
 	useCallback,
 	useEffect,
 	useLayoutEffect,
-	useReducer,
+	useMemo,
 	useRef,
+	useState,
+	useSyncExternalStore,
 } from "react";
-import { type AutosaveState, autosave } from "./autosave.ts";
+import type { AutosaveState } from "./autosave.ts";
+import {
+	downloadLetterDraft,
+	useLetterSaves,
+} from "./letter-save-provider.tsx";
+import type { LetterDraft } from "./letter-saves.ts";
+import { requestDeadline } from "./request-deadline.ts";
 
-export type AutosaveDraft = { title: string; content: LetterContent };
+export type AutosaveDraft = LetterDraft;
 
 export type UseAutosaveParams = {
 	letterId: string;
-	revision: number;
 	enabled: boolean;
+	resources: LetterResources;
 	draft: () => AutosaveDraft;
 	onNewerVersion: () => void;
 };
 
 export type Autosave = {
 	state: AutosaveState;
-	edited: () => void;
+	edited: (change?: Partial<AutosaveDraft>) => void;
 	keepMine: () => Promise<void>;
+	loadLatest: () => Promise<void>;
+	retry: () => Promise<void>;
+	download: () => void;
 };
 
-async function latestRevision(letterId: string): Promise<number | null> {
-	try {
-		const response = await getLetter(letterId, { cache: "no-store" });
-		return response.status === 200 ? response.data.revision : null;
-	} catch {
-		return null;
-	}
+export function useLetterRecovery(server: EditableLetter): {
+	letter: EditableLetter;
+	generation: number;
+} {
+	const saves = useLetterSaves();
+	const [initial] = useState(() =>
+		saves.open(server.id, {
+			title: server.title,
+			content: server.content,
+			resources: server.resources,
+			revision: server.revision,
+		}),
+	);
+	const subscribe = useCallback(
+		(listener: () => void) => saves.subscribe(server.id, listener),
+		[saves, server.id],
+	);
+	const snapshot = useCallback(
+		() => saves.snapshot(server.id).generation,
+		[saves, server.id],
+	);
+	const generation = useSyncExternalStore(subscribe, snapshot, snapshot);
+	const restored = useMemo(
+		() =>
+			generation === initial.generation ? initial : saves.snapshot(server.id),
+		[generation, initial, saves, server.id],
+	);
+	return {
+		generation,
+		letter: {
+			...server,
+			title: restored.draft.title,
+			content: restored.draft.content,
+			resources: restored.draft.resources ?? server.resources,
+			revision: restored.state.revision,
+		},
+	};
 }
 
 export function useAutosave(params: UseAutosaveParams): Autosave {
-	const { letterId, enabled } = params;
-	const [state, dispatch] = useReducer(autosave, {
-		status: "saved",
-		revision: params.revision,
-	});
-	const stateRef = useRef(state);
+	const saves = useLetterSaves();
+	const { letterId, enabled, resources } = params;
 	const draftRef = useRef(params.draft);
 	const onNewerVersionRef = useRef(params.onNewerVersion);
+	const subscribe = useCallback(
+		(listener: () => void) => saves.subscribe(letterId, listener),
+		[saves, letterId],
+	);
+	const snapshot = useCallback(
+		() => saves.snapshot(letterId),
+		[saves, letterId],
+	);
+	const { state } = useSyncExternalStore(subscribe, snapshot, snapshot);
 
 	useLayoutEffect(() => {
-		stateRef.current = state;
 		draftRef.current = params.draft;
 		onNewerVersionRef.current = params.onNewerVersion;
 	});
 
-	const edited = useCallback(() => {
-		dispatch({ type: "edited", now: Date.now() });
-	}, []);
+	useLayoutEffect(() => {
+		if (enabled) saves.resources(letterId, resources);
+	}, [enabled, saves, letterId, resources]);
+
+	const edited = useCallback(
+		(change?: Partial<AutosaveDraft>) => {
+			if (!enabled) return;
+			saves.edit(letterId, {
+				...draftRef.current(),
+				resources: saves.snapshot(letterId).draft.resources,
+				...change,
+			});
+		},
+		[enabled, saves, letterId],
+	);
 
 	useEffect(() => {
 		if (!enabled) return;
-		if (state.status !== "dirty" && state.status !== "retrying") return;
-		const expectedRevision = state.revision;
-		const timer = setTimeout(
-			async () => {
-				dispatch({ type: "saveStarted" });
-				try {
-					const response = await saveLetter(letterId, {
-						...draftRef.current(),
-						expectedRevision,
-					});
-					if (response.status === 200) {
-						dispatch({
-							type: "saveSucceeded",
-							revision: response.data.revision,
-							now: Date.now(),
-						});
-					} else if (response.status === 409) {
-						dispatch({ type: "saveConflicted" });
-					} else {
-						dispatch({ type: "saveFailed", now: Date.now() });
-					}
-				} catch {
-					dispatch({ type: "saveFailed", now: Date.now() });
-				}
-			},
-			Math.max(0, state.dueAt - Date.now()),
-		);
-		return () => clearTimeout(timer);
-	}, [state, letterId, enabled]);
-
-	useEffect(() => {
-		if (state.status === "saved") return;
-		const warn = (event: BeforeUnloadEvent) => {
-			event.preventDefault();
+		return () => {
+			void saves.flush(letterId);
 		};
-		window.addEventListener("beforeunload", warn);
-		return () => window.removeEventListener("beforeunload", warn);
-	}, [state.status]);
+	}, [enabled, saves, letterId]);
 
 	useEffect(() => {
 		const reloadWhenClean = async () => {
 			if (document.visibilityState !== "visible") return;
-			if (stateRef.current.status !== "saved") return;
-			const latest = await latestRevision(letterId);
-			const current = stateRef.current;
+			if (saves.snapshot(letterId).state.status !== "saved") return;
+			const response = await requestDeadline((signal) =>
+				getLetter(letterId, { cache: "no-store", signal }),
+			).catch(() => null);
+			const current = saves.snapshot(letterId).state;
 			if (
-				latest !== null &&
+				response?.status === 200 &&
 				current.status === "saved" &&
-				latest > current.revision
+				response.data.revision > current.revision
 			) {
 				onNewerVersionRef.current();
 			}
@@ -114,26 +140,16 @@ export function useAutosave(params: UseAutosaveParams): Autosave {
 		document.addEventListener("visibilitychange", reloadWhenClean);
 		return () =>
 			document.removeEventListener("visibilitychange", reloadWhenClean);
-	}, [letterId]);
+	}, [saves, letterId]);
 
-	useEffect(() => {
-		if (!enabled) return;
-		return () => {
-			const current = stateRef.current;
-			if (current.status !== "dirty") return;
-			void saveLetter(
-				letterId,
-				{ ...draftRef.current(), expectedRevision: current.revision },
-				{ keepalive: true },
-			).catch(() => undefined);
-		};
-	}, [letterId, enabled]);
-
-	const keepMine = useCallback(async () => {
-		const latest = await latestRevision(letterId);
-		if (latest === null) return;
-		dispatch({ type: "keptMine", latestRevision: latest, now: Date.now() });
-	}, [letterId]);
-
-	return { state, edited, keepMine };
+	return {
+		state,
+		edited,
+		keepMine: () => saves.keepMine(letterId),
+		loadLatest: async () => {
+			if (await saves.loadLatest(letterId)) onNewerVersionRef.current();
+		},
+		retry: () => saves.retry(letterId),
+		download: () => downloadLetterDraft(saves.snapshot(letterId).draft),
+	};
 }

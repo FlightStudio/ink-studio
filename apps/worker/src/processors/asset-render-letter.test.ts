@@ -104,7 +104,10 @@ async function exportLetter(
 		content,
 		expectedRevision: 1,
 	});
-	const { assetIds } = await letters.requestExport(caller, id, { revision: 2 });
+	const { assetIds } = await letters.requestExport(caller, id, {
+		revision: 2,
+		fonts: {},
+	});
 	return { letters, id, assetId: assetIds[0] ?? "" };
 }
 
@@ -122,7 +125,10 @@ it("later edits do not reach the export", async () => {
 		content: written(created.content, "Original sentence"),
 		expectedRevision: 1,
 	});
-	const { assetIds } = await letters.requestExport(ada, id, { revision: 2 });
+	const { assetIds } = await letters.requestExport(ada, id, {
+		revision: 2,
+		fonts: {},
+	});
 	const saved = await testDb.db.letters.byId(
 		ada.userOrganization.organizationId,
 		id,
@@ -377,6 +383,7 @@ it("a postcard side has its own download name", async () => {
 	const asset = await testDb.db.assets.create(
 		generatedAsset(ada.userOrganization.organizationId, {
 			kind: "render-letter",
+			fonts: {},
 			letterId: id,
 			title: "Hello from the pier",
 			content: letter.content,
@@ -409,6 +416,7 @@ it("the export is a PDF proof with a safe download name", async () => {
 	const asset = await testDb.db.assets.create(
 		generatedAsset(ada.userOrganization.organizationId, {
 			kind: "render-letter",
+			fonts: {},
 			letterId: crypto.randomUUID(),
 			title: 'Dear "Alex"\n',
 			content,
@@ -434,6 +442,129 @@ it("the export is a PDF proof with a safe download name", async () => {
 		expiresInSeconds: 300,
 		downloadName: "dear-alex-proof.pdf",
 	});
+});
+
+it("queued sides and retries render the accepted font bytes after later builds", async () => {
+	const ada = await member("ada-proof-fonts");
+	const organizationId = ada.userOrganization.organizationId;
+	const font = await testDb.db.fonts.create({
+		organizationId,
+		ownerUserId: ada.user.id,
+		ownerName: "Ada",
+		source: { kind: "drawn", glyphs: [] },
+		fontAssetId: null,
+		pendingFontAssetId: null,
+		chars: "abcdefghijklmnopqrstuvwxyz",
+	});
+	async function build(bytes: Uint8Array) {
+		const asset = await testDb.db.assets.create({
+			...generatedAsset(organizationId, {
+				kind: "build-font",
+				fontId: font.id,
+			}),
+			processing: { status: "done", attempts: 1 },
+			mimeType: "font/otf",
+			byteSize: bytes.length,
+			checksum: "a".repeat(64),
+		});
+		await storage.put({
+			key: asset.storageKey,
+			bytes,
+			contentType: asset.mimeType,
+		});
+		await testDb.db.fonts.setPending(organizationId, font.id, asset.id);
+		await testDb.db.fonts.finishBuild(
+			organizationId,
+			font.id,
+			asset.id,
+			font.chars,
+		);
+		return asset;
+	}
+	const displayedBytes = Uint8Array.from([1, 2, 3]);
+	const displayed = await build(displayedBytes);
+	const letters = new LetterService(testDb.db, { publish: async () => {} });
+	const { id } = await letters.createLetter(ada, {
+		format: "thanksio:postcard-6x9",
+	});
+	const letter = await letters.getLetter(ada, id);
+	if (!letter) throw new Error("letter missing");
+	await letters.saveLetter(ada, id, {
+		title: "My handwriting",
+		content: {
+			...written(letter.content, "Hello"),
+			defaults: {
+				...letter.content.defaults,
+				font: { kind: "own", fontId: font.id },
+			},
+		},
+		expectedRevision: 1,
+	});
+	const newer = await build(Uint8Array.from([4, 5, 6]));
+	const { assetIds } = await letters.requestExport(ada, id, {
+		revision: 2,
+		fonts: { [font.id]: displayed.id },
+	});
+	const measure = vi.fn<PrintRenderer["measure"]>(async () => ({
+		lineTopsIn: [1],
+		textBottomIn: 2,
+		wordsPastLimit: 0,
+	}));
+	const render = vi
+		.fn<PrintRenderer["render"]>(async () => Uint8Array.from([9]))
+		.mockRejectedValueOnce(new Error("renderer disconnected"));
+	const processor = processorFor({ measure, render });
+	await expect(
+		processor.process(message(processor, assetIds[0] ?? "")),
+	).rejects.toThrow("renderer disconnected");
+	const queued = await build(Uint8Array.from([7, 8, 9]));
+	for (const assetId of assetIds)
+		await processor.process(message(processor, assetId));
+	expect(render).toHaveBeenCalledTimes(3);
+	for (const [params] of [...measure.mock.calls, ...render.mock.calls]) {
+		expect(
+			params.resources.get(`https://letter.invalid/assets/${displayed.id}`)
+				?.bytes,
+		).toEqual(displayedBytes);
+		expect(
+			params.resources.has(`https://letter.invalid/assets/${newer.id}`),
+		).toBe(false);
+		expect(
+			params.resources.has(`https://letter.invalid/assets/${queued.id}`),
+		).toBe(false);
+		expect(params.html).toContain(displayed.id);
+	}
+});
+
+it("legacy proofs without accepted bindings fail clearly before rendering", async () => {
+	const ada = await member("ada-proof-legacy");
+	const content = await freshContent(ada);
+	const asset = await testDb.db.assets.create(
+		generatedAsset(ada.userOrganization.organizationId, {
+			kind: "render-letter",
+			letterId: crypto.randomUUID(),
+			title: "Legacy",
+			content,
+			fonts: {},
+			mergeValues: SAMPLE_MERGE_VALUES,
+			output: { format: "pdf", duplex: true },
+		}),
+	);
+	await testDb.execute("update assets set job = job - 'fonts' where id = $1", [
+		asset.id,
+	]);
+	const { renderer, render } = rendererReturning({
+		lineTopsIn: [1],
+		textBottomIn: 2,
+		wordsPastLimit: 0,
+	});
+	const processor = processorFor(renderer);
+	await processor.process(message(processor, asset.id));
+	expect(render).not.toHaveBeenCalled();
+	expect(
+		(await testDb.db.assets.byId(ada.userOrganization.organizationId, asset.id))
+			?.processing,
+	).toMatchObject({ status: "failed", error: "proof_fonts_unavailable" });
 });
 
 function written(content: LetterContent, text: string): LetterContent {

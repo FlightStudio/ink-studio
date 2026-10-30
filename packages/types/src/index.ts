@@ -59,7 +59,8 @@ export type {
 	SealFont,
 	TextNode,
 } from "./letter.ts";
-export { humanSeal, SIGNATURE_WIDTHS } from "./letter.ts";
+export { humanSeal, ownFontIds, SIGNATURE_WIDTHS } from "./letter.ts";
+export { normaliseLetterTitle, TITLE_MAX_CHARACTERS } from "./letter-title.ts";
 export type { MergeFieldKey, MergeValues } from "./merge-field.ts";
 export {
 	LONGEST_MERGE_VALUES,

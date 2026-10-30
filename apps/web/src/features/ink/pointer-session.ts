@@ -9,15 +9,17 @@ export type PointerSample = {
 	t: number;
 };
 
+export type CanvasStroke = Stroke & { strokeScale?: number };
+
 export type PointerSessionState = {
-	strokes: Stroke[];
-	undone: Stroke[];
-	active: { pointerId: number; stroke: Stroke; startedAt: number } | null;
+	strokes: CanvasStroke[];
+	undone: CanvasStroke[];
+	active: { pointerId: number; stroke: CanvasStroke; startedAt: number } | null;
 	penSeen: boolean;
 };
 
 export type PointerSessionEvent =
-	| { type: "down"; sample: PointerSample }
+	| { type: "down"; sample: PointerSample; strokeScale?: number }
 	| { type: "move"; samples: PointerSample[] }
 	| { type: "up"; pointerId: number }
 	| { type: "cancel"; pointerId: number }
@@ -51,13 +53,18 @@ function pointOf(sample: PointerSample, startedAt: number): StrokePoint {
 function start(
 	state: PointerSessionState,
 	sample: PointerSample,
+	strokeScale?: number,
 ): PointerSessionState {
 	return {
 		...state,
 		active: {
 			pointerId: sample.pointerId,
 			startedAt: sample.t,
-			stroke: { input: sample.input, points: [pointOf(sample, sample.t)] },
+			stroke: {
+				input: sample.input,
+				points: [pointOf(sample, sample.t)],
+				...(strokeScale === undefined ? {} : { strokeScale }),
+			},
 		},
 		penSeen: state.penSeen || sample.input === "pen",
 	};
@@ -66,14 +73,15 @@ function start(
 function down(
 	state: PointerSessionState,
 	sample: PointerSample,
+	strokeScale?: number,
 ): PointerSessionState {
 	const { active } = state;
 	if (sample.input === "pen") {
 		if (active && active.stroke.input !== "touch") return state;
-		return start(state, sample);
+		return start(state, sample, strokeScale);
 	}
 	if (sample.input === "touch" && state.penSeen) return state;
-	if (!active) return start(state, sample);
+	if (!active) return start(state, sample, strokeScale);
 	if (sample.input === "touch" && active.stroke.input === "touch") {
 		return { ...state, active: null };
 	}
@@ -109,7 +117,7 @@ export function pointerSession(
 ): PointerSessionState {
 	switch (event.type) {
 		case "down":
-			return down(state, event.sample);
+			return down(state, event.sample, event.strokeScale);
 		case "move":
 			return move(state, event.samples);
 		case "up":

@@ -80,6 +80,7 @@ it("the overflow fixture fails as overflow and the one-and-a-half fixture prints
 	});
 	const overflowExport = await letters.requestExport(ada, overflow.id, {
 		revision: 2,
+		fonts: {},
 	});
 	const overflowAssetId = overflowExport.assetIds[0] ?? "";
 	await processor.process({
@@ -105,6 +106,7 @@ it("the overflow fixture fails as overflow and the one-and-a-half fixture prints
 	});
 	const fittedExport = await letters.requestExport(ada, fitted.id, {
 		revision: 2,
+		fonts: {},
 	});
 	const fittedAssetId = fittedExport.assetIds[0] ?? "";
 	await processor.process({
@@ -136,6 +138,7 @@ it("a postcard's back renders as a 2738×1838 PNG with no ink in the address blo
 	});
 	const exported = await letters.requestExport(ada, created.id, {
 		revision: 2,
+		fonts: {},
 	});
 	const organizationId = ada.userOrganization.organizationId;
 	let backId = "";

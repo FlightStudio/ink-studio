@@ -18,6 +18,7 @@ import {
 	letterResources,
 	type PrintRenderer,
 	type PrintResource,
+	proofFontBindings,
 } from "@repo/services/letters";
 import type { MessageProcessor, QueueMessage } from "@repo/services/queue";
 import {
@@ -58,12 +59,21 @@ export class AssetRenderLetterProcessor implements MessageProcessor {
 					throw new ServiceError("invalid_input", "invalid_letter");
 				}
 				const spec = PAGE_SPECS[content.format];
-				const resources = await letterResources(
+				const fonts = await proofFontBindings(
 					this.params.db,
 					asset.organizationId,
 					content,
-					{ assetBaseUrl: ASSET_BASE, stockFontBaseUrl: STOCK_BASE },
+					job.fonts,
 				);
+				const resources = {
+					...(await letterResources(
+						this.params.db,
+						asset.organizationId,
+						content,
+						{ assetBaseUrl: ASSET_BASE, stockFontBaseUrl: STOCK_BASE },
+					)),
+					fonts,
+				};
 				const files = await this.filesOf(
 					asset.organizationId,
 					content,

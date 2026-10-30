@@ -5,7 +5,6 @@ import type {
 	Asset,
 	Drawing,
 	Font,
-	FontRef,
 	InkStyle,
 	LetterContent,
 	LetterResources,
@@ -18,6 +17,8 @@ import type {
 import {
 	DEFAULT_FORMAT,
 	missingLowercase,
+	normaliseLetterTitle,
+	ownFontIds,
 	PAGE_SPECS,
 	SAMPLE_MERGE_VALUES,
 } from "@repo/types";
@@ -44,8 +45,6 @@ const DEFAULT_INK_STYLE: InkStyle = {
 	sizePt: 20,
 	color: "ink-blue",
 };
-
-const TITLE_MAX_CHARACTERS = 120;
 
 export const LETTER_PAGE_SIZE = 24;
 
@@ -92,19 +91,6 @@ function decodeCursor(cursor: string): LetterCursor {
 	return { updatedAt, id };
 }
 
-function fontRefs(content: LetterContent): FontRef[] {
-	const refs = [content.defaults.font];
-	for (const block of content.doc.content) {
-		if (block.type !== "paragraph") continue;
-		for (const node of block.content ?? []) {
-			for (const mark of node.marks ?? []) {
-				if (mark.attrs.font) refs.push(mark.attrs.font);
-			}
-		}
-	}
-	return refs;
-}
-
 function validContent(json: unknown): LetterContent {
 	let content: LetterContent;
 	try {
@@ -113,16 +99,6 @@ function validContent(json: unknown): LetterContent {
 		throw new ServiceError("invalid_input", "invalid_letter");
 	}
 	return content;
-}
-
-function ownFontIds(content: LetterContent): string[] {
-	return [
-		...new Set(
-			fontRefs(content).flatMap((font) =>
-				font.kind === "own" ? [font.fontId] : [],
-			),
-		),
-	];
 }
 
 async function referencedFonts(
@@ -180,12 +156,8 @@ function sealRecord(
 }
 
 function validTitle(title: string): string {
-	const trimmed = title.trim();
-	if (
-		trimmed === "" ||
-		/\p{Cc}/u.test(trimmed) ||
-		[...trimmed].length > TITLE_MAX_CHARACTERS
-	) {
+	const trimmed = normaliseLetterTitle(title);
+	if (trimmed === null) {
 		throw new ServiceError("invalid_input", "invalid_title");
 	}
 	return trimmed;
@@ -343,6 +315,41 @@ export async function letterResources(
 		await resourceRows(tx, organizationId, [content]),
 		bases,
 	);
+}
+
+export async function proofFontBindings(
+	tx: Tx,
+	organizationId: string,
+	content: LetterContent,
+	supplied: unknown,
+): Promise<Record<string, string>> {
+	const parsed = z.record(z.uuid(), z.uuid()).safeParse(supplied);
+	if (!parsed.success)
+		throw new ServiceError("invalid_input", "proof_fonts_unavailable");
+	const ids = ownFontIds(content);
+	const fonts = await tx.fonts.referenced(organizationId, ids);
+	if (fonts.length !== ids.length || ids.some((id) => !parsed.data[id])) {
+		throw new ServiceError("invalid_input", "proof_fonts_unavailable");
+	}
+	const bindings: Record<string, string> = {};
+	const assets = await tx.assets.referenced(
+		organizationId,
+		ids.map((id) => parsed.data[id] ?? ""),
+	);
+	const byId = new Map(assets.map((asset) => [asset.id, asset]));
+	for (const fontId of ids) {
+		const asset = byId.get(parsed.data[fontId] ?? "");
+		if (
+			asset?.processing.status !== "done" ||
+			asset.origin.source !== "generated" ||
+			asset.origin.job.kind !== "build-font" ||
+			asset.origin.job.fontId !== fontId
+		) {
+			throw new ServiceError("invalid_input", "proof_fonts_unavailable");
+		}
+		bindings[fontId] = asset.id;
+	}
+	return bindings;
 }
 
 export async function letterOwnerIds(
@@ -522,6 +529,12 @@ export class LetterService {
 			if (![...owners].every((id) => id === member.user.id)) {
 				throw new ServiceError("forbidden", "not_owner");
 			}
+			const fonts = await proofFontBindings(
+				tx,
+				organizationId,
+				letter.content,
+				params.fonts,
+			);
 			const assets = [];
 			for (const output of proofOutputs(letter.content)) {
 				assets.push(
@@ -531,6 +544,7 @@ export class LetterService {
 							letterId,
 							title: letter.title,
 							content: letter.content,
+							fonts,
 							mergeValues: SAMPLE_MERGE_VALUES,
 							output,
 						}),

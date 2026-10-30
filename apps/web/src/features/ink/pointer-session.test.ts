@@ -45,6 +45,28 @@ function line(
 }
 
 describe("pointerSession", () => {
+	it("erase strokes retain their starting widths through movement and history", () => {
+		const broad = run(empty, [
+			{ type: "down", sample: sample(1, "pen", 0, 0, 0.5, 0), strokeScale: 6 },
+			{ type: "move", samples: [sample(1, "pen", 20, 10, 0.5, 20)] },
+			{ type: "up", pointerId: 1 },
+		]);
+		const fine = run(broad, [
+			{
+				type: "down",
+				sample: sample(2, "pen", 30, 0, 0.5, 40),
+				strokeScale: 1,
+			},
+			{ type: "move", samples: [sample(2, "pen", 40, 10, 0.5, 60)] },
+			{ type: "up", pointerId: 2 },
+		]);
+		expect(fine.strokes.map((stroke) => stroke.strokeScale)).toEqual([6, 1]);
+		const undone = pointerSession(fine, { type: "undo" });
+		expect(undone.strokes[0]?.strokeScale).toBe(6);
+		const redone = pointerSession(undone, { type: "redo" });
+		expect(redone.strokes).toEqual(fine.strokes);
+	});
+
 	it("a pen stroke keeps its pressures and times from its own start", () => {
 		const state = run(empty, [
 			{ type: "down", sample: sample(1, "pen", 10, 20, 0.2, 1000) },

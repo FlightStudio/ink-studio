@@ -1,3 +1,9 @@
+import {
+	fixtureContent,
+	letterFixture,
+	measureInputFor,
+	measureLetter,
+} from "@repo/render/html";
 import { INK_COLORS, type Member, PAGE_SPECS } from "@repo/types";
 import type { Page } from "playwright-core";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -171,6 +177,122 @@ describe("placed doodles", () => {
 				left: before.left,
 				top: before.top,
 			});
+	});
+
+	it("an unrelated pointer cannot move or finish a held doodle", async () => {
+		const page = await harness.open(member, `/letters/${letterId}`);
+		await letterText(page).waitFor();
+		await drawAndPlace(page, letterId);
+		const before = await elementStyle(page);
+		await page.getByRole("button", { name: "Move doodle" }).hover();
+		const start = await handleCentre(page, "Move doodle");
+		await page.mouse.move(start.x, start.y);
+		await page.mouse.down();
+		await page.mouse.move(start.x + 40, start.y + 15, { steps: 8 });
+		await expect
+			.poll(async () => (await elementStyle(page)).left)
+			.not.toBe(before.left);
+		const held = await elementStyle(page);
+		await page.evaluate(({ x, y }) => {
+			for (const type of ["pointermove", "pointerup", "pointercancel"]) {
+				window.dispatchEvent(
+					new PointerEvent(type, {
+						pointerId: 99,
+						pointerType: "touch",
+						clientX: x + 150,
+						clientY: y + 100,
+					}),
+				);
+			}
+		}, start);
+		expect(await elementStyle(page)).toEqual(held);
+		const saved = nextSave(page, letterId);
+		await page.mouse.move(start.x + 80, start.y + 30, { steps: 8 });
+		await expect
+			.poll(async () => (await elementStyle(page)).left)
+			.not.toBe(held.left);
+		await page.mouse.up();
+		await saved;
+		expect((await elementStyle(page)).left).not.toBe(before.left);
+		await page.keyboard.press("Meta+Z");
+		await expect.poll(() => elementStyle(page)).toEqual(before);
+	});
+
+	it("cancelling a doodle drag restores its position without an undo entry", async () => {
+		const page = await harness.open(member, `/letters/${letterId}`);
+		await letterText(page).waitFor();
+		await drawAndPlace(page, letterId);
+		const before = await elementStyle(page);
+		const start = await handleCentre(page, "Move doodle");
+		await page.mouse.move(start.x, start.y);
+		await page.mouse.down();
+		await page.mouse.move(start.x + 80, start.y + 30, { steps: 8 });
+		await expect
+			.poll(async () => (await elementStyle(page)).left)
+			.not.toBe(before.left);
+		await page.evaluate(() => {
+			window.dispatchEvent(new PointerEvent("pointercancel", { pointerId: 1 }));
+		});
+		await page.mouse.up();
+		await expect.poll(() => elementStyle(page)).toEqual(before);
+		await page.keyboard.press("Meta+Z");
+		await expect.poll(() => page.locator(".letter-element").count()).toBe(0);
+	});
+
+	it("wrapping and undo update the overflow count without another text edit", async () => {
+		const page = await harness.open(member, `/letters/${letterId}`);
+		await letterText(page).waitFor();
+		await drawAndPlace(page, letterId);
+		await waitForSaved(page);
+		const stored = await harness.letters.getLetter(member, letterId);
+		if (!stored) throw new Error("the letter was not saved");
+		const content = fixtureContent(letterFixture("overflow"));
+		content.doc.attrs.elements = stored.content.doc.attrs.elements.map(
+			(element) => ({
+				...element,
+				side: 0,
+				xIn: 1,
+				yIn: 1,
+				widthIn: 4,
+				heightIn: 3,
+				wrap: false,
+			}),
+		);
+		await harness.letters.saveLetter(member, letterId, {
+			title: "Wrapped overflow",
+			content,
+			expectedRevision: stored.revision,
+		});
+		await page.reload();
+		await letterText(page).waitFor();
+		await page.evaluate(() => document.fonts.ready);
+		const spec = PAGE_SPECS[content.format];
+		const measure = () =>
+			page
+				.locator(".letter-column")
+				.evaluate(measureLetter, measureInputFor(spec, "edit"));
+		const notice = page.locator("[data-overflow-notice]");
+		const agrees = async () => {
+			const measured = await measure();
+			return (
+				(await notice.textContent()) ===
+				`About ${measured.wordsPastLimit} words won't fit on ${spec.maxPages} sides. Shorten the letter or pick a smaller text size.`
+			);
+		};
+		await expect.poll(agrees).toBe(true);
+		const before = (await measure()).wordsPastLimit;
+		expect(before).toBeGreaterThan(0);
+		await page.getByRole("button", { name: "Move doodle" }).click();
+		await page.getByRole("button", { name: "Wrap text" }).click();
+		await expect
+			.poll(async () => (await measure()).wordsPastLimit)
+			.toBeGreaterThan(before);
+		await expect.poll(agrees).toBe(true);
+		await page.keyboard.press("Meta+Z");
+		await expect
+			.poll(async () => (await measure()).wordsPastLimit)
+			.toBe(before);
+		await expect.poll(agrees).toBe(true);
 	});
 
 	it("a moved doodle survives a reload", async () => {

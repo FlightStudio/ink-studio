@@ -25,6 +25,7 @@ export type GlyphCellProps = {
 	slot: GlyphSlot;
 	strokes: readonly Stroke[];
 	penOnly: boolean;
+	disabled: boolean;
 	highlighted: boolean;
 	full: boolean;
 	error: string | null;
@@ -94,6 +95,7 @@ function GlyphCellView({
 	slot,
 	strokes,
 	penOnly,
+	disabled,
 	highlighted,
 	full,
 	error,
@@ -170,6 +172,7 @@ function GlyphCellView({
 						size="icon-xs"
 						aria-label={`Clear ${slot.label}`}
 						aria-describedby={message ? messageId : undefined}
+						disabled={disabled}
 						className="absolute top-1 right-1 rounded-full text-ink-muted hover:text-ink"
 						onClick={() => onClear(slot.key)}
 					>

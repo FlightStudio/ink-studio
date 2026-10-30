@@ -482,7 +482,8 @@ async function finishedBuild(caller: Member, fontId: string) {
 		}),
 	);
 	await testDb.db.assets.claim(asset.id, new Date(0));
-	await testDb.db.assets.complete(asset.id, {
+	await testDb.db.assets.complete(asset.id, 1, {
+		storageKey: `${asset.storageKey}/attempts/1`,
 		mimeType: "font/otf",
 		byteSize: 4,
 		checksum: "f".repeat(64),
@@ -492,7 +493,7 @@ async function finishedBuild(caller: Member, fontId: string) {
 
 async function failBuild(assetId: string, code: string) {
 	await testDb.db.assets.claim(assetId, new Date(0));
-	await testDb.db.assets.fail(assetId, code);
+	await testDb.db.assets.fail(assetId, 1, code);
 }
 
 const LOWERCASE = "abcdefghijklmnopqrstuvwxyz";
@@ -600,7 +601,8 @@ it("a built font missing lowercase letters reads as incomplete", async () => {
 		glyphs: [],
 	});
 	await testDb.db.assets.claim(created.assetId, new Date(0));
-	await testDb.db.assets.complete(created.assetId, {
+	await testDb.db.assets.complete(created.assetId, 1, {
+		storageKey: `organizations/${karla.userOrganization.organizationId}/assets/${created.assetId}/attempts/1`,
 		mimeType: "font/otf",
 		byteSize: 4,
 		checksum: "f".repeat(64),
@@ -672,7 +674,8 @@ it("an incomplete paper font whose rebuild fails is still not usable", async () 
 	const karla = await member("karla-status-incomplete-retry");
 	const created = await templateFont(karla);
 	await testDb.db.assets.claim(created.assetId, new Date(0));
-	await testDb.db.assets.complete(created.assetId, {
+	await testDb.db.assets.complete(created.assetId, 1, {
+		storageKey: `organizations/${karla.userOrganization.organizationId}/assets/${created.assetId}/attempts/1`,
 		mimeType: "font/otf",
 		byteSize: 4,
 		checksum: "f".repeat(64),
