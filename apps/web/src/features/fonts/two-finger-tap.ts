@@ -1,7 +1,13 @@
 export const TAP_MS = 300;
 export const TAP_SLOP_PX = 12;
 
-export type TapTouch = { id: number; x: number; y: number; stylus: boolean };
+export type TapTouch = {
+	id: number;
+	x: number;
+	y: number;
+	stylus: boolean;
+	eligible?: boolean;
+};
 
 export type TapEvent = {
 	type: "start" | "move" | "end" | "cancel";
@@ -35,7 +41,8 @@ function strayed(
 }
 
 function begin(state: TapState, event: TapEvent): TapState {
-	if (event.changed.some((touch) => touch.stylus)) return FAILED;
+	if (event.changed.some((touch) => touch.stylus || touch.eligible === false))
+		return FAILED;
 	if (state.phase === "failed") return state;
 	const starts = state.phase === "tracking" ? { ...state.starts } : {};
 	for (const touch of event.changed)

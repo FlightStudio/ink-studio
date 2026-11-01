@@ -16,6 +16,8 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { AssetWatchNotice } from "@/components/shared/asset-watch-notice";
+import { requestDeadline } from "@/lib/request-deadline";
 import { useAssetWatch } from "@/lib/use-asset-watch";
 import {
 	buildMessage,
@@ -33,10 +35,13 @@ import {
 	fillsInPhrase,
 	fontAnnouncement,
 	fontHeading,
+	lettersDrawn,
 	METHOD_LABELS,
 	NEEDED_COUNT,
 	sealLine,
 } from "../font-status.ts";
+import { drawnGlyphs } from "../glyph-history.ts";
+import { useGlyphSession } from "../glyph-session-provider.tsx";
 import { FontPreview } from "./font-preview.tsx";
 import { FontUploadDialog } from "./font-upload-dialog.tsx";
 import { UploadButtons } from "./upload-buttons.tsx";
@@ -52,10 +57,9 @@ export const SLOW_NOTE = "Taking longer than usual.";
 export type FontHomeProps = {
 	font: EditableFont;
 	from: string | null;
-	drawn: number;
 };
 
-export function FontHome({ font, from, drawn }: FontHomeProps) {
+export function FontHome({ font, from }: FontHomeProps) {
 	const follow = useRef(false);
 	return (
 		<>
@@ -66,7 +70,6 @@ export function FontHome({ font, from, drawn }: FontHomeProps) {
 				key={`${font.status}:${font.pendingAssetId}:${font.assetId}`}
 				font={font}
 				from={from}
-				drawn={drawn}
 				follow={follow}
 			/>
 		</>
@@ -76,13 +79,23 @@ export function FontHome({ font, from, drawn }: FontHomeProps) {
 function FontView({
 	font,
 	from,
-	drawn,
 	follow,
 }: FontHomeProps & { follow: RefObject<boolean> }) {
 	const router = useRouter();
+	const { session, snapshot } = useGlyphSession(font);
+	const drawn = lettersDrawn(
+		drawnGlyphs(snapshot.history),
+		font.missingRequired,
+	);
+	const mounted = useRef(false);
+	const wasPending = useRef(snapshot.pending);
+	const wasBuilding = useRef(snapshot.building);
 	const heading = useRef<HTMLHeadingElement>(null);
-	const [starting, setStarting] = useState(false);
-	const [buildError, setBuildError] = useState<string | null>(null);
+	const [requesting, setStarting] = useState(false);
+	const [requestError, setBuildError] = useState<string | null>(null);
+	const starting = requesting || snapshot.building;
+	const buildError =
+		font.source === "drawn" ? snapshot.buildError : requestError;
 	const [fileOpen, setFileOpen] = useState(false);
 	const [confirming, setConfirming] = useState(false);
 	const [deleting, setDeleting] = useState(false);
@@ -90,13 +103,28 @@ function FontView({
 	const [opening, setOpening] = useState(false);
 	const [letterError, setLetterError] = useState<string | null>(null);
 	const name = `${font.ownerName}'s handwriting`;
-	const watch = useAssetWatch(
+	const { state: watch, retry: checkProgress } = useAssetWatch(
 		font.status === "building" ? font.pendingAssetId : null,
-		(state) => {
-			if (state.unreachable) return;
-			router.refresh();
-		},
+		() => router.refresh(),
 	);
+	useEffect(() => {
+		mounted.current = true;
+		return () => {
+			mounted.current = false;
+		};
+	}, []);
+	useEffect(() => {
+		if (wasPending.current && !snapshot.pending) router.refresh();
+		wasPending.current = snapshot.pending;
+	}, [snapshot.pending, router]);
+	useEffect(() => {
+		const completed = wasBuilding.current && !snapshot.building;
+		wasBuilding.current = snapshot.building;
+		if (completed && snapshot.buildError === null && mounted.current) {
+			follow.current = true;
+			router.refresh();
+		}
+	}, [snapshot.building, snapshot.buildError, follow, router]);
 
 	useEffect(() => {
 		if (!follow.current) return;
@@ -108,9 +136,16 @@ function FontView({
 	}, [follow, font.status]);
 
 	async function startBuild() {
+		if (font.source === "drawn") {
+			await session.build();
+			return;
+		}
 		setStarting(true);
 		setBuildError(null);
-		const requested = await requestFontBuild(font.id).catch(() => null);
+		const requested = await requestDeadline((signal) =>
+			requestFontBuild(font.id, { signal }),
+		).catch(() => null);
+		if (!mounted.current) return;
 		if (requested?.status !== 201) {
 			setStarting(false);
 			setBuildError(buildMessage(requested?.data.code));
@@ -206,8 +241,10 @@ function FontView({
 			return (
 				<>
 					<p className="text-ui text-ink-muted">
-						{drawn} of {NEEDED_COUNT} letters drawn. Everything you drew is
-						saved.
+						{drawn} of {NEEDED_COUNT} letters drawn.{" "}
+						{snapshot.pending
+							? "Your latest strokes still need to be saved."
+							: "Everything you drew is saved."}
 						{drawn === NEEDED_COUNT ? " Build it to write with it." : null}
 					</p>
 					<div className="flex flex-wrap items-center gap-2">
@@ -247,6 +284,10 @@ function FontView({
 						/>
 					</div>
 					<p className="text-ui text-ink-muted">{BUILDING_NOTE}</p>
+					<AssetWatchNotice
+						issue={watch?.issue ?? null}
+						onRetry={checkProgress}
+					/>
 					{watch?.slow ? (
 						<div className="flex flex-col gap-3 motion-safe:animate-settle">
 							<p className="text-ui text-ink">

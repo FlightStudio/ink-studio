@@ -13,6 +13,7 @@ import {
 	DrawnFontSourceKind,
 	GlyphStrokeInput,
 	type LetterContentEnvelope,
+	type LetterResources,
 	type LetterState,
 	type ListLettersParams,
 	PageFormatId,
@@ -65,6 +66,7 @@ export const createdLetterSchema: z.ZodType<CreatedLetter> = z.strictObject({
 export const requestExportRequestSchema: z.ZodType<RequestExportRequest> =
 	z.strictObject({
 		revision: z.number().int().min(1),
+		fonts: z.record(z.uuid(), z.uuid()),
 	});
 
 export const requestedExportSchema: z.ZodType<RequestedExport> = z.strictObject(
@@ -84,10 +86,22 @@ export const savedLetterSchema: z.ZodType<SavedLetter> = z.strictObject({
 	revision: z.number().int(),
 });
 
+const letterResourcesSchema: z.ZodType<LetterResources> = z.strictObject({
+	assetBaseUrl: z.string(),
+	stockFontBaseUrl: z.string(),
+	fonts: z.record(z.string(), z.uuid()),
+	drawings: z.record(
+		z.string(),
+		z.strictObject({ maskAssetId: z.uuid(), aspect: z.number() }),
+	),
+	frontImageAssetId: z.uuid().nullable(),
+});
+
 export const letterStateSchema: z.ZodType<LetterState> = z.strictObject({
 	title: z.string(),
 	revision: z.number().int(),
 	content: letterContentEnvelopeSchema,
+	resources: letterResourcesSchema,
 });
 
 export const listLettersParamsSchema: z.ZodType<ListLettersParams> =

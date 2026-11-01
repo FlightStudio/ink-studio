@@ -1,8 +1,37 @@
 import { errorMessages, isApiErrorCode } from "@repo/errors";
-import type { PageSpec } from "@repo/types";
+import { type LetterContent, ownFontIds, type PageSpec } from "@repo/types";
 import type { AssetWatchState } from "@/lib/asset-watch";
 
 export type Proof = AssetWatchState & { id: string };
+
+export type ProofIdentity = {
+	revision: number;
+	fonts: Readonly<Record<string, string>>;
+};
+
+export function proofFonts(
+	content: LetterContent,
+	available: Readonly<Record<string, string>>,
+): Record<string, string> {
+	return Object.fromEntries(
+		ownFontIds(content).flatMap((id) =>
+			available[id] ? [[id, available[id]]] : [],
+		),
+	);
+}
+
+export function proofMatches(
+	proof: ProofIdentity | null,
+	revision: number | null,
+	fonts: Readonly<Record<string, string>>,
+): boolean {
+	return (
+		proof !== null &&
+		proof.revision === revision &&
+		Object.keys(proof.fonts).length === Object.keys(fonts).length &&
+		Object.entries(proof.fonts).every(([id, assetId]) => fonts[id] === assetId)
+	);
+}
 
 export type ExportState =
 	| { phase: "idle" }
@@ -41,7 +70,7 @@ export function workingOn(ids: readonly string[]): ExportState {
 			status: "pending",
 			error: null,
 			slow: false,
-			unreachable: false,
+			issue: null,
 		})),
 	};
 }

@@ -3,6 +3,7 @@ export {
 	LetterService,
 	letterOwnerIds,
 	letterResources,
+	proofFontBindings,
 } from "./letters.service.ts";
 export type {
 	CreateLetterParams,

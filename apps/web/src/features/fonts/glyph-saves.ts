@@ -1,28 +1,31 @@
 import type { Stroke } from "@repo/types";
-import type { CellStrokes } from "./glyph-history.ts";
 
 export type SaveResult = { ok: true } | { ok: false; error: string | null };
 
 export type GlyphSavesParams = {
-	saved: CellStrokes;
 	send(key: string, strokes: readonly Stroke[]): Promise<SaveResult>;
-	onFailed(key: string, saved: readonly Stroke[], error: string | null): void;
+	onFailed(key: string, error: string | null): void;
+	onSaved?(key: string): void;
 	onPending?(pending: boolean): void;
 };
 
 export type GlyphSaves = {
 	save(key: string, strokes: readonly Stroke[]): void;
+	retry(): void;
 	idle(): Promise<void>;
 	pending(): boolean;
 };
 
 export function glyphSaves(params: GlyphSavesParams): GlyphSaves {
-	const confirmed = new Map(Object.entries(params.saved));
 	const queued = new Map<string, readonly Stroke[]>();
 	const running = new Map<string, Promise<void>>();
+	let pending = false;
 
 	function settle() {
-		if (running.size === 0) params.onPending?.(false);
+		const next = running.size > 0 || queued.size > 0;
+		if (next === pending) return;
+		pending = next;
+		params.onPending?.(next);
 	}
 
 	async function attempt(key: string, strokes: readonly Stroke[]) {
@@ -43,10 +46,11 @@ export function glyphSaves(params: GlyphSavesParams): GlyphSaves {
 				queued.delete(key);
 				const result = await attempt(key, strokes);
 				if (result.ok) {
-					confirmed.set(key, strokes);
+					if (!queued.has(key)) params.onSaved?.(key);
 				} else {
-					queued.delete(key);
-					params.onFailed(key, confirmed.get(key) ?? [], result.error);
+					if (!queued.has(key)) queued.set(key, strokes);
+					params.onFailed(key, result.error);
+					break;
 				}
 			}
 		} finally {
@@ -55,19 +59,26 @@ export function glyphSaves(params: GlyphSavesParams): GlyphSaves {
 		}
 	}
 
+	function start(key: string) {
+		if (running.has(key)) return;
+		running.set(
+			key,
+			Promise.resolve().then(() => drain(key)),
+		);
+		settle();
+	}
+
 	return {
 		save(key, strokes) {
-			queued.set(key, strokes);
-			if (running.has(key)) return;
-			if (running.size === 0) params.onPending?.(true);
-			running.set(
-				key,
-				Promise.resolve().then(() => drain(key)),
-			);
+			queued.set(key, structuredClone(strokes));
+			start(key);
+		},
+		retry() {
+			for (const key of queued.keys()) start(key);
 		},
 		async idle() {
 			while (running.size > 0) await Promise.allSettled(running.values());
 		},
-		pending: () => running.size > 0,
+		pending: () => pending,
 	};
 }

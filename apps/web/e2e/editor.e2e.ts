@@ -3,6 +3,7 @@ import { generatedAsset } from "@repo/services/assets";
 import { LETTER_PAGE_SIZE } from "@repo/services/letters";
 import { type Member, PAGE_SPECS } from "@repo/types";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { NEEDED_COUNT } from "../src/features/fonts/font-status.ts";
 import {
 	type Harness,
 	letterText,
@@ -124,7 +125,9 @@ describe("the editor", () => {
 
 		await letterText(tabB).click();
 		await tabB.keyboard.type("Written in tab B.");
-		await tabB.getByText("This letter changed in another tab").waitFor();
+		await tabB
+			.getByText("A different version of this letter is saved")
+			.waitFor();
 		expect(
 			await tabB.getByRole("button", { name: "Load the latest" }).isVisible(),
 		).toBe(true);
@@ -426,7 +429,7 @@ describe("the editor", () => {
 			(label) => label.replace(/\s+/g, " ").trim(),
 		);
 		expect(labels.slice(-3)).toEqual([
-			"Sam's handwriting · 2 of 31 · Continue",
+			`Sam's handwriting · 2 of ${NEEDED_COUNT} · Continue`,
 			"Make your handwriting",
 			"Manage handwriting",
 		]);

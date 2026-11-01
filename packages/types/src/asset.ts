@@ -15,6 +15,7 @@ export type AssetJob =
 			letterId: string;
 			title: string;
 			content: LetterContent;
+			fonts: Record<string, string>;
 			mergeValues: MergeValues;
 			output: PrintOutput;
 	  };

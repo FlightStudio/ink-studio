@@ -1,9 +1,8 @@
 "use client";
 
-import { requestFontBuild, saveGlyph } from "@repo/api";
 import { errorMessages, isApiErrorCode } from "@repo/errors";
 import type { EditableFont, Stroke } from "@repo/types";
-import { missingChars } from "@repo/types";
+import { GLYPH_LIMITS, missingChars } from "@repo/types";
 import { Button, buttonVariants } from "@repo/ui/components/ui/button";
 import { Redo2, Undo2 } from "lucide-react";
 import Link from "next/link";
@@ -16,7 +15,7 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { buildMessage } from "../font-errors.ts";
+import { drawsWith } from "@/features/ink/pointer-session";
 import { fontHome, letterWithFont } from "../font-links.ts";
 import {
 	addStroke,
@@ -25,33 +24,29 @@ import {
 	clearCell,
 	drawnGlyphs,
 	type GlyphHistory,
-	glyphHistory,
 	isFull,
-	parseCellKey,
 	redo,
 	redoTarget,
-	rollback,
 	strokesOf,
 	undo,
 	undoTarget,
 } from "../glyph-history.ts";
-import {
-	type GlyphSaves,
-	glyphSaves,
-	type SaveResult,
-} from "../glyph-saves.ts";
 import {
 	type GlyphSection,
 	type GlyphSectionId,
 	glyphSections,
 	startSlot,
 } from "../glyph-sections.ts";
+import { useGlyphSession } from "../glyph-session-provider.tsx";
 import { useTwoFingerTap } from "../use-two-finger-tap.ts";
 import { GlyphCell } from "./glyph-cell.tsx";
 import { StrokeSpecimen } from "./stroke-specimen.tsx";
 
 export const SAVE_FAILED =
-	"Not saved. Check your connection and draw it again.";
+	"Not saved. Your strokes are still here. Retry when connected.";
+
+export const STROKE_TOO_LONG =
+	"This stroke is too long, so draw it again in shorter pieces.";
 
 const SECTION_COPY: Record<
 	GlyphSectionId,
@@ -79,7 +74,7 @@ const SECTION_COPY: Record<
 	punctuation: {
 		title: () => "More punctuation",
 		description:
-			"Quotes, brackets and symbols. Any you skip are written in Caveat.",
+			"Sentence marks, quotes, brackets and symbols. Any you skip are written in Caveat.",
 	},
 };
 
@@ -93,23 +88,6 @@ function messageOf(error: string | null): string {
 	return error !== null && error !== "internal_error" && isApiErrorCode(error)
 		? errorMessages[error]
 		: SAVE_FAILED;
-}
-
-async function sendGlyph(
-	fontId: string,
-	key: string,
-	strokes: readonly Stroke[],
-): Promise<SaveResult> {
-	const saved = await saveGlyph(fontId, {
-		...parseCellKey(key),
-		strokes: strokes.map((stroke) => ({
-			input: stroke.input,
-			points: stroke.points.map((point) => [...point]),
-		})),
-	});
-	return saved.status === 204
-		? { ok: true }
-		: { ok: false, error: saved.data.code };
 }
 
 function isEditable(target: EventTarget | null): boolean {
@@ -127,72 +105,65 @@ function countDrawn(section: GlyphSection, history: GlyphHistory): number {
 
 export function GlyphGrid({ font, from, glyph }: GlyphGridProps) {
 	const router = useRouter();
-	const [history, setHistory] = useState(() => glyphHistory(font.glyphs));
-	const current = useRef(history);
-	const [errors, setErrors] = useState<Readonly<Record<string, string>>>({});
+	const { session, snapshot } = useGlyphSession(font);
+	const { history, errors, pending: saving, building, buildError } = snapshot;
 	const [penSeen, setPenSeen] = useState(false);
-	const [saving, setSaving] = useState(false);
-	const [building, setBuilding] = useState(false);
-	const [buildError, setBuildError] = useState<string | null>(null);
+	const [tooLongKey, setTooLongKey] = useState<string | null>(null);
 	const [start] = useState(() => startSlot(font.glyphs, glyph));
 	const grid = useRef<HTMLDivElement>(null);
 	const header = useRef<HTMLElement>(null);
+	const mounted = useRef(false);
+	const pointers = useRef(new Set<number>());
+	useEffect(() => {
+		mounted.current = true;
+		const held = pointers.current;
+		return () => {
+			mounted.current = false;
+			for (const pointer of held) session.pointerEnd(pointer);
+			held.clear();
+		};
+	}, [session]);
 
-	const show = useCallback((next: GlyphHistory) => {
-		current.current = next;
-		setHistory(next);
-	}, []);
-
-	const [saves] = useState<GlyphSaves>(() =>
-		glyphSaves({
-			saved: glyphHistory(font.glyphs).cells,
-			send: (key, strokes) => sendGlyph(font.id, key, strokes),
-			onFailed: (key, saved, error) => {
-				show(rollback(current.current, key, saved));
-				setErrors((shown) => ({ ...shown, [key]: messageOf(error) }));
-			},
-			onPending: setSaving,
-		}),
-	);
-
-	const apply = useCallback(
-		(next: GlyphHistory, key: string | null) => {
-			if (key === null || next === current.current) return;
-			show(next);
-			setErrors((shown) => {
-				if (!(key in shown)) return shown;
-				const { [key]: _, ...rest } = shown;
-				return rest;
-			});
-			setBuildError(null);
-			saves.save(key, strokesOf(next, key));
+	const claimPointer = useCallback(
+		(pointerId: number) => {
+			if (!session.pointerDown(pointerId)) return false;
+			pointers.current.add(pointerId);
+			return true;
 		},
-		[saves, show],
+		[session],
 	);
 
 	const onClear = useCallback(
-		(key: string) => apply(clearCell(current.current, key), key),
-		[apply],
+		(key: string) => {
+			setTooLongKey((current) => (current === key ? null : current));
+			session.apply(clearCell(session.snapshot().history, key), key);
+		},
+		[session],
 	);
 
-	const stepBack = useCallback(
-		() => apply(undo(current.current), undoTarget(current.current)),
-		[apply],
-	);
+	const stepBack = useCallback(() => {
+		const current = session.snapshot().history;
+		session.apply(undo(current), undoTarget(current));
+	}, [session]);
 
-	const stepForward = useCallback(
-		() => apply(redo(current.current), redoTarget(current.current)),
-		[apply],
-	);
+	const stepForward = useCallback(() => {
+		const current = session.snapshot().history;
+		session.apply(redo(current), redoTarget(current));
+	}, [session]);
 
-	const severalFingers = useTwoFingerTap(stepBack);
+	const severalFingers = useTwoFingerTap(grid, stepBack);
 
 	const onStroke = useCallback(
 		(key: string, stroke: Stroke) => {
 			if (stroke.input === "touch" && severalFingers.current) return;
-			apply(addStroke(current.current, key, stroke), key);
+			if (stroke.points.length > GLYPH_LIMITS.pointsPerStroke) {
+				setTooLongKey(key);
+				return;
+			}
+			setTooLongKey((current) => (current === key ? null : current));
+			session.apply(addStroke(session.snapshot().history, key, stroke), key);
 		},
-		[apply, severalFingers],
+		[session, severalFingers],
 	);
 
 	useEffect(() => {
@@ -214,13 +185,6 @@ export function GlyphGrid({ font, from, glyph }: GlyphGridProps) {
 	}, [stepBack, stepForward]);
 
 	useEffect(() => {
-		if (!saving) return;
-		const hold = (event: BeforeUnloadEvent) => event.preventDefault();
-		window.addEventListener("beforeunload", hold);
-		return () => window.removeEventListener("beforeunload", hold);
-	}, [saving]);
-
-	useEffect(() => {
 		if (start === null) return;
 		const cell = [
 			...(grid.current?.querySelectorAll<HTMLElement>("[data-cell]") ?? []),
@@ -240,28 +204,15 @@ export function GlyphGrid({ font, from, glyph }: GlyphGridProps) {
 	const highlighted = undoTarget(history) ?? start;
 	const backHref = from ? letterWithFont(from, font.id) : null;
 
-	async function requestBuild(): Promise<string | null> {
-		await saves.idle();
-		if (missingChars(drawnGlyphs(current.current)).length > 0) {
-			return errorMessages.font_incomplete;
+	async function build() {
+		if ((await session.build()) && mounted.current) {
+			router.push(fontHome(font.id, from));
 		}
-		const requested = await requestFontBuild(font.id).catch(() => null);
-		return requested?.status === 201
-			? null
-			: buildMessage(requested?.data.code);
 	}
 
-	async function build() {
-		if (building) return;
-		setBuilding(true);
-		setBuildError(null);
-		const failure = await requestBuild();
-		if (failure === null) {
-			router.push(fontHome(font.id, from));
-			return;
-		}
-		setBuilding(false);
-		setBuildError(failure);
+	function endPointer(pointerId: number) {
+		pointers.current.delete(pointerId);
+		session.pointerEnd(pointerId);
 	}
 
 	return (
@@ -269,8 +220,24 @@ export function GlyphGrid({ font, from, glyph }: GlyphGridProps) {
 			ref={grid}
 			className="flex flex-col gap-12"
 			onPointerDownCapture={(event) => {
+				const fingerMayScroll = event.pointerType === "touch" && !penSeen;
+				if (
+					event.target instanceof HTMLCanvasElement &&
+					event.target.closest("[data-cell]") &&
+					drawsWith(event, penSeen) &&
+					!fingerMayScroll
+				) {
+					if (!claimPointer(event.pointerId)) {
+						event.preventDefault();
+						event.stopPropagation();
+						return;
+					}
+				}
 				if (event.pointerType === "pen") setPenSeen(true);
 			}}
+			onPointerUpCapture={(event) => endPointer(event.pointerId)}
+			onPointerCancelCapture={(event) => endPointer(event.pointerId)}
+			onLostPointerCaptureCapture={(event) => endPointer(event.pointerId)}
 		>
 			<div className="sticky top-0 z-20 -mt-3 pt-3">
 				<div aria-hidden className="absolute inset-x-0 top-0 h-6 bg-desk" />
@@ -301,7 +268,13 @@ export function GlyphGrid({ font, from, glyph }: GlyphGridProps) {
 									{drawn} of {needed} letters
 								</p>
 								<p role="status" className="text-label text-ink-muted">
-									{saving ? "Saving…" : canUndo(history) ? "Saved" : null}
+									{Object.keys(errors).length > 0
+										? "Not saved"
+										: saving
+											? "Saving…"
+											: canUndo(history) || canRedo(history)
+												? "Saved"
+												: null}
 								</p>
 							</div>
 						</div>
@@ -310,7 +283,7 @@ export function GlyphGrid({ font, from, glyph }: GlyphGridProps) {
 								type="button"
 								variant="ghost"
 								aria-keyshortcuts="Meta+Z Control+Z"
-								disabled={!canUndo(history)}
+								disabled={building || !canUndo(history)}
 								onClick={stepBack}
 							>
 								<Undo2 />
@@ -320,12 +293,21 @@ export function GlyphGrid({ font, from, glyph }: GlyphGridProps) {
 								type="button"
 								variant="ghost"
 								aria-keyshortcuts="Shift+Meta+Z Shift+Control+Z Control+Y"
-								disabled={!canRedo(history)}
+								disabled={building || !canRedo(history)}
 								onClick={stepForward}
 							>
 								<Redo2 />
 								Redo
 							</Button>
+							{Object.keys(errors).length > 0 ? (
+								<Button
+									type="button"
+									variant="outline"
+									onClick={() => session.retry()}
+								>
+									Retry saving
+								</Button>
+							) : null}
 							<span aria-hidden className="mx-1 h-5 w-px bg-rule" />
 							<Button
 								type="button"
@@ -388,16 +370,27 @@ export function GlyphGrid({ font, from, glyph }: GlyphGridProps) {
 								{copy.description}
 							</p>
 						</div>
-						<ul className="grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-4 pointer-coarse:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] pointer-coarse:gap-5">
+						<ul
+							data-glyph-drawing-area
+							className="grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-4 pointer-coarse:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] pointer-coarse:gap-5"
+						>
 							{section.slots.map((slot) => (
 								<GlyphCell
 									key={slot.key}
 									slot={slot}
 									strokes={strokesOf(history, slot.key)}
 									penOnly={penSeen}
+									onClaimPointer={claimPointer}
+									disabled={building}
 									highlighted={highlighted === slot.key}
 									full={isFull(history, slot.key)}
-									error={errors[slot.key] ?? null}
+									error={
+										slot.key in errors
+											? messageOf(errors[slot.key] ?? null)
+											: tooLongKey === slot.key
+												? STROKE_TOO_LONG
+												: null
+									}
 									onStroke={onStroke}
 									onClear={onClear}
 								/>

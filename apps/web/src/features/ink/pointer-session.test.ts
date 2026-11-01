@@ -7,6 +7,8 @@ import {
 	type PointerSessionEvent,
 	type PointerSessionState,
 	pointerSession,
+	TOUCH_INK_SLOP,
+	touchPastSlop,
 } from "./pointer-session.ts";
 
 const empty: PointerSessionState = EMPTY_POINTER_SESSION;
@@ -45,6 +47,28 @@ function line(
 }
 
 describe("pointerSession", () => {
+	it("erase strokes retain their starting widths through movement and history", () => {
+		const broad = run(empty, [
+			{ type: "down", sample: sample(1, "pen", 0, 0, 0.5, 0), strokeScale: 6 },
+			{ type: "move", samples: [sample(1, "pen", 20, 10, 0.5, 20)] },
+			{ type: "up", pointerId: 1 },
+		]);
+		const fine = run(broad, [
+			{
+				type: "down",
+				sample: sample(2, "pen", 30, 0, 0.5, 40),
+				strokeScale: 1,
+			},
+			{ type: "move", samples: [sample(2, "pen", 40, 10, 0.5, 60)] },
+			{ type: "up", pointerId: 2 },
+		]);
+		expect(fine.strokes.map((stroke) => stroke.strokeScale)).toEqual([6, 1]);
+		const undone = pointerSession(fine, { type: "undo" });
+		expect(undone.strokes[0]?.strokeScale).toBe(6);
+		const redone = pointerSession(undone, { type: "redo" });
+		expect(redone.strokes).toEqual(fine.strokes);
+	});
+
 	it("a pen stroke keeps its pressures and times from its own start", () => {
 		const state = run(empty, [
 			{ type: "down", sample: sample(1, "pen", 10, 20, 0.2, 1000) },
@@ -214,6 +238,18 @@ describe("pointerSession", () => {
 		const cleared = run(drawn, [{ type: "undo" }, { type: "clear" }]);
 		expect(cleared.strokes).toEqual([]);
 		expect(cleared.undone).toEqual([]);
+	});
+});
+
+describe("touchPastSlop", () => {
+	it("a finger becomes ink only after a small movement", () => {
+		expect(touchPastSlop({ x: 0, y: 0 }, { x: 0, y: 0 })).toBe(false);
+		expect(
+			touchPastSlop({ x: 10, y: 20 }, { x: 10, y: 20 + TOUCH_INK_SLOP - 0.1 }),
+		).toBe(false);
+		expect(
+			touchPastSlop({ x: 10, y: 20 }, { x: 10 + TOUCH_INK_SLOP, y: 20 }),
+		).toBe(true);
 	});
 });
 

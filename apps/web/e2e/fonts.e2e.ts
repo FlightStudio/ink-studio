@@ -233,7 +233,9 @@ describe("handwriting fonts", () => {
 		const page = await harness.open(member, `/fonts/${fontId}/draw`, {
 			viewport: { width: 1280, height: 720 },
 		});
-		await page.getByText("30 of 31 letters").waitFor();
+		await page
+			.getByText(`${REQUIRED.length - 1} of ${REQUIRED.length} letters`)
+			.waitFor();
 		const build = page.getByRole("button", { name: "Build my font" });
 		expect(await build.isDisabled()).toBe(true);
 		expect(await cell(page, "x:0").getAttribute("data-highlighted")).toBe(
@@ -251,7 +253,9 @@ describe("handwriting fonts", () => {
 				.count(),
 		).toBe(0);
 		await drawChar(page, "x");
-		await page.getByText("31 of 31 letters").waitFor();
+		await page
+			.getByText(`${REQUIRED.length} of ${REQUIRED.length} letters`)
+			.waitFor();
 		expect(await build.isEnabled()).toBe(true);
 		await page
 			.getByRole("heading", { name: "Make it look more natural" })
@@ -308,7 +312,7 @@ describe("handwriting fonts", () => {
 		expect(await strokes(page, "c:0")).toBe(0);
 	});
 
-	it("a save that fails rolls the cell back and says so under the cell", async () => {
+	it("a failed save retains the stroke and undo history and retries without redrawing", async () => {
 		const member = await harness.seedIdentity();
 		const fontId = await seedDrawnFont(member, ["a"]);
 		const page = await harness.open(member, `/fonts/${fontId}/draw`);
@@ -317,15 +321,121 @@ describe("handwriting fonts", () => {
 		const alert = cell(page, "d:0").locator("..").getByRole("alert");
 		await alert.waitFor();
 		expect(await alert.textContent()).toBe(
-			"Not saved. Check your connection and draw it again.",
+			"Not saved. Your strokes are still here. Retry when connected.",
 		);
-		await waitForStrokes(page, "d:0", 0);
-		expect(await page.getByRole("button", { name: "Undo" }).isDisabled()).toBe(
+		await waitForStrokes(page, "d:0", 1);
+		expect(await page.getByRole("button", { name: "Undo" }).isEnabled()).toBe(
 			true,
 		);
 		await page.unroute("**/api/fonts/*/glyphs");
-		await drawChar(page, "d");
+		await page.getByRole("button", { name: "Retry saving" }).click();
+		await waitForSavedGlyphs(page);
+		expect(await savedStrokes(member, fontId, "d")).toBe(1);
 		expect(await alert.count()).toBe(0);
+		await page.getByRole("button", { name: "Undo" }).click();
+		await waitForStrokes(page, "d:0", 0);
+		await waitForSavedGlyphs(page);
+		expect(await savedStrokes(member, fontId, "d")).toBe(0);
+	});
+
+	it("failed strokes and undo survive internal navigation back to the grid", async () => {
+		const member = await harness.seedIdentity();
+		const fontId = await seedDrawnFont(member, ["a"]);
+		const page = await harness.open(member, `/fonts/${fontId}/draw`);
+		await page.route("**/api/fonts/*/glyphs", (route) => route.abort());
+		await drawStroke(page, "d");
+		await cell(page, "d:0").locator("..").getByRole("alert").waitFor();
+		await page.getByRole("link", { name: "All handwriting" }).click();
+		await page.waitForURL((url) => url.pathname === "/fonts");
+		const notice = page.getByRole("complementary", {
+			name: "Unsaved handwriting",
+		});
+		await notice.waitFor();
+		await notice.getByRole("link", { name: "Karla's handwriting" }).click();
+		await waitForStrokes(page, "d:0", 1);
+		await cell(page, "d:0").locator("..").getByRole("alert").waitFor();
+		await page.getByRole("button", { name: "Undo", exact: true }).click();
+		await waitForStrokes(page, "d:0", 0);
+		await cell(page, "d:0").locator("..").getByRole("alert").waitFor();
+		await page.unroute("**/api/fonts/*/glyphs");
+		await page.getByRole("button", { name: "Retry saving" }).click();
+		await waitForSavedGlyphs(page);
+		expect(await savedStrokes(member, fontId, "d")).toBe(0);
+		await page.getByRole("button", { name: "Redo", exact: true }).click();
+		await waitForStrokes(page, "d:0", 1);
+		await waitForSavedGlyphs(page);
+		expect(await savedStrokes(member, fontId, "d")).toBe(1);
+	});
+
+	it("font home refreshes when a build started before navigation is accepted", async () => {
+		const member = await harness.seedIdentity();
+		const fontId = await seedDrawnFont(member, REQUIRED);
+		const page = await harness.open(member, `/fonts/${fontId}/draw`);
+		let release = () => {};
+		const held = new Promise<void>((done) => {
+			release = done;
+		});
+		let builds = 0;
+		await page.route("**/api/fonts/*/builds", async (route) => {
+			builds += 1;
+			await held;
+			await route.continue();
+		});
+		await page.route("**/api/assets/*/status", (route) =>
+			route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({ status: "running", error: null }),
+			}),
+		);
+		const asked = page.waitForRequest((request) =>
+			request.url().includes("/builds"),
+		);
+		await page.getByRole("button", { name: "Build my font" }).click();
+		await asked;
+		await page.getByRole("link", { name: "All handwriting" }).click();
+		await page.waitForURL((url) => url.pathname === "/fonts");
+		await page.locator(`a[href="/fonts/${fontId}"]`).first().click();
+		await page.waitForURL((url) => url.pathname === `/fonts/${fontId}`);
+		await page.getByRole("button", { name: "Starting…" }).waitFor();
+		release();
+		await page
+			.getByText("Building your font…", { exact: true })
+			.first()
+			.waitFor();
+		expect(builds).toBe(1);
+	});
+
+	it("a completed build request does not navigate away after leaving the grid", async () => {
+		const member = await harness.seedIdentity();
+		const fontId = await seedDrawnFont(member, REQUIRED);
+		const page = await harness.open(member, `/fonts/${fontId}/draw`);
+		let release = () => {};
+		const held = new Promise<void>((done) => {
+			release = done;
+		});
+		await page.route("**/api/fonts/*/builds", async (route) => {
+			await held;
+			await route.fulfill({
+				status: 201,
+				contentType: "application/json",
+				body: JSON.stringify({ assetId: randomUUID() }),
+			});
+		});
+		const asked = page.waitForRequest((request) =>
+			request.url().includes("/builds"),
+		);
+		await page.getByRole("button", { name: "Build my font" }).click();
+		await asked;
+		await page.getByRole("link", { name: "All handwriting" }).click();
+		await page.waitForURL((url) => url.pathname === "/fonts");
+		const answered = page.waitForResponse((response) =>
+			response.url().includes("/builds"),
+		);
+		release();
+		await answered;
+		await page.evaluate(() => new Promise(requestAnimationFrame));
+		expect(new URL(page.url()).pathname).toBe("/fonts");
 	});
 
 	it("a full cell takes no more strokes and says how to start again", async () => {
@@ -375,7 +485,7 @@ describe("handwriting fonts", () => {
 		const letterId = await harness.newLetter(member);
 		const fontId = await seedDrawnFont(
 			member,
-			REQUIRED.filter((char) => char !== "'"),
+			REQUIRED.filter((char) => char !== "z"),
 		);
 		const page = await harness.open(
 			member,
@@ -393,7 +503,7 @@ describe("handwriting fonts", () => {
 			if (request.url().includes("/builds")) events.push("build asked");
 		});
 		await harness.open(member, `/fonts/${fontId}`);
-		await drawStroke(page, "'");
+		await drawStroke(page, "z");
 		const build = page.getByRole("button", { name: "Build my font" });
 		await build.click();
 		await page.waitForURL(
@@ -473,7 +583,7 @@ describe("handwriting fonts", () => {
 			chars: "",
 		});
 		const page = await harness.open(member, `/fonts/${font.id}/draw`);
-		await page.getByText("2 of 31 letters").waitFor();
+		await page.getByText(`2 of ${REQUIRED.length} letters`).waitFor();
 		expect(await strokes(page, "e:0")).toBe(GLYPH_LIMITS.strokes);
 	});
 
@@ -490,7 +600,7 @@ describe("handwriting fonts", () => {
 			`/letters/${letterId}?font=${fontId}`,
 		);
 		const plain = await harness.open(member, `/fonts/${fontId}/draw`);
-		await plain.getByText("0 of 31 letters").waitFor();
+		await plain.getByText(`0 of ${REQUIRED.length} letters`).waitFor();
 		expect(
 			await plain.getByRole("link", { name: "Back to your letter" }).count(),
 		).toBe(0);
@@ -557,114 +667,158 @@ describe("handwriting fonts", () => {
 		expect(await specimen.locator('[data-drawn="o"]').count()).toBe(0);
 	});
 
-	it("after the first Pencil stroke, fingers no longer draw in any cell", async () => {
-		const member = await harness.seedIdentity();
-		const fontId = await seedDrawnFont(member, []);
-		const page = await harness.open(member, `/fonts/${fontId}/draw`, TABLET);
-		const cdp = await page.context().newCDPSession(page);
-		const a = page.getByLabel("Draw a", { exact: true });
-		const b = page.getByLabel("Draw b", { exact: true });
-		expect(await b.getAttribute("class")).toContain("touch-none");
-		await penStroke(cdp, await center(a));
-		await waitForStrokes(page, "a:0", 1);
-		await page.waitForFunction(() =>
-			[...document.querySelectorAll("[data-cell] canvas")].every((canvas) =>
-				canvas.classList.contains("touch-pan-y"),
-			),
-		);
-		const start = await center(b);
-		await cdp.send("Input.dispatchTouchEvent", {
-			type: "touchStart",
-			touchPoints: [{ x: start.x, y: start.y, id: 1 }],
-		});
-		for (let step = 1; step <= 6; step += 1) {
+	it.skipIf(process.env.E2E_BROWSER === "webkit")(
+		"after the first Pencil stroke, fingers no longer draw in any cell",
+		async () => {
+			const member = await harness.seedIdentity();
+			const fontId = await seedDrawnFont(member, []);
+			const page = await harness.open(member, `/fonts/${fontId}/draw`, TABLET);
+			const cdp = await page.context().newCDPSession(page);
+			const a = page.getByLabel("Draw a", { exact: true });
+			const b = page.getByLabel("Draw b", { exact: true });
+			expect(await b.getAttribute("class")).toContain("touch-pan-y");
+			await penStroke(cdp, await center(a));
+			await waitForStrokes(page, "a:0", 1);
+			await page.waitForFunction(() =>
+				[...document.querySelectorAll("[data-cell] canvas")].every((canvas) =>
+					canvas.classList.contains("touch-pan-y"),
+				),
+			);
+			const start = await center(b);
 			await cdp.send("Input.dispatchTouchEvent", {
-				type: "touchMove",
-				touchPoints: [{ x: start.x, y: start.y - step * 8, id: 1 }],
+				type: "touchStart",
+				touchPoints: [{ x: start.x, y: start.y, id: 1 }],
 			});
-		}
-		await cdp.send("Input.dispatchTouchEvent", {
-			type: "touchEnd",
-			touchPoints: [],
-		});
-		await penStroke(cdp, await center(b));
-		await waitForStrokes(page, "b:0", 1);
-	});
+			for (let step = 1; step <= 6; step += 1) {
+				await cdp.send("Input.dispatchTouchEvent", {
+					type: "touchMove",
+					touchPoints: [{ x: start.x, y: start.y - step * 8, id: 1 }],
+				});
+			}
+			await cdp.send("Input.dispatchTouchEvent", {
+				type: "touchEnd",
+				touchPoints: [],
+			});
+			await penStroke(cdp, await center(b));
+			await waitForStrokes(page, "b:0", 1);
+		},
+	);
 
-	it("a two-finger tap undoes the last stroke", async () => {
-		const member = await harness.seedIdentity();
-		const fontId = await seedDrawnFont(member, []);
-		const page = await harness.open(member, `/fonts/${fontId}/draw`, TABLET);
-		const cdp = await page.context().newCDPSession(page);
-		await penStroke(
-			cdp,
-			await center(page.getByLabel("Draw a", { exact: true })),
-		);
-		await waitForStrokes(page, "a:0", 1);
-		const b = page.getByLabel("Draw b", { exact: true });
-		const left = await center(b, -16);
-		const right = await center(b, 16);
-		await cdp.send("Input.dispatchTouchEvent", {
-			type: "touchStart",
-			touchPoints: [
-				{ x: left.x, y: left.y, id: 1 },
-				{ x: right.x, y: right.y, id: 2 },
-			],
-		});
-		await cdp.send("Input.dispatchTouchEvent", {
-			type: "touchEnd",
-			touchPoints: [],
-		});
-		await waitForStrokes(page, "a:0", 0);
-		expect(await strokes(page, "b:0")).toBe(0);
-		await page.getByRole("button", { name: "Redo" }).click();
-		await waitForStrokes(page, "a:0", 1);
-	});
+	it.skipIf(process.env.E2E_BROWSER === "webkit")(
+		"a two-finger tap on the heading leaves drawing history alone",
+		async () => {
+			const member = await harness.seedIdentity();
+			const fontId = await seedDrawnFont(member, []);
+			const page = await harness.open(member, `/fonts/${fontId}/draw`, TABLET);
+			const cdp = await page.context().newCDPSession(page);
+			await penStroke(
+				cdp,
+				await center(page.getByLabel("Draw a", { exact: true })),
+			);
+			await waitForStrokes(page, "a:0", 1);
+			const heading = page.getByRole("heading", {
+				name: "Karla's handwriting",
+			});
+			const left = await center(heading, -16);
+			const right = await center(heading, 16);
+			await cdp.send("Input.dispatchTouchEvent", {
+				type: "touchStart",
+				touchPoints: [
+					{ x: left.x, y: left.y, id: 1 },
+					{ x: right.x, y: right.y, id: 2 },
+				],
+			});
+			await cdp.send("Input.dispatchTouchEvent", {
+				type: "touchEnd",
+				touchPoints: [],
+			});
+			expect(await strokes(page, "a:0")).toBe(1);
+			expect(
+				await page.getByRole("button", { name: "Redo" }).isDisabled(),
+			).toBe(true);
+		},
+	);
 
-	it("a two-finger tap across two cells draws nothing for a finger-only creator", async () => {
-		const member = await harness.seedIdentity();
-		const fontId = await seedDrawnFont(member, []);
-		const page = await harness.open(member, `/fonts/${fontId}/draw`, TABLET);
-		const cdp = await page.context().newCDPSession(page);
-		const box = (char: string) =>
-			page.getByLabel(`Draw ${char}`, { exact: true });
-		await fingerStroke(cdp, await center(box("a")));
-		await waitForStrokes(page, "a:0", 1);
-		await fingerStroke(cdp, await center(box("b")));
-		await waitForStrokes(page, "b:0", 1);
-		await waitForSavedGlyphs(page);
-		await page.getByRole("button", { name: "Undo" }).click();
-		await waitForStrokes(page, "b:0", 0);
-		const d = await center(box("d"));
-		const e = await center(box("e"));
-		await cdp.send("Input.dispatchTouchEvent", {
-			type: "touchStart",
-			touchPoints: [{ x: d.x, y: d.y, id: 1 }],
-		});
-		await cdp.send("Input.dispatchTouchEvent", {
-			type: "touchStart",
-			touchPoints: [
-				{ x: d.x, y: d.y, id: 1 },
-				{ x: e.x, y: e.y, id: 2 },
-			],
-		});
-		await cdp.send("Input.dispatchTouchEvent", {
-			type: "touchEnd",
-			touchPoints: [],
-		});
-		await waitForStrokes(page, "a:0", 0);
-		expect(await strokes(page, "d:0")).toBe(0);
-		expect(await strokes(page, "e:0")).toBe(0);
-		const redo = page.getByRole("button", { name: "Redo" });
-		await redo.click();
-		await waitForStrokes(page, "a:0", 1);
-		await redo.click();
-		await waitForStrokes(page, "b:0", 1);
-		await expect.poll(() => savedStrokes(member, fontId, "b")).toBe(1);
-		await expect.poll(() => savedStrokes(member, fontId, "a")).toBe(1);
-		expect(await savedStrokes(member, fontId, "d")).toBe(0);
-		expect(await savedStrokes(member, fontId, "e")).toBe(0);
-	});
+	it.skipIf(process.env.E2E_BROWSER === "webkit")(
+		"a two-finger tap undoes the last stroke",
+		async () => {
+			const member = await harness.seedIdentity();
+			const fontId = await seedDrawnFont(member, []);
+			const page = await harness.open(member, `/fonts/${fontId}/draw`, TABLET);
+			const cdp = await page.context().newCDPSession(page);
+			await penStroke(
+				cdp,
+				await center(page.getByLabel("Draw a", { exact: true })),
+			);
+			await waitForStrokes(page, "a:0", 1);
+			const b = page.getByLabel("Draw b", { exact: true });
+			const left = await center(b, -16);
+			const right = await center(b, 16);
+			await cdp.send("Input.dispatchTouchEvent", {
+				type: "touchStart",
+				touchPoints: [
+					{ x: left.x, y: left.y, id: 1 },
+					{ x: right.x, y: right.y, id: 2 },
+				],
+			});
+			await cdp.send("Input.dispatchTouchEvent", {
+				type: "touchEnd",
+				touchPoints: [],
+			});
+			await waitForStrokes(page, "a:0", 0);
+			expect(await strokes(page, "b:0")).toBe(0);
+			await page.getByRole("button", { name: "Redo" }).click();
+			await waitForStrokes(page, "a:0", 1);
+		},
+	);
+
+	it.skipIf(process.env.E2E_BROWSER === "webkit")(
+		"a two-finger tap across two cells draws nothing for a finger-only creator",
+		async () => {
+			const member = await harness.seedIdentity();
+			const fontId = await seedDrawnFont(member, []);
+			const page = await harness.open(member, `/fonts/${fontId}/draw`, TABLET);
+			const cdp = await page.context().newCDPSession(page);
+			const box = (char: string) =>
+				page.getByLabel(`Draw ${char}`, { exact: true });
+			await fingerStroke(cdp, await center(box("a")));
+			await waitForStrokes(page, "a:0", 1);
+			await fingerStroke(cdp, await center(box("b")));
+			await waitForStrokes(page, "b:0", 1);
+			await waitForSavedGlyphs(page);
+			await page.getByRole("button", { name: "Undo" }).click();
+			await waitForStrokes(page, "b:0", 0);
+			const d = await center(box("d"));
+			const e = await center(box("e"));
+			await cdp.send("Input.dispatchTouchEvent", {
+				type: "touchStart",
+				touchPoints: [{ x: d.x, y: d.y, id: 1 }],
+			});
+			await cdp.send("Input.dispatchTouchEvent", {
+				type: "touchStart",
+				touchPoints: [
+					{ x: d.x, y: d.y, id: 1 },
+					{ x: e.x, y: e.y, id: 2 },
+				],
+			});
+			await cdp.send("Input.dispatchTouchEvent", {
+				type: "touchEnd",
+				touchPoints: [],
+			});
+			await waitForStrokes(page, "a:0", 0);
+			expect(await strokes(page, "d:0")).toBe(0);
+			expect(await strokes(page, "e:0")).toBe(0);
+			const redo = page.getByRole("button", { name: "Redo" });
+			await redo.click();
+			await waitForStrokes(page, "a:0", 1);
+			await redo.click();
+			await waitForStrokes(page, "b:0", 1);
+			await expect.poll(() => savedStrokes(member, fontId, "b")).toBe(1);
+			await expect.poll(() => savedStrokes(member, fontId, "a")).toBe(1);
+			expect(await savedStrokes(member, fontId, "d")).toBe(0);
+			expect(await savedStrokes(member, fontId, "e")).toBe(0);
+		},
+	);
 
 	it("a drawn font becomes a choice in the toolbar and in the seal", async () => {
 		const member = await harness.seedIdentity();
@@ -710,7 +864,7 @@ describe("handwriting fonts", () => {
 		);
 		await harness.db.fonts.setPending(organizationId, fontId, build.id);
 		await harness.db.assets.claim(build.id, new Date(0));
-		await harness.db.assets.fail(build.id, "processing_failed");
+		await harness.db.assets.fail(build.id, 1, "processing_failed");
 		const page = await harness.open(member, `/fonts/${fontId}/draw`);
 		const button = page.getByRole("button", { name: "Build my font" });
 		await button.waitFor();

@@ -9,28 +9,90 @@ import { Button, buttonVariants } from "@repo/ui/components/ui/button";
 import { Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { AssetWatchNotice } from "@/components/shared/asset-watch-notice";
 import { useAssetWatch } from "@/lib/use-asset-watch";
 import { fontHome } from "../font-links.ts";
 import {
 	DELETE_NOTE,
+	lettersDrawn,
 	METHOD_LABELS,
 	NEEDED_COUNT,
 	pillStatus,
 	statusLabel,
 } from "../font-status.ts";
+import { drawnGlyphs } from "../glyph-history.ts";
+import { useExistingGlyphSnapshot } from "../glyph-session-provider.tsx";
 import { SPECIMEN_TEXT } from "../specimen.ts";
 import { FontPreview } from "./font-preview.tsx";
 
 export type FontListProps = { fonts: FontOption[] };
 
+function FontRow({ font, onDelete }: { font: FontOption; onDelete(): void }) {
+	const router = useRouter();
+	const snapshot = useExistingGlyphSnapshot(font.id);
+	const wasPending = useRef(snapshot?.pending ?? false);
+	useEffect(() => {
+		const pending = snapshot?.pending ?? false;
+		if (wasPending.current && !pending) router.refresh();
+		wasPending.current = pending;
+	}, [snapshot?.pending, router]);
+	const name = `${font.ownerName}'s handwriting`;
+	const drawn = lettersDrawn(
+		snapshot ? drawnGlyphs(snapshot.history) : null,
+		font.missingRequired,
+	);
+	return (
+		<li
+			data-font-id={font.id}
+			className="group relative flex items-center gap-4 rounded-[3px] bg-paper px-5 py-4 shadow-sheet transition-[translate,box-shadow] duration-(--duration-settle) ease-settle focus-within:outline-2 focus-within:outline-offset-4 focus-within:outline-ring hover:-translate-y-0.5"
+		>
+			<div className="flex min-w-0 flex-1 flex-col gap-1.5">
+				<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+					<Link
+						href={fontHome(font.id, null)}
+						className="text-title text-ink outline-none after:absolute after:inset-0 after:content-['']"
+					>
+						{name}
+					</Link>
+					<StatusPill
+						status={pillStatus(font.status)}
+						label={statusLabel(font.status, drawn)}
+					/>
+				</div>
+				<p className="text-label text-ink-muted">
+					{METHOD_LABELS[font.source]}
+				</p>
+				{isUsableFont(font) && font.assetId ? (
+					<FontPreview
+						fontId={font.id}
+						assetId={font.assetId}
+						text={SPECIMEN_TEXT}
+						className="truncate text-[1.5rem] leading-[1.4] text-ink"
+					/>
+				) : null}
+				{font.status === "building" && font.pendingAssetId ? (
+					<BuildWatch assetId={font.pendingAssetId} />
+				) : null}
+			</div>
+			<Button
+				type="button"
+				variant="ghost"
+				size="icon-lg"
+				aria-label={`Delete ${name}`}
+				className="relative text-ink-muted hover:text-danger"
+				onClick={onDelete}
+			>
+				<Trash2 />
+			</Button>
+		</li>
+	);
+}
+
 function BuildWatch({ assetId }: { assetId: string }) {
 	const router = useRouter();
-	useAssetWatch(assetId, (state) => {
-		if (state.unreachable) return;
-		router.refresh();
-	});
-	return null;
+	const { state, retry } = useAssetWatch(assetId, () => router.refresh());
+	return <AssetWatchNotice issue={state?.issue ?? null} onRetry={retry} />;
 }
 
 export function FontList({ fonts }: FontListProps) {
@@ -61,8 +123,8 @@ export function FontList({ fonts }: FontListProps) {
 			<div className="flex flex-col items-start gap-4 rounded-[3px] bg-paper px-6 py-8 shadow-sheet">
 				<p className="font-display text-title">No handwriting yet.</p>
 				<p className="max-w-prose text-ui text-ink-muted">
-					Write 31 letters once, and every letter you send can be written in
-					your own hand.
+					Write {NEEDED_COUNT} letters once, and every letter you send can be
+					written in your own hand.
 				</p>
 				<Link
 					href="/fonts/new"
@@ -77,62 +139,17 @@ export function FontList({ fonts }: FontListProps) {
 	return (
 		<>
 			<ul className="flex flex-col gap-3">
-				{live.map((font) => {
-					const name = `${font.ownerName}'s handwriting`;
-					return (
-						<li
-							key={font.id}
-							data-font-id={font.id}
-							className="group relative flex items-center gap-4 rounded-[3px] bg-paper px-5 py-4 shadow-sheet transition-[translate,box-shadow] duration-(--duration-settle) ease-settle focus-within:outline-2 focus-within:outline-offset-4 focus-within:outline-ring hover:-translate-y-0.5"
-						>
-							{font.status === "building" && font.pendingAssetId ? (
-								<BuildWatch assetId={font.pendingAssetId} />
-							) : null}
-							<div className="flex min-w-0 flex-1 flex-col gap-1.5">
-								<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-									<Link
-										href={fontHome(font.id, null)}
-										className="text-title text-ink outline-none after:absolute after:inset-0 after:content-['']"
-									>
-										{name}
-									</Link>
-									<StatusPill
-										status={pillStatus(font.status)}
-										label={statusLabel(
-											font.status,
-											NEEDED_COUNT - font.missingRequired,
-										)}
-									/>
-								</div>
-								<p className="text-label text-ink-muted">
-									{METHOD_LABELS[font.source]}
-								</p>
-								{isUsableFont(font) && font.assetId ? (
-									<FontPreview
-										fontId={font.id}
-										assetId={font.assetId}
-										text={SPECIMEN_TEXT}
-										className="truncate text-[1.5rem] leading-[1.4] text-ink"
-									/>
-								) : null}
-							</div>
-							<Button
-								type="button"
-								variant="ghost"
-								size="icon-lg"
-								aria-label={`Delete ${name}`}
-								className="relative text-ink-muted hover:text-danger"
-								onClick={() => {
-									setError(null);
-									setTarget(font);
-									setConfirming(true);
-								}}
-							>
-								<Trash2 />
-							</Button>
-						</li>
-					);
-				})}
+				{live.map((font) => (
+					<FontRow
+						key={font.id}
+						font={font}
+						onDelete={() => {
+							setError(null);
+							setTarget(font);
+							setConfirming(true);
+						}}
+					/>
+				))}
 			</ul>
 			<ConfirmDialog
 				open={confirming}

@@ -28,9 +28,12 @@ export interface CreatedLetter {
   id: string;
 }
 
+export type RequestExportRequestFonts = {[key: string]: string};
+
 export interface RequestExportRequest {
   /** @minimum 1 */
   revision: number;
+  fonts: RequestExportRequestFonts;
 }
 
 export interface RequestedExport {
@@ -48,12 +51,6 @@ export interface SavedLetter {
   revision: number;
 }
 
-export interface LetterState {
-  title: string;
-  revision: number;
-  content: LetterContentEnvelope;
-}
-
 export type LetterResourcesFonts = {[key: string]: string};
 
 export type LetterResourcesDrawings = {[key: string]: {
@@ -68,6 +65,13 @@ export interface LetterResources {
   drawings: LetterResourcesDrawings;
   /** @nullable */
   frontImageAssetId: string | null;
+}
+
+export interface LetterState {
+  title: string;
+  revision: number;
+  content: LetterContentEnvelope;
+  resources: LetterResources;
 }
 
 export interface LetterPreview {
@@ -212,6 +216,7 @@ export const ApiErrorCode = {
   invalid_glyphs: 'invalid_glyphs',
   font_incomplete: 'font_incomplete',
   font_not_ready: 'font_not_ready',
+  proof_fonts_unavailable: 'proof_fonts_unavailable',
   not_owner: 'not_owner',
   stale_revision: 'stale_revision',
   file_too_large: 'file_too_large',

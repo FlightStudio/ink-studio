@@ -6,6 +6,7 @@ import { assets } from "./schema/assets.ts";
 export type NewAsset = Omit<Asset, "createdAt" | "updatedAt">;
 
 export type StoredFile = {
+	storageKey: string;
 	mimeType: string;
 	byteSize: number;
 	checksum: string;
@@ -16,9 +17,13 @@ export type Assets = {
 	referenced: (organizationId: string, ids: string[]) => Promise<Asset[]>;
 	create: (input: NewAsset) => Promise<Asset>;
 	claim: (id: string, staleBefore: Date) => Promise<Asset | null>;
-	complete: (id: string, file: StoredFile) => Promise<void>;
-	release: (id: string, error: string) => Promise<void>;
-	fail: (id: string, error: string) => Promise<void>;
+	complete: (
+		id: string,
+		attempt: number,
+		file: StoredFile,
+	) => Promise<Asset | null>;
+	release: (id: string, attempt: number, error: string) => Promise<boolean>;
+	fail: (id: string, attempt: number, error: string) => Promise<boolean>;
 	stale: (before: Date) => Promise<Asset[]>;
 };
 
@@ -107,8 +112,12 @@ function processingColumns(processing: AssetProcessing) {
 	};
 }
 
-function running(id: string) {
-	return and(eq(assets.id, id), eq(assets.processingStatus, "running"));
+function running(id: string, attempt: number) {
+	return and(
+		eq(assets.id, id),
+		eq(assets.processingStatus, "running"),
+		eq(assets.processingAttempts, attempt),
+	);
 }
 
 export function createAssets(db: Query): Assets {
@@ -179,10 +188,11 @@ export function createAssets(db: Query): Assets {
 			const row = claimed[0];
 			return row ? toAsset(row) : null;
 		},
-		async complete(id, file) {
-			await db
+		async complete(id, attempt, file) {
+			const rows = await db
 				.update(assets)
 				.set({
+					storageKey: file.storageKey,
 					mimeType: file.mimeType,
 					byteSize: file.byteSize,
 					checksum: file.checksum,
@@ -190,27 +200,33 @@ export function createAssets(db: Query): Assets {
 					processingLastError: null,
 					updatedAt: sql`now()`,
 				})
-				.where(running(id));
+				.where(running(id, attempt))
+				.returning();
+			return rows[0] ? toAsset(rows[0]) : null;
 		},
-		async release(id, error) {
-			await db
+		async release(id, attempt, error) {
+			const rows = await db
 				.update(assets)
 				.set({
 					processingStatus: "pending",
 					processingLastError: error,
 					updatedAt: sql`now()`,
 				})
-				.where(running(id));
+				.where(running(id, attempt))
+				.returning({ id: assets.id });
+			return rows.length > 0;
 		},
-		async fail(id, error) {
-			await db
+		async fail(id, attempt, error) {
+			const rows = await db
 				.update(assets)
 				.set({
 					processingStatus: "failed",
 					processingLastError: error,
 					updatedAt: sql`now()`,
 				})
-				.where(running(id));
+				.where(running(id, attempt))
+				.returning({ id: assets.id });
+			return rows.length > 0;
 		},
 		async stale(before) {
 			const rows = await db

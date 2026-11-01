@@ -14,6 +14,7 @@ export const apiErrorCodes = [
 	"invalid_glyphs",
 	"font_incomplete",
 	"font_not_ready",
+	"proof_fonts_unavailable",
 	"not_owner",
 	"stale_revision",
 	"file_too_large",
@@ -56,6 +57,8 @@ export const errorMessages = {
 	invalid_glyphs: "That letter could not be saved, so draw it again.",
 	font_incomplete: "Some needed letters are still blank, so draw them first.",
 	font_not_ready: "That handwriting is not ready yet.",
+	proof_fonts_unavailable:
+		"The handwriting for this proof could not be verified. Reload the letter, then export again.",
 	not_owner: "Only the owner can do that.",
 	stale_revision: "This letter changed in another tab.",
 	file_too_large: "That file is too large.",

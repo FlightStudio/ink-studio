@@ -498,11 +498,16 @@ components:
     RequestExportRequest:
       type: object
       additionalProperties: false
-      required: [revision]
+      required: [revision, fonts]
       properties:
         revision:
           type: integer
           minimum: 1
+        fonts:
+          type: object
+          additionalProperties:
+            type: string
+            format: uuid
     RequestedExport:
       type: object
       additionalProperties: false
@@ -535,7 +540,7 @@ components:
     LetterState:
       type: object
       additionalProperties: false
-      required: [title, revision, content]
+      required: [title, revision, content, resources]
       properties:
         title:
           type: string
@@ -543,6 +548,8 @@ components:
           type: integer
         content:
           $ref: "#/components/schemas/LetterContentEnvelope"
+        resources:
+          $ref: "#/components/schemas/LetterResources"
     LetterResources:
       type: object
       additionalProperties: false
@@ -879,6 +886,7 @@ components:
         - invalid_glyphs
         - font_incomplete
         - font_not_ready
+        - proof_fonts_unavailable
         - not_owner
         - stale_revision
         - file_too_large

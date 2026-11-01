@@ -294,6 +294,77 @@ describe("a photographed doodle", () => {
 		expect(mask.middleColumn.bottom).toBeGreaterThan(200);
 	});
 
+	it("each erase stroke keeps its size through size changes and history", async () => {
+		const page = await openPhoto(harness, member, letterId);
+		await fakeLift(page);
+		await page.getByLabel("Choose a photo").setInputFiles(PHOTO);
+		const eraser = page.getByLabel("Eraser", { exact: true });
+		await eraser.waitFor();
+		const box = await eraser.boundingBox();
+		if (!box) throw new Error("the eraser has no box");
+		const snapshot = () =>
+			eraser.evaluate(async (node) => {
+				await new Promise(requestAnimationFrame);
+				return (node as HTMLCanvasElement).toDataURL();
+			});
+		const eraseAt = async (share: number) => {
+			const y = box.y + box.height * share;
+			await page.mouse.move(box.x + 12, y);
+			await page.mouse.down();
+			await page.mouse.move(box.x + box.width - 12, y, { steps: 16 });
+			await page.mouse.up();
+		};
+		const size = page.getByRole("slider", { name: "Eraser size" });
+		await size.focus();
+		await page.keyboard.press("End");
+		await eraseAt(0.5);
+		const broad = await snapshot();
+		await size.focus();
+		await page.keyboard.press("Home");
+		expect(await snapshot()).toBe(broad);
+		await eraseAt(0.7);
+		const both = await snapshot();
+		expect(both).not.toBe(broad);
+		const dialog = page.getByRole("dialog", { name: "Photograph a doodle" });
+		await dialog.getByRole("button", { name: "Undo", exact: true }).click();
+		expect(await snapshot()).toBe(broad);
+		await dialog.getByRole("button", { name: "Redo", exact: true }).click();
+		expect(await snapshot()).toBe(both);
+		const mask = await readMask(page, await saveAndCatchMask(page));
+		expect(mask.runs).toBe(LIFTED.lines.length);
+		expect(mask.middleColumn.gap).toBe(0);
+	});
+
+	it("only the owning pointer can finish a crop and cancellation restores it", async () => {
+		const page = await openPhoto(harness, member, letterId);
+		await fakeLift(page);
+		await page.getByLabel("Choose a photo").setInputFiles(PHOTO);
+		await page.getByLabel("Eraser", { exact: true }).waitFor();
+		const handle = page.getByRole("button", {
+			name: "Crop from the bottom right",
+		});
+		const box = await handle.boundingBox();
+		if (!box) throw new Error("the crop handle has no box");
+		const crop = () => page.locator("[data-crop-box]").getAttribute("style");
+		const before = await crop();
+		const x = box.x + box.width / 2;
+		const y = box.y + box.height / 2;
+		await page.mouse.move(x, y);
+		await page.mouse.down();
+		await page.mouse.move(x - 30, y - 30, { steps: 4 });
+		await expect.poll(crop).not.toBe(before);
+		const first = await crop();
+		await handle.dispatchEvent("pointerup", {
+			pointerId: 99,
+			pointerType: "touch",
+		});
+		await page.mouse.move(x - 60, y - 60, { steps: 4 });
+		await expect.poll(crop).not.toBe(first);
+		await handle.dispatchEvent("pointercancel", { pointerId: 1 });
+		await page.mouse.up();
+		await expect.poll(crop).toBe(before);
+	});
+
 	it("closing with a lifted photo asks first", async () => {
 		const page = await openPhoto(harness, member, letterId);
 		await fakeLift(page);

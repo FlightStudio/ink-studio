@@ -1,17 +1,19 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
 	type AssetReading,
+	type AssetReadResult,
 	type AssetWatchState,
+	assetReadIssue,
 	pollDelay,
 	SLOW_AFTER_MS,
 	watchAsset,
 } from "./asset-watch.ts";
 
-function reader(readings: (AssetReading | null | Error)[]) {
+function reader(readings: (AssetReadResult | Error)[]) {
 	const read = vi.fn(async () => {
 		const next = readings.length > 1 ? readings.shift() : readings[0];
 		if (next instanceof Error) throw next;
-		return next ?? null;
+		return next ?? { issue: "unreachable" as const };
 	});
 	return read;
 }
@@ -71,7 +73,7 @@ describe("watchAsset", () => {
 			status: "failed",
 			error: "font_unreadable",
 			slow: false,
-			unreachable: false,
+			issue: null,
 		});
 		await vi.advanceTimersByTimeAsync(5000);
 		expect(read).toHaveBeenCalledTimes(1);
@@ -96,35 +98,110 @@ describe("watchAsset", () => {
 		expect(states.at(-1)).toEqual({
 			...running,
 			slow: true,
-			unreachable: false,
+			issue: null,
 		});
 		const reads = read.mock.calls.length;
 		await vi.advanceTimersByTimeAsync(3000);
 		expect(read.mock.calls.length).toBe(reads + 1);
 	});
 
-	test("a lost reading or a thrown one stops the watch", async () => {
-		const lost = reader([null, done]);
-		const onLost = vi.fn();
-		watchAsset({ read: lost, onChange: onLost });
-		await vi.advanceTimersByTimeAsync(0);
-		expect(onLost).toHaveBeenCalledTimes(1);
-		expect(onLost).toHaveBeenCalledWith({
-			status: "failed",
-			error: null,
+	test("a connection failure retains the last status and recovers even when it is unchanged", async () => {
+		const read = reader([
+			running,
+			new Error("offline"),
+			{ issue: "unreachable" },
+			running,
+			done,
+		]);
+		const states: AssetWatchState[] = [];
+		watchAsset({ read, onChange: (state) => states.push(state) });
+		await vi.advanceTimersByTimeAsync(500);
+		expect(states.at(-1)).toEqual({
+			...running,
 			slow: false,
-			unreachable: true,
+			issue: "unreachable",
 		});
-		await vi.advanceTimersByTimeAsync(10_000);
-		expect(lost).toHaveBeenCalledTimes(1);
+		await vi.advanceTimersByTimeAsync(750);
+		expect(states).toHaveLength(2);
+		await vi.advanceTimersByTimeAsync(1125);
+		expect(states.at(-1)).toEqual({
+			...running,
+			slow: false,
+			issue: null,
+		});
+		await vi.advanceTimersByTimeAsync(SLOW_AFTER_MS * 2);
+		expect(states.at(-1)?.status).toBe("done");
+		expect(read).toHaveBeenCalledTimes(5);
+	});
 
-		const thrown = reader([new Error("offline"), done]);
-		const onThrown = vi.fn();
-		watchAsset({ read: thrown, onChange: onThrown });
-		await vi.advanceTimersByTimeAsync(0);
-		expect(onThrown).toHaveBeenCalledTimes(1);
+	test("a first connection failure stays pending and keeps retrying at the capped delay", async () => {
+		const read = reader([{ issue: "unreachable" }]);
+		const states: AssetWatchState[] = [];
+		const stop = watchAsset({ read, onChange: (state) => states.push(state) });
+		await vi.advanceTimersByTimeAsync(SLOW_AFTER_MS + 10_000);
+		expect(states).toEqual([{ ...pending, slow: false, issue: "unreachable" }]);
+		const reads = read.mock.calls.length;
+		await vi.advanceTimersByTimeAsync(3000);
+		expect(read).toHaveBeenCalledTimes(reads + 1);
+		stop();
 		await vi.advanceTimersByTimeAsync(10_000);
-		expect(thrown).toHaveBeenCalledTimes(1);
+		expect(read).toHaveBeenCalledTimes(reads + 1);
+	});
+
+	test.each(["unauthenticated", "forbidden", "not_found"] as const)(
+		"%s stops checking without claiming the job failed",
+		async (issue) => {
+			const read = reader([running, { issue }, done]);
+			const onChange = vi.fn();
+			watchAsset({ read, onChange });
+			await vi.advanceTimersByTimeAsync(SLOW_AFTER_MS * 2);
+			expect(read).toHaveBeenCalledTimes(2);
+			expect(onChange).toHaveBeenLastCalledWith({
+				...running,
+				slow: false,
+				issue,
+			});
+		},
+	);
+
+	test("a confirmed job failure after reconnecting stops the watch", async () => {
+		const read = reader([
+			{ issue: "unreachable" },
+			{ status: "failed", error: "font_unreadable" },
+		]);
+		const onChange = vi.fn();
+		watchAsset({ read, onChange });
+		await vi.advanceTimersByTimeAsync(SLOW_AFTER_MS * 2);
+		expect(read).toHaveBeenCalledTimes(2);
+		expect(onChange).toHaveBeenLastCalledWith({
+			status: "failed",
+			error: "font_unreadable",
+			slow: false,
+			issue: null,
+		});
+	});
+
+	test("rechecking preserves the last confirmed status if the connection is still unavailable", async () => {
+		const onChange = vi.fn();
+		const stop = watchAsset({
+			read: reader([{ issue: "unreachable" }]),
+			initialReading: running,
+			onChange,
+		});
+		await vi.advanceTimersByTimeAsync(0);
+		expect(onChange).toHaveBeenLastCalledWith({
+			...running,
+			slow: false,
+			issue: "unreachable",
+		});
+		stop();
+	});
+
+	test("stopping from a status callback prevents another read", async () => {
+		const read = reader([running, done]);
+		const stop = watchAsset({ read, onChange: () => stop() });
+		await vi.advanceTimersByTimeAsync(SLOW_AFTER_MS * 2);
+		expect(read).toHaveBeenCalledTimes(1);
 	});
 
 	test("stop ends the reads and drops a reading still on its way", async () => {
@@ -144,4 +221,15 @@ describe("watchAsset", () => {
 		expect(onChange).not.toHaveBeenCalled();
 		expect(read).toHaveBeenCalledTimes(1);
 	});
+});
+
+test.each([
+	[401, "unauthenticated"],
+	[403, "forbidden"],
+	[404, "not_found"],
+	[429, "unreachable"],
+	[500, "unreachable"],
+	[503, "unreachable"],
+] as const)("HTTP %s is classified as %s", (status, issue) => {
+	expect(assetReadIssue(status)).toBe(issue);
 });

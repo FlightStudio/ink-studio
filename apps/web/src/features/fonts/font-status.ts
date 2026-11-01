@@ -56,6 +56,13 @@ export function drawnCount(glyphs: readonly DrawnGlyph[]): number {
 	return NEEDED_COUNT - missingChars(glyphs).length;
 }
 
+export function lettersDrawn(
+	glyphs: readonly DrawnGlyph[] | null,
+	missingRequired: number,
+): number {
+	return glyphs === null ? NEEDED_COUNT - missingRequired : drawnCount(glyphs);
+}
+
 export function statusLabel(status: FontStatus, drawn: number): string {
 	return status === "drawing"
 		? `Drawing ${drawn}/${NEEDED_COUNT}`
