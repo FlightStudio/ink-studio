@@ -1,0 +1,39 @@
+{
+	"name": "worker",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "tsx watch --env-file-if-exists=.env src/index.ts",
+		"dev:render": "WORKER_POOL=render PUBSUB_JOBS_SUBSCRIPTION=jobs-worker-render tsx watch --env-file-if-exists=.env src/index.ts",
+		"build": "tsdown && rm -rf dist/fonts && mkdir -p dist/fonts && cp ../../packages/render/fonts/*.ttf dist/fonts",
+		"start": "node --env-file-if-exists=.env dist/index.mjs",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run --passWithNoTests"
+	},
+	"dependencies": {
+		"@google-cloud/pubsub": "catalog:",
+		"@google-cloud/storage": "catalog:",
+		"@repo/db": "workspace:*",
+		"@repo/errors": "workspace:*",
+		"@repo/integrations": "workspace:*",
+		"@repo/logger": "workspace:*",
+		"@repo/render": "workspace:*",
+		"@repo/services": "workspace:*",
+		"@repo/types": "workspace:*",
+		"@t3-oss/env-core": "catalog:",
+		"playwright-core": "catalog:",
+		"sharp": "catalog:",
+		"zod": "catalog:"
+	},
+	"devDependencies": {
+		"@repo/testing": "workspace:*",
+		"@repo/typescript-config": "workspace:*",
+		"@types/node": "catalog:",
+		"@types/opentype.js": "^1.3.10",
+		"opentype.js": "catalog:",
+		"tsdown": "^0.23.2",
+		"tsx": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	}
+}

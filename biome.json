@@ -1,0 +1,74 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.6.3/schema.json",
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true
+	},
+	"files": {
+		"ignoreUnknown": true,
+		"includes": ["**", "!PLAN.md", "!pnpm-lock.yaml", "!packages/api/src/gen"]
+	},
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
+		}
+	},
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab"
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"preset": "recommended",
+			"style": {
+				"noRestrictedImports": {
+					"level": "error",
+					"options": {
+						"paths": {
+							"sharp": "sharp, opentype.js and playwright-core only in worker integrations and tests",
+							"opentype.js": "sharp, opentype.js and playwright-core only in worker integrations and tests",
+							"playwright-core": "sharp, opentype.js and playwright-core only in worker integrations and tests"
+						}
+					}
+				}
+			}
+		}
+	},
+	"overrides": [
+		{
+			"includes": [
+				"packages/integrations/src/worker/**",
+				"packages/testing/**",
+				"packages/render/src/**/*.browser.test.ts",
+				"packages/render/src/**/*.browser.test.tsx",
+				"apps/worker/src/**/*.test.ts",
+				"apps/web/e2e/**",
+				"tools/dev/**"
+			],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"paths": {}
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": ["**", "!pnpm-lock.yaml", "!packages/api/src/gen"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noArrayIndexKey": "off"
+					}
+				}
+			}
+		}
+	]
+}

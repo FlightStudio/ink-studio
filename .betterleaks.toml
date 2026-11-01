@@ -1,0 +1,3 @@
+[allowlist]
+description = "Local development files that are not secrets"
+paths = ["**/.env.example"]

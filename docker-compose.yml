@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ink_studio
+    ports:
+      - "127.0.0.1:5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ink_studio"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+  gcs:
+    image: fsouza/fake-gcs-server:1.56.1
+    command:
+      - -scheme
+      - http
+      - -port
+      - "4443"
+      - -public-host
+      - ${DEV_LAN_HOST:-localhost}:4443
+      - -cors-headers
+      - Content-Type
+      - -data
+      - /data
+    ports:
+      - "4443:4443"
+    volumes:
+      - ./tools/docker/gcs:/data
+  pubsub:
+    build:
+      context: ./tools/docker
+      dockerfile: Dockerfile.pubsub
+    environment:
+      PUBSUB_PROJECT_ID: ink-studio-local
+    ports:
+      - "127.0.0.1:8086:8086"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -fs http://localhost:8086/v1/projects/ink-studio-local/subscriptions/jobs-worker-render
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  browser:
+    image: mcr.microsoft.com/playwright:v1.64.1-noble
+    command:
+      - npx
+      - -y
+      - playwright@1.64.1
+      - run-server
+      - --port
+      - "3001"
+      - --host
+      - 0.0.0.0
+      - --unsafe
+    ports:
+      - "127.0.0.1:3001:3001"

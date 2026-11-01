@@ -1,0 +1,60 @@
+import type { LetterContent } from "./letter.ts";
+import type { MergeValues } from "./merge-field.ts";
+
+export type UploadPurpose = "photo" | "mask" | "font-file" | "cover";
+
+export type PrintOutput =
+	| { format: "pdf"; duplex: boolean }
+	| { format: "png"; side: number };
+
+export type AssetJob =
+	| { kind: "lift-ink"; photoAssetId: string }
+	| { kind: "build-font"; fontId: string }
+	| {
+			kind: "render-letter";
+			letterId: string;
+			title: string;
+			content: LetterContent;
+			fonts: Record<string, string>;
+			mergeValues: MergeValues;
+			output: PrintOutput;
+	  };
+
+export function assetMessageType<K extends AssetJob["kind"]>(
+	kind: K,
+): `asset.${K}` {
+	return `asset.${kind}`;
+}
+
+export type AssetOrigin =
+	| {
+			source: "uploaded";
+			purpose: UploadPurpose;
+			filename: string;
+			uploadedByUserId: string;
+	  }
+	| { source: "generated"; job: AssetJob };
+
+export type AssetProcessing =
+	| {
+			status: "pending" | "running";
+			attempts: number;
+			lastError: string | null;
+	  }
+	| { status: "done"; attempts: number }
+	| { status: "failed"; attempts: number; error: string };
+
+export type AssetProcessingStatus = AssetProcessing["status"];
+
+export type Asset = {
+	id: string;
+	organizationId: string;
+	storageKey: string;
+	mimeType: string;
+	byteSize: number | null;
+	checksum: string | null;
+	origin: AssetOrigin;
+	processing: AssetProcessing;
+	createdAt: Date;
+	updatedAt: Date;
+};
