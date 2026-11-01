@@ -233,7 +233,9 @@ describe("handwriting fonts", () => {
 		const page = await harness.open(member, `/fonts/${fontId}/draw`, {
 			viewport: { width: 1280, height: 720 },
 		});
-		await page.getByText("30 of 31 letters").waitFor();
+		await page
+			.getByText(`${REQUIRED.length - 1} of ${REQUIRED.length} letters`)
+			.waitFor();
 		const build = page.getByRole("button", { name: "Build my font" });
 		expect(await build.isDisabled()).toBe(true);
 		expect(await cell(page, "x:0").getAttribute("data-highlighted")).toBe(
@@ -251,7 +253,9 @@ describe("handwriting fonts", () => {
 				.count(),
 		).toBe(0);
 		await drawChar(page, "x");
-		await page.getByText("31 of 31 letters").waitFor();
+		await page
+			.getByText(`${REQUIRED.length} of ${REQUIRED.length} letters`)
+			.waitFor();
 		expect(await build.isEnabled()).toBe(true);
 		await page
 			.getByRole("heading", { name: "Make it look more natural" })
@@ -481,7 +485,7 @@ describe("handwriting fonts", () => {
 		const letterId = await harness.newLetter(member);
 		const fontId = await seedDrawnFont(
 			member,
-			REQUIRED.filter((char) => char !== "'"),
+			REQUIRED.filter((char) => char !== "z"),
 		);
 		const page = await harness.open(
 			member,
@@ -499,7 +503,7 @@ describe("handwriting fonts", () => {
 			if (request.url().includes("/builds")) events.push("build asked");
 		});
 		await harness.open(member, `/fonts/${fontId}`);
-		await drawStroke(page, "'");
+		await drawStroke(page, "z");
 		const build = page.getByRole("button", { name: "Build my font" });
 		await build.click();
 		await page.waitForURL(
@@ -579,7 +583,7 @@ describe("handwriting fonts", () => {
 			chars: "",
 		});
 		const page = await harness.open(member, `/fonts/${font.id}/draw`);
-		await page.getByText("2 of 31 letters").waitFor();
+		await page.getByText(`2 of ${REQUIRED.length} letters`).waitFor();
 		expect(await strokes(page, "e:0")).toBe(GLYPH_LIMITS.strokes);
 	});
 
@@ -596,7 +600,7 @@ describe("handwriting fonts", () => {
 			`/letters/${letterId}?font=${fontId}`,
 		);
 		const plain = await harness.open(member, `/fonts/${fontId}/draw`);
-		await plain.getByText("0 of 31 letters").waitFor();
+		await plain.getByText(`0 of ${REQUIRED.length} letters`).waitFor();
 		expect(
 			await plain.getByRole("link", { name: "Back to your letter" }).count(),
 		).toBe(0);
@@ -672,7 +676,7 @@ describe("handwriting fonts", () => {
 			const cdp = await page.context().newCDPSession(page);
 			const a = page.getByLabel("Draw a", { exact: true });
 			const b = page.getByLabel("Draw b", { exact: true });
-			expect(await b.getAttribute("class")).toContain("touch-none");
+			expect(await b.getAttribute("class")).toContain("touch-pan-y");
 			await penStroke(cdp, await center(a));
 			await waitForStrokes(page, "a:0", 1);
 			await page.waitForFunction(() =>

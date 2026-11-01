@@ -2,7 +2,7 @@
 
 import { errorMessages, isApiErrorCode } from "@repo/errors";
 import type { EditableFont, Stroke } from "@repo/types";
-import { missingChars } from "@repo/types";
+import { GLYPH_LIMITS, missingChars } from "@repo/types";
 import { Button, buttonVariants } from "@repo/ui/components/ui/button";
 import { Redo2, Undo2 } from "lucide-react";
 import Link from "next/link";
@@ -45,6 +45,9 @@ import { StrokeSpecimen } from "./stroke-specimen.tsx";
 export const SAVE_FAILED =
 	"Not saved. Your strokes are still here. Retry when connected.";
 
+export const STROKE_TOO_LONG =
+	"This stroke is too long, so draw it again in shorter pieces.";
+
 const SECTION_COPY: Record<
 	GlyphSectionId,
 	{ title(count: number): string; description: ReactNode }
@@ -71,7 +74,7 @@ const SECTION_COPY: Record<
 	punctuation: {
 		title: () => "More punctuation",
 		description:
-			"Quotes, brackets and symbols. Any you skip are written in Caveat.",
+			"Sentence marks, quotes, brackets and symbols. Any you skip are written in Caveat.",
 	},
 };
 
@@ -105,6 +108,7 @@ export function GlyphGrid({ font, from, glyph }: GlyphGridProps) {
 	const { session, snapshot } = useGlyphSession(font);
 	const { history, errors, pending: saving, building, buildError } = snapshot;
 	const [penSeen, setPenSeen] = useState(false);
+	const [tooLongKey, setTooLongKey] = useState<string | null>(null);
 	const [start] = useState(() => startSlot(font.glyphs, glyph));
 	const grid = useRef<HTMLDivElement>(null);
 	const header = useRef<HTMLElement>(null);
@@ -120,9 +124,20 @@ export function GlyphGrid({ font, from, glyph }: GlyphGridProps) {
 		};
 	}, [session]);
 
+	const claimPointer = useCallback(
+		(pointerId: number) => {
+			if (!session.pointerDown(pointerId)) return false;
+			pointers.current.add(pointerId);
+			return true;
+		},
+		[session],
+	);
+
 	const onClear = useCallback(
-		(key: string) =>
-			session.apply(clearCell(session.snapshot().history, key), key),
+		(key: string) => {
+			setTooLongKey((current) => (current === key ? null : current));
+			session.apply(clearCell(session.snapshot().history, key), key);
+		},
 		[session],
 	);
 
@@ -141,6 +156,11 @@ export function GlyphGrid({ font, from, glyph }: GlyphGridProps) {
 	const onStroke = useCallback(
 		(key: string, stroke: Stroke) => {
 			if (stroke.input === "touch" && severalFingers.current) return;
+			if (stroke.points.length > GLYPH_LIMITS.pointsPerStroke) {
+				setTooLongKey(key);
+				return;
+			}
+			setTooLongKey((current) => (current === key ? null : current));
 			session.apply(addStroke(session.snapshot().history, key, stroke), key);
 		},
 		[session, severalFingers],
@@ -200,17 +220,18 @@ export function GlyphGrid({ font, from, glyph }: GlyphGridProps) {
 			ref={grid}
 			className="flex flex-col gap-12"
 			onPointerDownCapture={(event) => {
+				const fingerMayScroll = event.pointerType === "touch" && !penSeen;
 				if (
 					event.target instanceof HTMLCanvasElement &&
 					event.target.closest("[data-cell]") &&
-					drawsWith(event, penSeen)
+					drawsWith(event, penSeen) &&
+					!fingerMayScroll
 				) {
-					if (!session.pointerDown(event.pointerId)) {
+					if (!claimPointer(event.pointerId)) {
 						event.preventDefault();
 						event.stopPropagation();
 						return;
 					}
-					pointers.current.add(event.pointerId);
 				}
 				if (event.pointerType === "pen") setPenSeen(true);
 			}}
@@ -359,13 +380,16 @@ export function GlyphGrid({ font, from, glyph }: GlyphGridProps) {
 									slot={slot}
 									strokes={strokesOf(history, slot.key)}
 									penOnly={penSeen}
+									onClaimPointer={claimPointer}
 									disabled={building}
 									highlighted={highlighted === slot.key}
 									full={isFull(history, slot.key)}
 									error={
 										slot.key in errors
 											? messageOf(errors[slot.key] ?? null)
-											: null
+											: tooLongKey === slot.key
+												? STROKE_TOO_LONG
+												: null
 									}
 									onStroke={onStroke}
 									onClear={onClear}

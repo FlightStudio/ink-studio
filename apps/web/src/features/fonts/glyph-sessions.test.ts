@@ -1,4 +1,4 @@
-import { HANDWRITING_GLYPHS, type Stroke } from "@repo/types";
+import { GLYPH_LIMITS, HANDWRITING_GLYPHS, type Stroke } from "@repo/types";
 import { describe, expect, it, vi } from "vitest";
 import {
 	REQUEST_DEADLINE_MS,
@@ -146,6 +146,27 @@ describe("studio glyph sessions", () => {
 		expect(await building).toBe(true);
 		expect(reopened.snapshot().building).toBe(false);
 		expect(reopened.pointerDown(8)).toBe(true);
+	});
+
+	it("a stroke longer than the server allows is not kept and never enters the save queue", async () => {
+		const send = vi.fn();
+		const sessions = createGlyphSessions({ send, build: vi.fn() });
+		const session = sessions.open(font);
+		const tooLong: Stroke = {
+			input: "pen",
+			points: Array.from(
+				{ length: GLYPH_LIMITS.pointsPerStroke + 1 },
+				(_, index) => [index, 1, 0.5, index],
+			),
+		};
+		const before = session.snapshot().history;
+		session.apply(addStroke(before, "a:0", tooLong), "a:0");
+		await session.idle();
+		expect(session.snapshot().history).toBe(before);
+		expect(session.snapshot().pending).toBe(false);
+		expect(session.snapshot().errors).toEqual({});
+		expect(send).not.toHaveBeenCalled();
+		expect(sessions.pending()).toEqual([]);
 	});
 
 	it("never evicts a pending session while bounding inactive saved sessions", async () => {

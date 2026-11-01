@@ -276,6 +276,21 @@ function requiredGlyphs(): DrawnGlyph[] {
 	);
 }
 
+it("the lowercase letters are enough to build", async () => {
+	const karla = await member("karla-letters");
+	const publish = vi.fn<Publisher["publish"]>(async () => {});
+	const building = new FontService(testDb.db, { publish });
+	const { id } = await building.createFont(karla, { ownerName: "Karla" });
+	for (const char of "abcdefghijklmnopqrstuvwxyz") {
+		await building.saveGlyph(karla, id, glyph(char));
+	}
+	const { assetId } = await building.requestBuild(karla, id);
+	expect(assetId).toEqual(expect.any(String));
+	expect(publish).toHaveBeenCalledExactlyOnceWith("asset.build-font", {
+		assetId,
+	});
+});
+
 it("a build needs every required character", async () => {
 	const karla = await member("karla-incomplete");
 	const publish = vi.fn<Publisher["publish"]>(async () => {});

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { type ReactNode, useId, useState } from "react";
 import { createMessage } from "../font-errors.ts";
 import { drawPage, templatePage } from "../font-links.ts";
-import { cleanOwnerName } from "../font-status.ts";
+import { cleanOwnerName, NEEDED_COUNT } from "../font-status.ts";
 import { FontUploadDialog } from "./font-upload-dialog.tsx";
 import { SealNameField } from "./seal-name-field.tsx";
 
@@ -23,8 +23,7 @@ const METHODS: readonly {
 		id: "draw",
 		title: "Write it here",
 		badge: "Recommended",
-		description:
-			"Write 31 letters with your Pencil, finger or mouse. About 5 minutes.",
+		description: `Write ${NEEDED_COUNT} letters with your Pencil, finger or mouse. About 5 minutes.`,
 		icon: <PenLine />,
 	},
 	{

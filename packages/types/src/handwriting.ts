@@ -22,10 +22,14 @@ const VARIANTS = {
 
 export const LOWERCASE_LETTERS = [..."abcdefghijklmnopqrstuvwxyz"] as const;
 
-const REQUIRED_PUNCTUATION = [".", ",", "!", "?", "'"] as const;
+const REQUIRED_PUNCTUATION = [] as const;
 
 const PUNCTUATION = [
-	...REQUIRED_PUNCTUATION,
+	".",
+	",",
+	"!",
+	"?",
+	"'",
 	'"',
 	":",
 	";",

@@ -25,6 +25,7 @@ export type GlyphCellProps = {
 	slot: GlyphSlot;
 	strokes: readonly Stroke[];
 	penOnly: boolean;
+	onClaimPointer(pointerId: number): boolean;
 	disabled: boolean;
 	highlighted: boolean;
 	full: boolean;
@@ -95,6 +96,7 @@ function GlyphCellView({
 	slot,
 	strokes,
 	penOnly,
+	onClaimPointer,
 	disabled,
 	highlighted,
 	full,
@@ -155,6 +157,8 @@ function GlyphCellView({
 						heightPx={side}
 						strokeScale={(CELL.strokeScale * side) / CELL.size}
 						penOnly={penOnly}
+						scrollTouch
+						onClaimPointer={onClaimPointer}
 						aria-label={`Draw ${slot.label}`}
 						className="rounded-xl"
 						onStrokeEnd={(drawn) => {

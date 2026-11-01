@@ -597,7 +597,9 @@ describe("making a handwriting font", () => {
 				`/fonts/${fontId}?from=${letterId}`,
 			);
 			await page
-				.getByText("31 of 31 letters drawn.", { exact: false })
+				.getByText(`${REQUIRED.length} of ${REQUIRED.length} letters drawn.`, {
+					exact: false,
+				})
 				.waitFor();
 			expect(
 				await page
@@ -635,7 +637,12 @@ describe("making a handwriting font", () => {
 		const member = await seedNamed("Karla");
 		const fontId = await seedFont(member, drawn(REQUIRED.slice(1)));
 		const page = await harness.open(member, `/fonts/${fontId}`);
-		await page.getByText("30 of 31 letters drawn.", { exact: false }).waitFor();
+		await page
+			.getByText(
+				`${REQUIRED.length - 1} of ${REQUIRED.length} letters drawn.`,
+				{ exact: false },
+			)
+			.waitFor();
 		await page.getByRole("link", { name: "Keep drawing" }).waitFor();
 		expect(
 			await page.getByRole("button", { name: "Build my font" }).count(),
@@ -646,7 +653,9 @@ describe("making a handwriting font", () => {
 		const member = await seedNamed("Karla");
 		const fontId = await seedFont(member, drawn(["a", "b"]));
 		const page = await harness.open(member, `/fonts/${fontId}`);
-		await page.getByText("2 of 31 letters drawn.", { exact: false }).waitFor();
+		await page
+			.getByText(`2 of ${REQUIRED.length} letters drawn.`, { exact: false })
+			.waitFor();
 		await page.getByRole("button", { name: "Delete" }).click();
 		const confirm = page.getByRole("dialog", {
 			name: "Delete Karla's handwriting?",
@@ -675,7 +684,12 @@ describe("making a handwriting font", () => {
 		const page = await harness.open(member, "/fonts");
 		const row = (id: string) => page.locator(`[data-font-id="${id}"]`);
 		const expected = [
-			[dana, "Dana's handwriting", "Drawing 12/31", "Written here"],
+			[
+				dana,
+				"Dana's handwriting",
+				`Drawing 12/${REQUIRED.length}`,
+				"Written here",
+			],
 			[bea, "Bea's handwriting", "Building", "Written here"],
 			[ines, "Ines's handwriting", "Needs attention", "Written on paper"],
 			[fay, "Fay's handwriting", "Didn't work", "From a font file"],

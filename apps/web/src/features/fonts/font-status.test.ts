@@ -10,6 +10,7 @@ import {
 	fillsInPhrase,
 	fontAnnouncement,
 	fontHeading,
+	lettersDrawn,
 	listOf,
 	NEEDED_COUNT,
 	pillStatus,
@@ -34,6 +35,12 @@ describe("drawnCount", () => {
 		expect(drawnCount([])).toBe(0);
 		expect(drawnCount(drawn("abc"))).toBe(3);
 		expect(drawnCount(drawn(required))).toBe(NEEDED_COUNT);
+	});
+
+	test("a live glyph session decides the count, and a missing session uses the stored gap", () => {
+		expect(lettersDrawn(null, 4)).toBe(NEEDED_COUNT - 4);
+		expect(lettersDrawn(drawn(required), NEEDED_COUNT)).toBe(required.length);
+		expect(lettersDrawn(drawn("ab"), 0)).toBe(2);
 	});
 
 	test("capitals, extra variants and blank cells do not count", () => {

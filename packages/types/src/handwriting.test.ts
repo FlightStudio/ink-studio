@@ -37,6 +37,22 @@ describe("missingChars", () => {
 	it("a cell with no strokes does not count", () => {
 		expect(missingChars(drawnOnce())).toEqual(["x"]);
 	});
+
+	it("a to z is complete, and sentence marks are optional like the hyphen", () => {
+		const letters = [..."abcdefghijklmnopqrstuvwxyz"].map((char) => ({
+			char,
+			variant: 0,
+			strokes: [stroke],
+		}));
+		expect(missingChars(letters)).toEqual([]);
+		expect(missingChars(letters.filter((glyph) => glyph.char !== "z"))).toEqual(
+			["z"],
+		);
+		const missing = missingChars([]);
+		for (const char of [".", ",", "!", "?", "'", "-"]) {
+			expect(missing).not.toContain(char);
+		}
+	});
 });
 
 describe("missingLowercase", () => {
@@ -89,7 +105,7 @@ describe("HANDWRITING_GLYPHS", () => {
 			HANDWRITING_GLYPHS.filter((glyph) => glyph.required).map(
 				(glyph) => glyph.char,
 			),
-		).toEqual([..."abcdefghijklmnopqrstuvwxyz", ".", ",", "!", "?", "'"]);
+		).toEqual([..."abcdefghijklmnopqrstuvwxyz"]);
 		expect(new Set(HANDWRITING_GLYPHS.map((glyph) => glyph.char)).size).toBe(
 			HANDWRITING_GLYPHS.length,
 		);

@@ -37,9 +37,24 @@ describe("glyphSections", () => {
 			"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
 		);
 		expect(punctuation?.id).toBe("punctuation");
-		expect(punctuation?.slots.map((slot) => slot.char).join("")).toBe(
-			'":;-()/&@#*',
-		);
+		expect(punctuation?.slots.map((slot) => slot.char)).toEqual([
+			".",
+			",",
+			"!",
+			"?",
+			"'",
+			'"',
+			":",
+			";",
+			"-",
+			"(",
+			")",
+			"/",
+			"&",
+			"@",
+			"#",
+			"*",
+		]);
 	});
 
 	test("the natural section waits until every needed letter is drawn", () => {

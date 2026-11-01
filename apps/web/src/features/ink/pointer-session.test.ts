@@ -7,6 +7,8 @@ import {
 	type PointerSessionEvent,
 	type PointerSessionState,
 	pointerSession,
+	TOUCH_INK_SLOP,
+	touchPastSlop,
 } from "./pointer-session.ts";
 
 const empty: PointerSessionState = EMPTY_POINTER_SESSION;
@@ -236,6 +238,18 @@ describe("pointerSession", () => {
 		const cleared = run(drawn, [{ type: "undo" }, { type: "clear" }]);
 		expect(cleared.strokes).toEqual([]);
 		expect(cleared.undone).toEqual([]);
+	});
+});
+
+describe("touchPastSlop", () => {
+	it("a finger becomes ink only after a small movement", () => {
+		expect(touchPastSlop({ x: 0, y: 0 }, { x: 0, y: 0 })).toBe(false);
+		expect(
+			touchPastSlop({ x: 10, y: 20 }, { x: 10, y: 20 + TOUCH_INK_SLOP - 0.1 }),
+		).toBe(false);
+		expect(
+			touchPastSlop({ x: 10, y: 20 }, { x: 10 + TOUCH_INK_SLOP, y: 20 }),
+		).toBe(true);
 	});
 });
 

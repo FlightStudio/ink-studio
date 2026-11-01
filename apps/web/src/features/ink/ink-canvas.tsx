@@ -19,6 +19,7 @@ import {
 	type PointerSample,
 	type PointerSessionEvent,
 	pointerSession,
+	touchPastSlop,
 } from "./pointer-session.ts";
 
 export type InkCanvasHandle = { undo(): void; redo(): void; clear(): void };
@@ -34,6 +35,8 @@ export type InkCanvasProps = {
 	composite?: "source-over" | "destination-out";
 	underlay?: CanvasImageSource | null;
 	penOnly?: boolean;
+	scrollTouch?: boolean;
+	onClaimPointer?(pointerId: number): boolean;
 	onStrokeEnd(strokes: CanvasStroke[], history: InkHistory): void;
 	ref?: Ref<InkCanvasHandle>;
 	className?: string;
@@ -77,6 +80,8 @@ export function InkCanvas({
 	composite = "source-over",
 	underlay = null,
 	penOnly = false,
+	scrollTouch = false,
+	onClaimPointer,
 	onStrokeEnd,
 	ref,
 	className,
@@ -84,6 +89,11 @@ export function InkCanvas({
 }: InkCanvasProps) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const session = useRef(EMPTY_POINTER_SESSION);
+	const candidate = useRef<{
+		pointerId: number;
+		sample: PointerSample;
+		strokeScale?: number;
+	} | null>(null);
 	const frame = useRef(0);
 	const cache = useRef({
 		scale: strokeScale,
@@ -210,22 +220,91 @@ export function InkCanvas({
 		return samplesOf(event.nativeEvent, event.currentTarget, widthPx, heightPx);
 	}
 
-	function onPointerDown(event: ReactPointerEvent<HTMLCanvasElement>) {
-		if (!drawsWith(event, penOnly)) return;
+	function beginStroke(
+		event: ReactPointerEvent<HTMLCanvasElement>,
+		sample: PointerSample,
+		strokeScaleValue: number | undefined,
+		moved: PointerSample[],
+	) {
 		event.preventDefault();
 		event.currentTarget.setPointerCapture(event.pointerId);
+		dispatch({
+			type: "down",
+			sample,
+			...(strokeScaleValue === undefined
+				? {}
+				: { strokeScale: strokeScaleValue }),
+		});
+		if (moved.length > 0) dispatch({ type: "move", samples: moved });
+	}
+
+	function onPointerDown(event: ReactPointerEvent<HTMLCanvasElement>) {
+		if (!drawsWith(event, penOnly)) return;
 		const [sample] = samples(event).slice(-1);
-		if (sample)
-			dispatch({
-				type: "down",
+		if (!sample) return;
+		const strokeScaleValue =
+			composite === "destination-out" ? strokeScale : undefined;
+		if (scrollTouch && sample.input === "touch" && !penOnly) {
+			if (session.current.active) {
+				dispatch({ type: "down", sample });
+				return;
+			}
+			if (candidate.current) {
+				candidate.current = null;
+				return;
+			}
+			candidate.current = {
+				pointerId: event.pointerId,
 				sample,
-				...(composite === "destination-out" ? { strokeScale } : {}),
-			});
+				...(strokeScaleValue === undefined
+					? {}
+					: { strokeScale: strokeScaleValue }),
+			};
+			return;
+		}
+		beginStroke(event, sample, strokeScaleValue, []);
 	}
 
 	function onPointerMove(event: ReactPointerEvent<HTMLCanvasElement>) {
+		const pending = candidate.current;
+		if (pending?.pointerId === event.pointerId) {
+			const moved = samples(event);
+			const latest = moved.at(-1);
+			if (!latest || !touchPastSlop(pending.sample, latest)) return;
+			if (onClaimPointer && !onClaimPointer(pending.pointerId)) {
+				candidate.current = null;
+				return;
+			}
+			candidate.current = null;
+			beginStroke(event, pending.sample, pending.strokeScale, moved);
+			return;
+		}
 		if (session.current.active?.pointerId !== event.pointerId) return;
 		dispatch({ type: "move", samples: samples(event) });
+	}
+
+	function finishPointer(
+		event: ReactPointerEvent<HTMLCanvasElement>,
+		kind: "up" | "cancel",
+	) {
+		const pending = candidate.current;
+		if (pending?.pointerId === event.pointerId) {
+			const moved = samples(event);
+			const latest = moved.at(-1) ?? pending.sample;
+			if (
+				kind === "up" &&
+				touchPastSlop(pending.sample, latest) &&
+				(!onClaimPointer || onClaimPointer(pending.pointerId))
+			) {
+				candidate.current = null;
+				beginStroke(event, pending.sample, pending.strokeScale, moved);
+				dispatch({ type: "up", pointerId: event.pointerId });
+				return;
+			}
+			candidate.current = null;
+			return;
+		}
+		dispatch({ type: kind, pointerId: event.pointerId });
 	}
 
 	return (
@@ -250,19 +329,13 @@ export function InkCanvas({
 				aria-label={ariaLabel}
 				className={[
 					"absolute inset-0 size-full [-webkit-touch-callout:none]",
-					penOnly ? "touch-pan-y" : "touch-none",
+					penOnly || scrollTouch ? "touch-pan-y" : "touch-none",
 				].join(" ")}
 				onPointerDown={onPointerDown}
 				onPointerMove={onPointerMove}
-				onPointerUp={(event) =>
-					dispatch({ type: "up", pointerId: event.pointerId })
-				}
-				onPointerCancel={(event) =>
-					dispatch({ type: "cancel", pointerId: event.pointerId })
-				}
-				onLostPointerCapture={(event) =>
-					dispatch({ type: "cancel", pointerId: event.pointerId })
-				}
+				onPointerUp={(event) => finishPointer(event, "up")}
+				onPointerCancel={(event) => finishPointer(event, "cancel")}
+				onLostPointerCapture={(event) => finishPointer(event, "cancel")}
 			/>
 		</div>
 	);

@@ -29,6 +29,17 @@ export type PointerSessionEvent =
 
 export const FLAT_PRESSURE = 0.5;
 
+export const TOUCH_INK_SLOP = 10;
+
+export function touchPastSlop(
+	start: { x: number; y: number },
+	point: { x: number; y: number },
+): boolean {
+	const dx = point.x - start.x;
+	const dy = point.y - start.y;
+	return dx * dx + dy * dy >= TOUCH_INK_SLOP * TOUCH_INK_SLOP;
+}
+
 export const EMPTY_POINTER_SESSION: PointerSessionState = {
 	strokes: [],
 	undone: [],

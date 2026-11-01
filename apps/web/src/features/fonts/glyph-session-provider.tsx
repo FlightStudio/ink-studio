@@ -9,6 +9,7 @@ import {
 	createContext,
 	type ReactNode,
 	use,
+	useCallback,
 	useEffect,
 	useState,
 	useSyncExternalStore,
@@ -16,7 +17,11 @@ import {
 import { requestDeadline } from "@/lib/request-deadline";
 import { drawPage } from "./font-links.ts";
 import { parseCellKey } from "./glyph-history.ts";
-import { createGlyphSessions, type GlyphSessions } from "./glyph-sessions.ts";
+import {
+	createGlyphSessions,
+	type GlyphSessionSnapshot,
+	type GlyphSessions,
+} from "./glyph-sessions.ts";
 
 const GlyphSessionsContext = createContext<GlyphSessions | null>(null);
 
@@ -109,6 +114,29 @@ export function GlyphSessionProvider({ children }: { children: ReactNode }) {
 			) : null}
 			{children}
 		</GlyphSessionsContext>
+	);
+}
+
+export function useExistingGlyphSnapshot(
+	fontId: string,
+): GlyphSessionSnapshot | null {
+	const sessions = use(GlyphSessionsContext);
+	const subscribe = useCallback(
+		(listener: () => void) => {
+			if (!sessions) return () => {};
+			const unsubscribe = sessions.find(fontId)?.subscribe(listener);
+			const unsubscribeAll = sessions.subscribeAll(listener);
+			return () => {
+				unsubscribe?.();
+				unsubscribeAll();
+			};
+		},
+		[sessions, fontId],
+	);
+	return useSyncExternalStore(
+		subscribe,
+		() => sessions?.find(fontId)?.snapshot() ?? null,
+		() => null,
 	);
 }
 

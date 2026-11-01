@@ -1,5 +1,10 @@
 import { errorMessages } from "@repo/errors";
-import { type EditableFont, missingChars, type Stroke } from "@repo/types";
+import {
+	type EditableFont,
+	GLYPH_LIMITS,
+	missingChars,
+	type Stroke,
+} from "@repo/types";
 import { buildMessage } from "./font-errors.ts";
 import { glyphBuildGate } from "./glyph-build-gate.ts";
 import {
@@ -77,6 +82,13 @@ function createSession(
 		active: () => listeners.size > 0,
 		apply(history: GlyphHistory, key: string | null) {
 			if (!gate.editable() || key === null || history === value.history) return;
+			if (
+				strokesOf(history, key).some(
+					(stroke) => stroke.points.length > GLYPH_LIMITS.pointsPerStroke,
+				)
+			) {
+				return;
+			}
 			emit({ history, errors: withoutError(key), buildError: null });
 			saves.save(key, strokesOf(history, key));
 		},
@@ -132,6 +144,9 @@ export function createGlyphSessions(transport: Transport) {
 		for (const listener of listeners) listener();
 	}
 	return {
+		find(id: string): GlyphSession | null {
+			return sessions.get(id) ?? null;
+		},
 		open(font: InitialFont): GlyphSession {
 			const existing = sessions.get(font.id);
 			if (existing) return existing;

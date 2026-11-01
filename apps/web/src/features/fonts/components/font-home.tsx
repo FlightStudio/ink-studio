@@ -35,10 +35,12 @@ import {
 	fillsInPhrase,
 	fontAnnouncement,
 	fontHeading,
+	lettersDrawn,
 	METHOD_LABELS,
 	NEEDED_COUNT,
 	sealLine,
 } from "../font-status.ts";
+import { drawnGlyphs } from "../glyph-history.ts";
 import { useGlyphSession } from "../glyph-session-provider.tsx";
 import { FontPreview } from "./font-preview.tsx";
 import { FontUploadDialog } from "./font-upload-dialog.tsx";
@@ -55,10 +57,9 @@ export const SLOW_NOTE = "Taking longer than usual.";
 export type FontHomeProps = {
 	font: EditableFont;
 	from: string | null;
-	drawn: number;
 };
 
-export function FontHome({ font, from, drawn }: FontHomeProps) {
+export function FontHome({ font, from }: FontHomeProps) {
 	const follow = useRef(false);
 	return (
 		<>
@@ -69,7 +70,6 @@ export function FontHome({ font, from, drawn }: FontHomeProps) {
 				key={`${font.status}:${font.pendingAssetId}:${font.assetId}`}
 				font={font}
 				from={from}
-				drawn={drawn}
 				follow={follow}
 			/>
 		</>
@@ -79,12 +79,16 @@ export function FontHome({ font, from, drawn }: FontHomeProps) {
 function FontView({
 	font,
 	from,
-	drawn,
 	follow,
 }: FontHomeProps & { follow: RefObject<boolean> }) {
 	const router = useRouter();
 	const { session, snapshot } = useGlyphSession(font);
+	const drawn = lettersDrawn(
+		drawnGlyphs(snapshot.history),
+		font.missingRequired,
+	);
 	const mounted = useRef(false);
+	const wasPending = useRef(snapshot.pending);
 	const wasBuilding = useRef(snapshot.building);
 	const heading = useRef<HTMLHeadingElement>(null);
 	const [requesting, setStarting] = useState(false);
@@ -109,6 +113,10 @@ function FontView({
 			mounted.current = false;
 		};
 	}, []);
+	useEffect(() => {
+		if (wasPending.current && !snapshot.pending) router.refresh();
+		wasPending.current = snapshot.pending;
+	}, [snapshot.pending, router]);
 	useEffect(() => {
 		const completed = wasBuilding.current && !snapshot.building;
 		wasBuilding.current = snapshot.building;
