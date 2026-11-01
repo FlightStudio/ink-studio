@@ -2,7 +2,7 @@
 
 ## Structure
 
-`apps` are processes. `packages` are libraries named `@repo/*`. `tools` holds repo checks and dev scripts. `guide.html` is the step-by-step guide for a person setting the project up on their own machine.
+`apps` are processes. `packages` are libraries named `@repo/*`. `tools` holds repo checks and dev scripts. 
 
 ## Tech stack
 
@@ -14,9 +14,9 @@ pnpm and Turborepo. TypeScript 7. Biome. Vitest per package. Postgres 17 on port
 - `pnpm lint`
 - `pnpm typecheck`
 - `pnpm test`
-- `pnpm dev` once the web app exists
-- `docker compose up -d` once `docker-compose.yml` exists
-- `pnpm db:migrate` and `pnpm seed` once those scripts exist
+- `pnpm dev` 
+- `docker compose up -d` 
+- `pnpm db:migrate` and `pnpm seed`
 
 ## How to work
 
@@ -25,4 +25,4 @@ pnpm and Turborepo. TypeScript 7. Biome. Vitest per package. Postgres 17 on port
 - `ARCHITECTURE.md` changes with every change. It names files and constants, never their values.
 - Stored geometry is inches with an `In` suffix.
 - `sharp`, `opentype.js`, and `playwright-core` are imported only in worker integrations and tests.
-- One step of `PLAN.md` at a time. Leave the repo green.
+- Leave the repo green.

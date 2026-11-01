@@ -453,7 +453,7 @@ Repo checks live in `tools/check.ts`.
 
 ## Moving into project-post
 
-Shared packages are shaped so the move is a folder merge. The plan is `PLAN.md`.
+Shared packages are shaped so the move is a folder merge. 
 
 `packages/services/src/queue` and the Pub/Sub classes in `packages/integrations/src/shared/gcp/pubsub` are v2's copies of project-post's and are dropped on the move. The render pool's filter moves from `tools/docker/pubsub-entrypoint.sh` into project-post's entrypoint and its Terraform subscriptions.
 

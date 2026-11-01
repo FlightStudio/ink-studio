@@ -61,7 +61,7 @@
 			}
 		},
 		{
-			"includes": ["packages/ui/src/components/ui/**"],
+			"includes": ["**", "!pnpm-lock.yaml", "!packages/api/src/gen"],
 			"linter": {
 				"rules": {
 					"suspicious": {
