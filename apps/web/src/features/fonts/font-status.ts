@@ -6,6 +6,7 @@ import type {
 } from "@repo/types";
 import {
 	HANDWRITING_GLYPHS,
+	listOf,
 	missingChars,
 	OWNER_NAME_MAX_CHARACTERS,
 } from "@repo/types";
@@ -71,13 +72,6 @@ export function statusLabel(status: FontStatus, drawn: number): string {
 
 export function pillStatus(status: FontStatus): StatusPillProps["status"] {
 	return PILL_STATUS[status];
-}
-
-export function listOf(items: readonly string[]): string {
-	const last = items.at(-1) ?? "";
-	return items.length < 2
-		? last
-		: `${items.slice(0, -1).join(", ")} and ${last}`;
 }
 
 export function blankSentence(missing: readonly string[]): string {
