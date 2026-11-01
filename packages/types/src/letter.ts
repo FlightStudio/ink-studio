@@ -92,7 +92,7 @@ export function ownFontIds(content: LetterContent): string[] {
 
 export type SealFont = { ownerName: string; chars: ReadonlySet<string> };
 
-function listOf(items: readonly string[]): string {
+export function listOf(items: readonly string[]): string {
 	const last = items.at(-1) ?? "";
 	return items.length < 2
 		? last

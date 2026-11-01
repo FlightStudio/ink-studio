@@ -1,5 +1,9 @@
 import type { DrawnGlyph, Stroke } from "@repo/types";
-import { HANDWRITING_GLYPHS, OWNER_NAME_MAX_CHARACTERS } from "@repo/types";
+import {
+	HANDWRITING_GLYPHS,
+	listOf,
+	OWNER_NAME_MAX_CHARACTERS,
+} from "@repo/types";
 import { describe, expect, test } from "vitest";
 import {
 	blankSentence,
@@ -10,7 +14,6 @@ import {
 	fillsInPhrase,
 	fontAnnouncement,
 	fontHeading,
-	listOf,
 	NEEDED_COUNT,
 	pillStatus,
 	sealLine,

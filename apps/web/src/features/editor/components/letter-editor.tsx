@@ -51,6 +51,7 @@ import {
 	useState,
 } from "react";
 import { StudioHeaderActions } from "@/components/studio/studio-header";
+import { useCoarsePointer } from "@/features/fonts/use-coarse-pointer";
 import { LibrarySheet } from "@/features/library/components/library-sheet";
 import { useAutosave, useLetterRecovery } from "@/lib/use-autosave";
 import {
@@ -66,7 +67,7 @@ import { writeLetterIn } from "../letter-font.ts";
 import { mergeFieldSuggestion } from "../merge-field-suggestion.ts";
 import { placementFor, signaturePlacement } from "../transform.ts";
 import { AddSide } from "./add-side.tsx";
-import { EditorToolbar, useCoarsePointer } from "./editor-toolbar.tsx";
+import { EditorToolbar } from "./editor-toolbar.tsx";
 import { ElementHandles, placementSentence } from "./element-handles.tsx";
 import { ExportButton } from "./export-button.tsx";
 import { FontOffer } from "./font-offer.tsx";
