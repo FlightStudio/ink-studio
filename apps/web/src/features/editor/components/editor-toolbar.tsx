@@ -61,12 +61,10 @@ import {
 	type RefObject,
 	useId,
 	useLayoutEffect,
-	useSyncExternalStore,
 } from "react";
 import { fontMenu, hrefOfMenuValue } from "../font-menu.ts";
 import { startMergeField } from "../merge-field-suggestion.ts";
 
-const COARSE_POINTER = "(pointer: coarse)";
 const KEYBOARD_GAP_PX = 12;
 const KEYBOARD_PLACEMENT: CSSProperties = {
 	position: "fixed",
@@ -188,20 +186,6 @@ function alignParagraphs(editor: Editor, align: Align): void {
 function runHistory(editor: Editor, command: typeof undo): void {
 	command(editor.state, editor.view.dispatch);
 	editor.commands.focus();
-}
-
-function subscribeCoarsePointer(onChange: () => void): () => void {
-	const query = window.matchMedia(COARSE_POINTER);
-	query.addEventListener("change", onChange);
-	return () => query.removeEventListener("change", onChange);
-}
-
-export function useCoarsePointer(): boolean {
-	return useSyncExternalStore(
-		subscribeCoarsePointer,
-		() => window.matchMedia(COARSE_POINTER).matches,
-		() => false,
-	);
 }
 
 function useFollowKeyboard(

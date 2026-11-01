@@ -1,12 +1,6 @@
-import { apiErrorCodes } from "@repo/errors";
 import { z } from "zod";
 import {
-	AssetProcessingStatus,
-	type AssetStatus,
 	type CreateDrawingRequest,
-	type CreatedDrawing,
-	type CreatedFont,
-	type CreatedLetter,
 	type CreateFontRequest,
 	type CreateLetterRequest,
 	DrawingKind,
@@ -19,31 +13,15 @@ import {
 	PageFormatId,
 	type RenameDrawingRequest,
 	type RequestExportRequest,
-	type RequestedBuild,
-	type RequestedExport,
-	type RequestedLift,
 	type RequestLiftRequest,
-	type SavedLetter,
 	type SaveGlyphRequest,
 	type SaveLetterRequest,
 	StrokeInput,
 	TemplatePhotoFontSourceKind,
 	TemplatePhotoFontSourceTemplateVersion,
-	type UploadedAsset,
 	UploadFontSourceKind,
 	UploadPurpose,
 } from "./gen/api.ts";
-
-export const apiErrorCodeSchema = z.enum(apiErrorCodes);
-
-export const apiErrorSchema = z.object({
-	code: apiErrorCodeSchema,
-	message: z.string(),
-});
-
-export const healthSchema = z.object({
-	ok: z.boolean(),
-});
 
 export const pageFormatIdSchema = z.enum(PageFormatId);
 
@@ -59,21 +37,11 @@ export const createLetterRequestSchema: z.ZodType<CreateLetterRequest> =
 		fontId: z.uuid().optional(),
 	});
 
-export const createdLetterSchema: z.ZodType<CreatedLetter> = z.strictObject({
-	id: z.uuid(),
-});
-
 export const requestExportRequestSchema: z.ZodType<RequestExportRequest> =
 	z.strictObject({
 		revision: z.number().int().min(1),
 		fonts: z.record(z.uuid(), z.uuid()),
 	});
-
-export const requestedExportSchema: z.ZodType<RequestedExport> = z.strictObject(
-	{
-		assetIds: z.array(z.uuid()),
-	},
-);
 
 export const saveLetterRequestSchema: z.ZodType<SaveLetterRequest> =
 	z.strictObject({
@@ -81,10 +49,6 @@ export const saveLetterRequestSchema: z.ZodType<SaveLetterRequest> =
 		content: letterContentEnvelopeSchema,
 		expectedRevision: z.number().int().min(1),
 	});
-
-export const savedLetterSchema: z.ZodType<SavedLetter> = z.strictObject({
-	revision: z.number().int(),
-});
 
 const letterResourcesSchema: z.ZodType<LetterResources> = z.strictObject({
 	assetBaseUrl: z.string(),
@@ -136,11 +100,6 @@ export const createFontRequestSchema: z.ZodType<CreateFontRequest> =
 			.optional(),
 	});
 
-export const createdFontSchema: z.ZodType<CreatedFont> = z.strictObject({
-	id: z.uuid(),
-	assetId: z.uuid().optional(),
-});
-
 const glyphPointSchema = z.tuple([
 	z.number(),
 	z.number(),
@@ -161,17 +120,6 @@ export const saveGlyphRequestSchema: z.ZodType<SaveGlyphRequest> =
 	});
 
 export const uploadPurposeSchema = z.enum(UploadPurpose);
-
-export const uploadedAssetSchema: z.ZodType<UploadedAsset> = z.strictObject({
-	id: z.uuid(),
-});
-
-export const assetProcessingStatusSchema = z.enum(AssetProcessingStatus);
-
-export const assetStatusSchema: z.ZodType<AssetStatus> = z.strictObject({
-	status: assetProcessingStatusSchema,
-	error: apiErrorCodeSchema.nullable(),
-});
 
 const strokeSchema = z.strictObject({
 	input: z.enum(StrokeInput),
@@ -203,18 +151,6 @@ export const requestLiftRequestSchema: z.ZodType<RequestLiftRequest> =
 	z.strictObject({
 		photoAssetId: z.uuid(),
 	});
-
-export const requestedLiftSchema: z.ZodType<RequestedLift> = z.strictObject({
-	assetId: z.uuid(),
-});
-
-export const requestedBuildSchema: z.ZodType<RequestedBuild> = z.strictObject({
-	assetId: z.uuid(),
-});
-
-export const createdDrawingSchema: z.ZodType<CreatedDrawing> = z.strictObject({
-	id: z.uuid(),
-});
 
 export const renameDrawingRequestSchema: z.ZodType<RenameDrawingRequest> =
 	z.strictObject({

@@ -1,8 +1,7 @@
 "use client";
 
+import { TITLE_MAX_CHARACTERS } from "@repo/types";
 import { useState } from "react";
-
-const TITLE_MAX_CHARACTERS = 120;
 
 export type LetterTitleProps = {
 	title: string;

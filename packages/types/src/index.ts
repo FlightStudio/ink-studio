@@ -59,7 +59,7 @@ export type {
 	SealFont,
 	TextNode,
 } from "./letter.ts";
-export { humanSeal, ownFontIds, SIGNATURE_WIDTHS } from "./letter.ts";
+export { humanSeal, listOf, ownFontIds, SIGNATURE_WIDTHS } from "./letter.ts";
 export { normaliseLetterTitle, TITLE_MAX_CHARACTERS } from "./letter-title.ts";
 export type { MergeFieldKey, MergeValues } from "./merge-field.ts";
 export {
@@ -73,8 +73,6 @@ export type {
 	OrganizationRole,
 	OrganizationUser,
 } from "./organization-user.ts";
-export type { OtherString } from "./other-string.ts";
-export { asOtherString } from "./other-string.ts";
 export type {
 	Corner,
 	KeepClearZone,
