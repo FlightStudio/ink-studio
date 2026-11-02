@@ -1,0 +1,23 @@
+{
+	"extends": "@repo/typescript-config/base.json",
+	"compilerOptions": {
+		"lib": ["es2023", "dom", "dom.iterable"],
+		"jsx": "preserve",
+		"plugins": [{ "name": "next" }],
+		"paths": {
+			"@/*": ["./src/*"]
+		},
+		"allowJs": true,
+		"noEmit": true,
+		"incremental": true
+	},
+	"include": [
+		"src/**/*.ts",
+		"src/**/*.tsx",
+		"e2e/**/*.ts",
+		"vitest.config.ts",
+		"vitest.e2e.config.ts",
+		".next/types/**/*.ts"
+	],
+	"exclude": ["node_modules"]
+}

@@ -1,0 +1,48 @@
+{
+	"version": "7",
+	"dialect": "postgresql",
+	"entries": [
+		{
+			"idx": 0,
+			"version": "7",
+			"when": 1793119939358,
+			"tag": "0000_last_scrambler",
+			"breakpoints": true
+		},
+		{
+			"idx": 1,
+			"version": "7",
+			"when": 1793136526523,
+			"tag": "0001_smiling_wildside",
+			"breakpoints": true
+		},
+		{
+			"idx": 2,
+			"version": "7",
+			"when": 1793138184047,
+			"tag": "0002_complex_lilandra",
+			"breakpoints": true
+		},
+		{
+			"idx": 3,
+			"version": "7",
+			"when": 1793146339619,
+			"tag": "0003_handwriting_fonts",
+			"breakpoints": true
+		},
+		{
+			"idx": 4,
+			"version": "7",
+			"when": 1793148271934,
+			"tag": "0004_big_namor",
+			"breakpoints": true
+		},
+		{
+			"idx": 5,
+			"version": "7",
+			"when": 1793276263543,
+			"tag": "0005_placed_signatures",
+			"breakpoints": true
+		}
+	]
+}

@@ -1,0 +1,971 @@
+openapi: 3.0.3
+info:
+  title: Ink Studio
+  version: 0.0.0
+paths:
+  /api/health:
+    get:
+      operationId: getHealth
+      responses:
+        "200":
+          description: The service is up.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /api/letters:
+    get:
+      operationId: listLetters
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          description: The nextCursor of the page before.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: One page of the organization's letters, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LetterListPage"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      operationId: createLetter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLetterRequest"
+      responses:
+        "201":
+          description: The letter was created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedLetter"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /api/letters/{letterId}:
+    parameters:
+      - name: letterId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getLetter
+      responses:
+        "200":
+          description: The letter's latest saved state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LetterState"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    put:
+      operationId: saveLetter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveLetterRequest"
+      responses:
+        "200":
+          description: The letter was saved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavedLetter"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      operationId: deleteLetter
+      responses:
+        "204":
+          description: The letter was deleted.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /api/letters/{letterId}/exports:
+    parameters:
+      - name: letterId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: requestExport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestExportRequest"
+      responses:
+        "201":
+          description: The proof was requested.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestedExport"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /api/fonts:
+    post:
+      operationId: createFont
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFontRequest"
+      responses:
+        "201":
+          description: The font was created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedFont"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /api/fonts/{fontId}:
+    parameters:
+      - name: fontId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      operationId: deleteFont
+      responses:
+        "204":
+          description: The font was deleted.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /api/fonts/{fontId}/glyphs:
+    parameters:
+      - name: fontId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: saveGlyph
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveGlyphRequest"
+      responses:
+        "204":
+          description: The cell was saved.
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /api/fonts/{fontId}/builds:
+    parameters:
+      - name: fontId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: requestFontBuild
+      responses:
+        "201":
+          description: The build was requested.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestedBuild"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /api/uploads:
+    post:
+      operationId: uploadFile
+      parameters:
+        - name: purpose
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/UploadPurpose"
+        - name: x-file-name
+          in: header
+          required: true
+          description: The file's name, URI-encoded.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "201":
+          description: The file was stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadedAsset"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /api/assets/{assetId}:
+    parameters:
+      - name: assetId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getAsset
+      responses:
+        "302":
+          description: A redirect to a fresh short signed URL for the file.
+          headers:
+            Location:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /api/assets/{assetId}/status:
+    parameters:
+      - name: assetId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getAssetStatus
+      responses:
+        "200":
+          description: The asset's processing status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetStatus"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /api/drawings:
+    post:
+      operationId: createDrawing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDrawingRequest"
+      responses:
+        "201":
+          description: The drawing was saved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedDrawing"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /api/drawings/lifts:
+    post:
+      operationId: requestLift
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestLiftRequest"
+      responses:
+        "201":
+          description: The lift was requested.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestedLift"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /api/drawings/{drawingId}:
+    parameters:
+      - name: drawingId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      operationId: renameDrawing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RenameDrawingRequest"
+      responses:
+        "204":
+          description: The drawing was renamed.
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      operationId: deleteDrawing
+      responses:
+        "204":
+          description: The drawing was deleted.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+components:
+  schemas:
+    PageFormatId:
+      type: string
+      enum:
+        - thanksio:letter-windowless
+        - thanksio:postcard-6x9
+    LetterContentEnvelope:
+      type: object
+      additionalProperties: true
+      required: [schemaVersion, format]
+      properties:
+        schemaVersion:
+          type: integer
+        format:
+          type: string
+    CreateLetterRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        format:
+          $ref: "#/components/schemas/PageFormatId"
+        fontId:
+          type: string
+          format: uuid
+          description: An own font to use as the new letter's default ink.
+    CreatedLetter:
+      type: object
+      additionalProperties: false
+      required: [id]
+      properties:
+        id:
+          type: string
+          format: uuid
+    RequestExportRequest:
+      type: object
+      additionalProperties: false
+      required: [revision, fonts]
+      properties:
+        revision:
+          type: integer
+          minimum: 1
+        fonts:
+          type: object
+          additionalProperties:
+            type: string
+            format: uuid
+    RequestedExport:
+      type: object
+      additionalProperties: false
+      required: [assetIds]
+      properties:
+        assetIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+    SaveLetterRequest:
+      type: object
+      additionalProperties: false
+      required: [title, content, expectedRevision]
+      properties:
+        title:
+          type: string
+        content:
+          $ref: "#/components/schemas/LetterContentEnvelope"
+        expectedRevision:
+          type: integer
+          minimum: 1
+    SavedLetter:
+      type: object
+      additionalProperties: false
+      required: [revision]
+      properties:
+        revision:
+          type: integer
+    LetterState:
+      type: object
+      additionalProperties: false
+      required: [title, revision, content, resources]
+      properties:
+        title:
+          type: string
+        revision:
+          type: integer
+        content:
+          $ref: "#/components/schemas/LetterContentEnvelope"
+        resources:
+          $ref: "#/components/schemas/LetterResources"
+    LetterResources:
+      type: object
+      additionalProperties: false
+      required:
+        [assetBaseUrl, stockFontBaseUrl, fonts, drawings, frontImageAssetId]
+      properties:
+        assetBaseUrl:
+          type: string
+        stockFontBaseUrl:
+          type: string
+        fonts:
+          type: object
+          additionalProperties:
+            type: string
+            format: uuid
+        drawings:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties: false
+            required: [maskAssetId, aspect]
+            properties:
+              maskAssetId:
+                type: string
+                format: uuid
+              aspect:
+                type: number
+        frontImageAssetId:
+          type: string
+          format: uuid
+          nullable: true
+    LetterPreview:
+      type: object
+      additionalProperties: false
+      required: [side, content, resources]
+      properties:
+        side:
+          type: integer
+          minimum: 0
+        content:
+          $ref: "#/components/schemas/LetterContentEnvelope"
+        resources:
+          $ref: "#/components/schemas/LetterResources"
+    LetterListItem:
+      type: object
+      additionalProperties: false
+      required: [id, title, updatedAt, productLabel, preview]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        productLabel:
+          type: string
+        preview:
+          $ref: "#/components/schemas/LetterPreview"
+    LetterListPage:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LetterListItem"
+        nextCursor:
+          type: string
+          nullable: true
+    DrawnFontSource:
+      type: object
+      additionalProperties: false
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          enum:
+            - drawn
+    TemplatePhotoFontSource:
+      type: object
+      additionalProperties: false
+      required: [kind, templateVersion, photoAssetId]
+      properties:
+        kind:
+          type: string
+          enum:
+            - template-photo
+        templateVersion:
+          type: integer
+          enum:
+            - 1
+        photoAssetId:
+          type: string
+          format: uuid
+    UploadFontSource:
+      type: object
+      additionalProperties: false
+      required: [kind, fileAssetId]
+      properties:
+        kind:
+          type: string
+          enum:
+            - upload
+        fileAssetId:
+          type: string
+          format: uuid
+    CreateFontRequest:
+      type: object
+      additionalProperties: false
+      required: [ownerName]
+      properties:
+        ownerName:
+          type: string
+        source:
+          oneOf:
+            - $ref: "#/components/schemas/DrawnFontSource"
+            - $ref: "#/components/schemas/TemplatePhotoFontSource"
+            - $ref: "#/components/schemas/UploadFontSource"
+    CreatedFont:
+      type: object
+      additionalProperties: false
+      required: [id]
+      properties:
+        id:
+          type: string
+          format: uuid
+        assetId:
+          type: string
+          format: uuid
+    GlyphStroke:
+      type: object
+      additionalProperties: false
+      required: [input, points]
+      properties:
+        input:
+          type: string
+          enum:
+            - pen
+            - mouse
+            - touch
+        points:
+          type: array
+          items:
+            type: array
+            minItems: 4
+            maxItems: 4
+            items:
+              type: number
+    SaveGlyphRequest:
+      type: object
+      additionalProperties: false
+      required: [char, variant, strokes]
+      properties:
+        char:
+          type: string
+        variant:
+          type: integer
+          minimum: 0
+        strokes:
+          type: array
+          items:
+            $ref: "#/components/schemas/GlyphStroke"
+    UploadPurpose:
+      type: string
+      enum:
+        - photo
+        - mask
+        - font-file
+        - cover
+    UploadedAsset:
+      type: object
+      additionalProperties: false
+      required: [id]
+      properties:
+        id:
+          type: string
+          format: uuid
+    AssetProcessingStatus:
+      type: string
+      enum:
+        - pending
+        - running
+        - done
+        - failed
+    AssetStatus:
+      type: object
+      additionalProperties: false
+      required: [status, error]
+      properties:
+        status:
+          $ref: "#/components/schemas/AssetProcessingStatus"
+        error:
+          allOf:
+            - $ref: "#/components/schemas/ApiErrorCode"
+          nullable: true
+    DrawingKind:
+      type: string
+      enum:
+        - doodle
+        - signature
+    StrokeInput:
+      type: string
+      enum:
+        - pen
+        - mouse
+        - touch
+    Stroke:
+      type: object
+      additionalProperties: false
+      required: [input, points]
+      properties:
+        input:
+          $ref: "#/components/schemas/StrokeInput"
+        points:
+          type: array
+          items:
+            type: array
+            minItems: 4
+            maxItems: 4
+            items:
+              type: number
+    DrawnSource:
+      type: object
+      additionalProperties: false
+      required: [kind, box, strokes]
+      properties:
+        kind:
+          type: string
+          enum: [drawn]
+        box:
+          type: object
+          additionalProperties: false
+          required: [widthPx, heightPx]
+          properties:
+            widthPx:
+              type: number
+            heightPx:
+              type: number
+        strokes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Stroke"
+    PhotoSource:
+      type: object
+      additionalProperties: false
+      required: [kind, photoAssetId]
+      properties:
+        kind:
+          type: string
+          enum: [photo]
+        photoAssetId:
+          type: string
+          format: uuid
+    CreateDrawingRequest:
+      type: object
+      additionalProperties: false
+      required: [kind, name, maskAssetId, source]
+      properties:
+        kind:
+          $ref: "#/components/schemas/DrawingKind"
+        name:
+          type: string
+        maskAssetId:
+          type: string
+          format: uuid
+        source:
+          oneOf:
+            - $ref: "#/components/schemas/DrawnSource"
+            - $ref: "#/components/schemas/PhotoSource"
+    RequestLiftRequest:
+      type: object
+      additionalProperties: false
+      required: [photoAssetId]
+      properties:
+        photoAssetId:
+          type: string
+          format: uuid
+    RequestedLift:
+      type: object
+      additionalProperties: false
+      required: [assetId]
+      properties:
+        assetId:
+          type: string
+          format: uuid
+    RequestedBuild:
+      type: object
+      additionalProperties: false
+      required: [assetId]
+      properties:
+        assetId:
+          type: string
+          format: uuid
+    CreatedDrawing:
+      type: object
+      additionalProperties: false
+      required: [id]
+      properties:
+        id:
+          type: string
+          format: uuid
+    RenameDrawingRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+    Health:
+      type: object
+      additionalProperties: false
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+    ApiErrorCode:
+      type: string
+      enum:
+        - invalid_request
+        - unauthenticated
+        - forbidden
+        - not_found
+        - invalid_origin
+        - unsupported_media_type
+        - internal_error
+        - no_organization
+        - invalid_letter
+        - invalid_title
+        - invalid_owner_name
+        - owner_name_too_long
+        - invalid_glyphs
+        - font_incomplete
+        - font_not_ready
+        - proof_fonts_unavailable
+        - not_owner
+        - stale_revision
+        - file_too_large
+        - unsupported_file
+        - heic_not_supported
+        - processing_failed
+        - photo_unreadable
+        - photo_too_large
+        - no_ink_found
+        - invalid_mask
+        - invalid_drawing
+        - invalid_photo
+        - template_markers_not_found
+        - font_unreadable
+        - font_timeout
+        - font_missing_glyphs
+        - letter_overflow
+        - letter_placement
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          $ref: "#/components/schemas/ApiErrorCode"
+        message:
+          type: string
+  responses:
+    InvalidRequest:
+      description: The request is not valid.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Unauthenticated:
+      description: Sign in is required.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Forbidden:
+      description: You cannot do that.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    NotFound:
+      description: That was not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    InvalidOrigin:
+      description: The origin is not allowed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    UnsupportedMediaType:
+      description: That file type is not supported.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Conflict:
+      description: This letter changed in another tab.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    InternalError:
+      description: Something went wrong.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    NoOrganization:
+      description: You are not in an organization.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
